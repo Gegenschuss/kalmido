@@ -42,7 +42,10 @@ session's zone, not the canonical form): use `to_char(x AT TIME ZONE 'UTC', 'YYY
 Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and say where its rows go in the exports:
 `obj_register(..., export={...})` (stage Q11, below "Export register"), not a hand entry in the export lists (`tools/check_export_tables.py`
 says what is missing). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`
-on the object's reference node in the file store.
+on the object's reference node in the file store. Since 2.1101.0 (#5954) those three tables have real types too: the times
+`TIMESTAMPTZ`, `vals_before` / `vals_after` / `snap` / `row_json` `JSONB` (`kalmido/core/objretype.py` moves an older database
+at its start, one way). The driver still hands the JSON back as text (`json.loads` as before); SQL that searches it as text
+casts first (`CAST(snap AS TEXT) ~ ?`), and a `VALUES` list written into it types its JSON as `jsonb`, not `text`.
 
 ## 2. Register the kind
 

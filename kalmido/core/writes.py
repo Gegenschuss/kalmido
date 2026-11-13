@@ -40,7 +40,7 @@ import hashlib
 import json
 from contextlib import contextmanager  # 2.809.0 (#5365): obj_purge_after
 from contextvars import ContextVar
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import g, has_request_context, request
 
@@ -153,6 +153,16 @@ def obj_touch(c, uid, kind, rid):
 
 
 # ---------------------------------------------------------------- history
+def _hist_recent(at, lim):
+    """2.1101.0 (#5954): whether a history entry's updated_at (TIMESTAMPTZ, read as canonical ISO text: core/pg.py ts_canon - six
+    digits of microseconds or none, where the TEXT column held milliseconds) is not older than lim (an aware datetime). Compared
+    as points in time, not as text: "...:00+00:00" < "...:00.000+00:00" as text. A value no parser reads is old (no merge)."""
+    try:
+        return datetime.fromisoformat(ts_canon(at)) >= lim
+    except (TypeError, ValueError):
+        return False
+
+
 def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=None, agent=None):
     """Note a change of the object in obj_history (before / after: {field: value} of what changed). An 'update' of the same
     person (and the same agent flag) within OBJ_MERGE_MIN minutes merges into the last entry: its before stays, after grows."""
@@ -168,8 +178,8 @@ def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=No
     ts = _now()
     if action == "update":
         last = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT 1", (kind, int(rid))).fetchone()
-        lim = iso_ms(now_utc() - timedelta(minutes=OBJ_MERGE_MIN))
-        if last is not None and last["action"] == "update" and last["user_id"] == uid and last["agent"] == ag and str(last["updated_at"]) >= lim:
+        lim = now_utc() - timedelta(minutes=OBJ_MERGE_MIN)
+        if last is not None and last["action"] == "update" and last["user_id"] == uid and last["agent"] == ag and _hist_recent(last["updated_at"], lim):
             b0, a0 = json.loads(last["vals_before"] or "{}"), json.loads(last["vals_after"] or "{}")
             for k, v in before.items():
                 b0.setdefault(k, v)
@@ -200,7 +210,7 @@ def obj_history_add_many(c, uid, kind, items, agent=None):
     _reg(kind)
     ag = 1 if (obj_is_agent(c, uid) if agent is None else agent) else 0
     ts = _now()
-    lim = iso_ms(now_utc() - timedelta(minutes=OBJ_MERGE_MIN))
+    lim = now_utc() - timedelta(minutes=OBJ_MERGE_MIN)
     for i in range(0, len(items), 500):
         part = items[i:i + 500]
         ids = [int(x[0]) for x in part]
@@ -210,7 +220,7 @@ def obj_history_add_many(c, uid, kind, items, agent=None):
         upd, ins = [], []
         for rid, before, after, oid in part:
             x = last.get(int(rid))
-            if x is not None and x["action"] == "update" and x["user_id"] == uid and x["agent"] == ag and str(x["updated_at"]) >= lim:
+            if x is not None and x["action"] == "update" and x["user_id"] == uid and x["agent"] == ag and _hist_recent(x["updated_at"], lim):
                 b0, a0 = json.loads(x["vals_before"] or "{}"), json.loads(x["vals_after"] or "{}")
                 for k, v in before.items():
                     b0.setdefault(k, v)
@@ -223,7 +233,7 @@ def obj_history_add_many(c, uid, kind, items, agent=None):
                 ins += [kind, int(rid), oid, uid, ag, "update", json.dumps(before, default=str), json.dumps(after, default=str), ts, ts]
         if upd:
             c.execute("UPDATE obj_history SET vals_before=v.b, vals_after=v.a, updated_at=? FROM (VALUES "
-                      + ",".join(["(CAST(? AS bigint), CAST(? AS text), CAST(? AS text))"] * (len(upd) // 3))
+                      + ",".join(["(CAST(? AS bigint), CAST(? AS jsonb), CAST(? AS jsonb))"] * (len(upd) // 3))  # 2.1101.0 (#5954): JSONB
                       + ") AS v(id, b, a) WHERE obj_history.id=v.id", [ts, *upd])
         if ins:
             c.execute("INSERT INTO obj_history(kind,ref_id,org_id,user_id,agent,action,vals_before,vals_after,created_at,updated_at) "

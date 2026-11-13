@@ -292,7 +292,7 @@ check(r.ok, "2 expired: the folder share ends in the past (the file store's own 
 # 2.644.0 (#5030): the watchdog (1 s here) may already have moved the project's own member share that ran out into obj_revoked
 # (lf_own_stale, reason 'expired') before this count - on a slow CI runner it did (5 -> 4): such a row counts as ended too
 ended = sql("SELECT count(*) FROM fs_shares WHERE user_id=? AND expires_at=?", (BOB, PAST))[0][0] + \
-    sql("SELECT count(*) FROM obj_revoked WHERE src='fs_shares' AND user_id=? AND reason='expired' AND row_json LIKE ?", (BOB, "%" + PAST[:10] + "%"))[0][0]
+    sql("SELECT count(*) FROM obj_revoked WHERE src='fs_shares' AND user_id=? AND reason='expired' AND CAST(row_json AS TEXT) LIKE ?", (BOB, "%" + PAST[:10] + "%"))[0][0]
 check(ended >= 5 and not sql("SELECT 1 FROM fs_shares WHERE user_id=? AND (expires_at IS NULL OR expires_at > ?)", (BOB, PAST)),
       f"2 expired: every core share of bob has its end date in the past (or ran out already) {ended}")
 after(X2, "2 expired", ("wiki", "cal", "book", "files"))  # at once

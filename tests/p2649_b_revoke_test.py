@@ -98,7 +98,7 @@ check(A.delete(B + f"/api/orgs/{K}/members/{BOB}").ok, "1: bob leaves the organi
 check(dbx("SELECT revoked_at IS NOT NULL FROM fs_ext_links WHERE id=?", (XL,)) == [(True,)], "1 left: the link is revoked (revoked_at)")
 check(dbx("SELECT revoked_at IS NOT NULL FROM fs_upload_requests WHERE id=?", (RQ,)) == [(True,)], "1 left: the file request is revoked")
 check(revoked("fs_ext_links", XL) == [("leave",)] and revoked("fs_upload_requests", RQ) == [("leave",)], "1 left: both in obj_revoked (leave)")
-check(not dbx("SELECT 1 FROM obj_revoked WHERE src='fs_ext_links' AND row_json LIKE '%token%'"), "1 left: no token in the register")
+check(not dbx("SELECT 1 FROM obj_revoked WHERE src='fs_ext_links' AND CAST(row_json AS TEXT) LIKE '%token%'"), "1 left: no token in the register")
 # Fable 1: an owner of the folder (alice) cannot bring them back while bob may no longer share / write there (409, the
 # register row stays) -- else they would open again by themselves the day bob comes back as an admin
 r = A.post(B + f"/api/files/ext-links/{XL}/restore")

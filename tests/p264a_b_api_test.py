@@ -183,13 +183,13 @@ check(bool(GP) and A.post(B + f"/api/undo/to/{GP}").ok and A.delete(B + f"/api/n
 # lock ("notepad") its texts before -- both in the copy; the sweep below finds any of them left in obj_undo
 dbx("UPDATE lists SET description=?, status_note=? WHERE id=?", (MK + "Desc", MK + "StatusNote", L), write=True)
 r = A.patch(B + f"/api/lists/{L}", json={"color": "#336699"})
-check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='listset' AND ref_id=? AND snap LIKE ?", (L, f"%{MK}Desc%")),
+check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='listset' AND ref_id=? AND CAST(snap AS TEXT) LIKE ?", (L, f"%{MK}Desc%")),
       f"#5551: a settings change: an undo step whose copy holds the description {r.status_code} {r.text[:200]}")
 r = A.post(B + f"/api/lists/{L}/notepads", json={"title": MK + "PadTitle", "body": MK + "PadBody"})
 check(r.ok, f"(setup) a notepad {r.status_code} {r.text[:200]}")
 PAD = r.json()["id"]
 r = A.patch(B + f"/api/notepads/{PAD}", json={"title": "", "body": ""})
-check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='notepad' AND ref_id=? AND snap LIKE ?", (PAD, f"%{MK}PadBody%")),
+check(r.ok and dbx("SELECT 1 FROM obj_undo WHERE kind='notepad' AND ref_id=? AND CAST(snap AS TEXT) LIKE ?", (PAD, f"%{MK}PadBody%")),
       f"#5551: emptied for the lock: an undo step whose copy holds the texts {r.status_code} {r.text[:200]}")
 SEC = dbx("SELECT id FROM sections WHERE list_id=?", (L,))[0][0]
 # copies the app writes in other places (shopping memory, a mail address, an agent proposal): written here like the app does
@@ -645,14 +645,14 @@ G2 = r.json().get("undo_group") if r.ok else None
 check(bool(G1 and G2), f"(setup) two time steps in the later locked project {G1} {G2}")
 dbx("UPDATE lists SET e2e='on' WHERE id=?", (L4,), write=True)
 dbx("UPDATE time_entries SET note='' WHERE list_id=?", (L4,), write=True)  # as le2b_scrub_free did at the lock
-nh0 = dbx("SELECT COUNT(*) FROM obj_history WHERE vals_after LIKE ? OR vals_before LIKE ?", ("%Back note%", "%Back note%"))[0][0]
+nh0 = dbx("SELECT COUNT(*) FROM obj_history WHERE CAST(vals_after AS TEXT) LIKE ? OR CAST(vals_before AS TEXT) LIKE ?", ("%Back note%", "%Back note%"))[0][0]
 r = A.post(B + f"/api/undo/to/{G1}")
 rows = {x[0]: (x[1], x[2]) for x in dbx("SELECT id, note, seconds FROM time_entries WHERE id IN (?, ?)", (E1, E2))}
 check(r.ok and rows.get(E2, (None,))[0] == "" and rows.get(E1) == ("", 2100) and G1 in [x.get("group") for x in r.json().get("stayed") or []],
       f"#5550: undo into a locked project: the deleted entry back without its note, the note change refused (stays) {r.status_code} {r.text[:300]} {rows}")
-check(dbx("SELECT COUNT(*) FROM obj_history WHERE vals_after LIKE ? OR vals_before LIKE ?", ("%Back note%", "%Back note%"))[0][0] == nh0,
+check(dbx("SELECT COUNT(*) FROM obj_history WHERE CAST(vals_after AS TEXT) LIKE ? OR CAST(vals_before AS TEXT) LIKE ?", ("%Back note%", "%Back note%"))[0][0] == nh0,
       "#5550: the refused step writes no history row with the note")
-check(not dbx("SELECT 1 FROM obj_undo WHERE kind='time_life' AND ref_id=? AND (snap LIKE ? OR COALESCE(redo, '') LIKE ?)",
+check(not dbx("SELECT 1 FROM obj_undo WHERE kind='time_life' AND ref_id=? AND (CAST(snap AS TEXT) LIKE ? OR COALESCE(redo, '') LIKE ?)",
               (E2, "%Gone note%", "%Gone note%")),
       "#5550: the taken back step keeps no note in its copy")
 dbx("UPDATE lists SET e2e=NULL WHERE id=?", (L4,), write=True)

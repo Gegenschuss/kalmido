@@ -126,7 +126,7 @@ r = A.put(B + CS, json={"data": {"loc_name": "Halle 2", "set_phone": "0170 12345
 h = hist(A)
 check(r.ok and r.json()["callsheet"]["sketch"] is True and "sketch" in h[0]["fields"] and h[0]["name"] == "Alice Admin",
       f"the sketch is a change of the history (merged into her entry of ten minutes) {h[:1]}")
-check(not kt.dbx("SELECT 1 FROM obj_history WHERE kind='callsheet' AND ref_id=? AND (vals_before LIKE ? OR vals_after LIKE ?)",
+check(not kt.dbx("SELECT 1 FROM obj_history WHERE kind='callsheet' AND ref_id=? AND (CAST(vals_before AS TEXT) LIKE ? OR CAST(vals_after AS TEXT) LIKE ?)",
                  (CSID, "%" + pic[:40] + "%", "%" + pic[:40] + "%")), "no history row holds the picture")
 
 # ---------------------------------------------------------------- undo across devices (the core's step of the call sheet)
@@ -136,7 +136,7 @@ big = base64.b64encode(png(400, 300, noise=True)).decode()
 r = Bo.put(B + CS, json={"data": {"loc_name": "Halle 2", "set_phone": "0170 1234567", "important": "Bitte leise"},
                          "sketch": "data:image/png;base64," + big})
 check(r.ok and len(big) > 300_000, f"bob replaces the sketch with a large picture {r.status_code} {r.text[:120]}")
-check(not kt.dbx("SELECT 1 FROM obj_undo WHERE kind='callsheet' AND ref_id=? AND snap LIKE ?", (CSID, "%" + big[:40] + "%")),
+check(not kt.dbx("SELECT 1 FROM obj_undo WHERE kind='callsheet' AND ref_id=? AND CAST(snap AS TEXT) LIKE ?", (CSID, "%" + big[:40] + "%")),
       "no undo copy holds the picture")
 r = Bo.put(B + CS, json={"data": {"loc_name": "Halle 3", "set_phone": "0170 1234567", "important": "Bitte leise"}})
 check(r.ok, "bob changes the location on the laptop")

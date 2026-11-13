@@ -32,6 +32,7 @@ from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copie
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 from .moneycol import mc_migrate  # 2.755.0 (#5293): the plain money columns of the office as NUMERIC(14,2)
 from .tplmove import tpl_move  # 2.905.0 (#5288): templates onto the shared core
+from .objretype import obj_retype  # 2.1101.0 (#5954): obj_history / obj_undo / obj_revoked onto real types
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
@@ -1010,6 +1011,8 @@ def init_db(guard=True):
         with pg_system_ctx(c):  # every organisation's templates
             tpl_move(c)  # 2.905.0 (#5288): templates onto the shared core, section_templates into it, before 5288_a drops that table
         clk("tpl_move")
+        obj_retype(c)  # 2.1101.0 (#5954): the core's history / undo / revoked: TIMESTAMPTZ and JSONB (core/objretype.py)
+        clk("obj_retype")
         from .objtags import otg_move, otg_move_user, OTG_ORG_TRIGGERS
         c.executescript(trigger_skip_present(c, OTG_ORG_TRIGGERS))  # 2.947.0 (#5275, review N1): after mig_apply (lists.org_id)
         with pg_system_ctx(c):  # every organisation's labels and projects

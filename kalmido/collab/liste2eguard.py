@@ -437,7 +437,8 @@ def le2b_undo_copies(c, kinds, lids, tids):
     kq = ",".join("?" * len(kinds))
     for ch in [ids[i:i + 500] for i in range(0, len(ids), 500)]:
         rx = rf'"(list|task)_id":\s*({"|".join(str(i) for i in ch)})\s*[,}}]'
-        for r in c.execute(f"SELECT id, snap, redo FROM obj_undo WHERE kind IN ({kq}) AND (snap ~ ? OR COALESCE(redo, '') ~ ?)",
+        # 2.1101.0 (#5954): snap is JSONB - the regex reads its text (JSONB writes "key": value with one space, as json.dumps)
+        for r in c.execute(f"SELECT id, snap, redo FROM obj_undo WHERE kind IN ({kq}) AND (CAST(snap AS TEXT) ~ ? OR COALESCE(redo, '') ~ ?)",
                            (*kinds, rx, rx)).fetchall():
             if r["id"] in seen:
                 continue

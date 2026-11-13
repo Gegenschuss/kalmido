@@ -279,7 +279,7 @@ A.post(B + "/api/settings/reset", json={})
 qf = setting(ALICE, "quiet_from")
 r = A.post(B + "/api/settings/reset", json={"undo": True})
 g = newest(PHONE)
-check(r.ok and setting(ALICE, "quiet_from") == "21:30" and one("SELECT COUNT(*) FROM obj_undo WHERE group_id=? AND snap LIKE ?", (g["id"], '%"quiet_from"%')) == 1,
+check(r.ok and setting(ALICE, "quiet_from") == "21:30" and one("SELECT COUNT(*) FROM obj_undo WHERE group_id=? AND CAST(snap AS TEXT) LIKE ?", (g["id"], '%"quiet_from"%')) == 1,
       f"N4: the app's own \"undo the reset\" is a step with the quiet hours {g}")
 res = back(PHONE, g["id"])
 check(res.get("undone") == [g["id"]] and setting(ALICE, "quiet_from") == qf, f"N4: ... taken back: the reset's values again {res} {setting(ALICE, 'quiet_from')}")

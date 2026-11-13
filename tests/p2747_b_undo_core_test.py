@@ -251,13 +251,13 @@ check(len(gc) == 300 and first not in [x["id"] for x in gc] and gc[-1]["state"] 
       f"300 kept, the oldest ({first}, carl's change of O2) went ({len(gc)}, {gc[0]['id']}, {dict(gc[-1])})")
 
 # ---------------------------------------------------------------- the watchdog: older than 30 days, parts without a group
-old = "to_char(now() - interval '31 days', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
+old = "date_trunc('second', now() - interval '31 days')"  # 2.1101.0 (#5954): obj_undo.created_at is TIMESTAMPTZ
 old_tz = "date_trunc('second', now() - interval '31 days')"  # undo_groups: TIMESTAMPTZ
 GO = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, created_at, updated_at) VALUES(?, 'other', 'Change', 'done', 1, {old_tz}, {old_tz}) "
          "RETURNING id", (BOB,))[0][0]
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id) VALUES(?, '', ?, ?, {old}, ?)", (BOB, K, O1, GO))
 dbx("INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id) VALUES(?, '', ?, ?, "
-    "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00'), 999999999)", (BOB, K, O1))
+    "date_trunc('second', now()), 999999999)", (BOB, K, O1))  # 2.1101.0 (#5954): TIMESTAMPTZ
 gone = until(lambda: not dbx("SELECT 1 FROM undo_groups WHERE id=?", (GO,)) and not dbx("SELECT 1 FROM obj_undo WHERE group_id IN (?, 999999999)", (GO,)), timeout=120)
 check(gone, "the watchdog removed the 31 days old group with its part and the part without a group")
 check(dbx("SELECT 1 FROM undo_groups WHERE id=?", (G1,)), "a young group stays")
@@ -292,7 +292,7 @@ check(Fr.post(B + f"/api/undo/to/{G1}").status_code == 404, "bob's group: 404 fo
 
 # 2.747.0 (#5249, review F2): the copy of a client / document deleted for good does not wait 30 days (their own deletions do
 # not call obj_rows_drop): the watchdog drops parts of obj_track kinds whose row is gone; a living row keeps its parts
-now_ = "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
+now_ = "date_trunc('second', now())"  # 2.1101.0 (#5954): obj_undo.created_at is TIMESTAMPTZ
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, snap, created_at) VALUES(?, ?, 'client', 999999998, '{{\"clients\": [{{\"name\": \"Gone Ltd\"}}]}}', {now_})", (FID, "ef" * 8))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at) VALUES(?, ?, 'client', ?, {now_})", (FID, "ef" * 8, FC))
 GOR = dbx("INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, date_trunc('second', now()), date_trunc('second', now())) "

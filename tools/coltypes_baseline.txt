@@ -382,14 +382,6 @@ oauth_grants.created_at time
 oauth_grants.last_used_at time
 oauth_grants.refresh_expires_at time
 oauth_grants.revoked_at time
-obj_history.created_at time
-obj_history.updated_at time
-obj_history.vals_after json
-obj_history.vals_before json
-obj_revoked.created_at time
-obj_revoked.row_json json
-obj_undo.created_at time
-obj_undo.snap json
 office_agreements.archived bool
 office_agreements.created_at time
 office_agreements.updated_at time

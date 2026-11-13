@@ -42,7 +42,7 @@ def dbw(sql, args=()):
 
 def copies(word):
     """Undo parts whose copy (before / after) still holds word."""
-    return kt.dbx("SELECT id, kind FROM obj_undo WHERE snap LIKE ? OR COALESCE(redo, '') LIKE ?", (f"%{word}%", f"%{word}%"))
+    return kt.dbx("SELECT id, kind FROM obj_undo WHERE CAST(snap AS TEXT) LIKE ? OR COALESCE(redo, '') LIKE ?", (f"%{word}%", f"%{word}%"))
 
 
 def plist(s, name):
