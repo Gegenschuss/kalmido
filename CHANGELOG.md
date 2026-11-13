@@ -21,7 +21,10 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1100.0] - 2026-11-13
+## [2.1103.0] - 2026-11-13
+
+### Fixed
+- main: the backup suite tests the zip bomb check again instead of the size limit - the bomb member comes before the database dump (CI red of 2.1086.0)
 
 Package 2.1088 (Bündel: Seitenleiste Android: letzter Eintrag (Kassenbuch), Sammelpaket: Aufgaben ohne Paket (Dispatcher), Glocke: Bündel einer Agenten-Frag).
 ### Fixed
@@ -197,5 +200,10 @@ Package 2.1074 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 - #5493: a device's own undo / redo of a step without a server group sends `X-Kalmido-Undo-Own: 1` and records no new server step, so the way forward (redo) of the person's undone steps stays.
 - #5493: the server labels a task's step as the app's history does ("Priority of “Jump”: High", "Renamed …", "Date of …: 4 Mar", "Moved …", the title in quotes; was "Edited Jump"); no project, section or field name goes into a label (a project locked later would keep it there).
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1100.0...HEAD
+## [2.1100.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1103.0.
+
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1103.0...HEAD
+[2.1103.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1103.0
 [2.1100.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1100.0
