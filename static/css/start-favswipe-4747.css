@@ -8,7 +8,7 @@
   /* 2.1108.0 (#5965): the grip was a bare grey line ("what is that?"): now a small tab growing out of the bar's top edge with the
      favourites' star (favtiles.js fvd_sync), so it reads as "pull up the favourites"; the open row shows the slim accent line */
   #favgrip::before{content:'';position:absolute;left:50%;bottom:calc(.75rem - 1px);width:2.75rem;height:1.0625rem;margin-left:-1.375rem;box-sizing:border-box;border:1px solid var(--line);border-bottom:0;border-radius:.625rem .625rem 0 0;background:var(--bg2)}
-  #favgrip > svg.i{position:absolute;left:50%;bottom:calc(.75rem + .0625rem);width:.75rem;height:.75rem;margin-left:-.375rem;color:var(--text2);pointer-events:none}
+  #favgrip > svg.i{position:absolute;left:50%;bottom:calc(.75rem + .0625rem);margin-left:calc(var(--ic-s) / -2);color:var(--text2);pointer-events:none}
   #favgrip[aria-expanded="true"]::before{bottom:auto;top:50%;width:2.25rem;height:.25rem;margin:-.125rem 0 0 -1.125rem;border:0;border-radius:.125rem;background:var(--accent);opacity:.9}
   #favgrip[aria-expanded="true"] > svg.i{display:none}
   #favgrip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:.5rem}
