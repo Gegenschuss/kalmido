@@ -531,7 +531,9 @@ refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup
                                                   "files": [["kalmido.dump", len(src_dump), "0" * 64]]}), "hash", "checksum mismatch")
 refused(make_zip({"kalmido.dump": src_dump}, manifest={"format": "kalmido-backup", "format_version": 2, "app_version": "2.0.0", "schema_version": 2,
                                                   "files": [["kalmido.dump", len(src_dump) - 1, hashlib.sha256(src_dump).hexdigest()]]}), None, "size mismatch")
-refused(make_zip({"kalmido.dump": src_dump, "attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024)}), "bomb", "zip bomb (ratio)")  # 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first)
+# 2.22.0: 3 MB (the bigger schema + 4 MB passed the 5 MB size limit first); 2.1086.0 (#3506): the bomb member comes
+# BEFORE the dump - the member check sums the sizes in zip order, and a dump over 2 MB (CI data) hit the 5 MB size limit first
+refused(make_zip({"attachments/1/zeros.bin": b"\0" * (3 * 1024 * 1024), "kalmido.dump": src_dump}), "bomb", "zip bomb (ratio)")
 refused(make_zip({"kalmido.dump": src_dump, "attachments/1/big.bin": os.urandom(6 * 1024 * 1024)}), None, "larger than KALMIDO_BACKUP_MAX_MB")
 refused(make_zip({"kalmido.dump": src_dump}, schema=99), "schema", "newer schema (manifest)")
 
