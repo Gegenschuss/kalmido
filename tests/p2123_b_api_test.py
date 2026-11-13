@@ -177,11 +177,16 @@ check(A.get(B + f"/api/wiki/pages/{plan}").json().get("shares") == 1 and A.get(B
       "#2104: the page's share count")
 r = A.get(B + "/api/wiki/shares", params={"page": plan})
 j = r.json()
-check(r.ok and j.get("person") is True and len(j["shares"]) == 1 and j["shares"][0]["direct"] is False and j["shares"][0]["folder"] is True,
+# 2.1106.0 (#5833): since 2.1071.0 (#5658) the share to the unknown address above stays open (obj_addr_shares) and the dialog
+# lists it as invited, read-only, in the same shape as the address that found its account (no account oracle) - two entries
+sh = {x["user"]["name"]: x for x in j.get("shares") or []}
+check(r.ok and j.get("person") is True and set(sh) == {"dave@example.com", "nobody@example.com"}
+      and all(x["direct"] is False and x["folder"] is True and x["path"] == "Customer A" for x in sh.values()),
       "#2104: the page's dialog shows the folder's share as inherited " + r.text[:1500])
-pshare = j["shares"][0]["id"] if j.get("shares") else 0
-check(j["shares"][0]["user"] == {"id": None, "name": "dave@example.com", "by_email": True} if j.get("shares") else False,
-      "#2104: a share made by e-mail address shows the typed address, not the account " + r.text[:300])
+pshare = sh.get("dave@example.com", {}).get("id", 0)
+check(sh.get("dave@example.com", {}).get("user") == {"id": None, "name": "dave@example.com", "by_email": True}
+      and sh.get("nobody@example.com", {}).get("user") == {"id": None, "name": "nobody@example.com", "by_email": True},
+      "#2104 / #5658: a share made by e-mail address shows the typed address, not the account - the open one alike " + r.text[:300])
 deep = page(A, "private", "Customer A/Deep", ">" * 3000 + " deep\n\n" + "**" * 1500 + "x" + "**" * 1500)
 r = Da.get(B + f"/api/wiki/shared/pages/{deep}")
 check(r.ok and "deep" in r.json().get("html", ""), f"#2104: deeply nested quotes / emphasis render (no recursion error) {r.status_code}")
