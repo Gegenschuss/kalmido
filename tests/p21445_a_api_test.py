@@ -241,7 +241,7 @@ check(A.put(B + "/api/admin/oidc", json={"required_group": ""}).ok, "R4: the gro
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Suedwind", "admin_id": ids["sven"]}).json()["id"]
 q, loc = stepup(Sv, ORG, {"sub": "sub-sven", "preferred_username": "sven", "auth_time": int(time.time())})
 check(loc == f"/#rck-stepup/{ORG}/show", f"R1: a step-up for showing {loc}")
-check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at<>''", (ids["sven"],)) == f"{ORG}:show", "R5: the session notes org + purpose")
+check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at IS NOT NULL", (ids["sven"],)) == f"{ORG}:show", "R5: the session notes org + purpose")  # 2.1115.0 (#5951): stepup_at TIMESTAMPTZ, NULL = never
 st = Sv.get(B + f"/api/orgs/{ORG}/encryption").json()
 check(st.get("fresh") is True and st.get("fresh_new") is False, f"R5: fresh for showing, not for a new key {st}")
 r = Sv.post(B + f"/api/orgs/{ORG}/encryption/recovery", json={"new": True})
@@ -321,7 +321,7 @@ check(r.status_code == 403 and r.json().get("need") == "fresh" and r.json().get(
       f"#2871: a recovery key's step-up does not count for the download {r.status_code} {r.text[:150]}")
 q, loc = stepup(Sv, 0, {"sub": "sub-sven", "preferred_username": "sven", "auth_time": int(time.time())}, "su")
 check(loc == "/#rck-stepup/0/su", f"#2871: the step-up 'su' needs no office of its own {loc}")
-check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at<>''", (ids["sven"],)) == "0:su", "#2871: the session notes 0:su")
+check(one("SELECT stepup_for FROM sessions WHERE user_id=? AND stepup_at IS NOT NULL", (ids["sven"],)) == "0:su", "#2871: the session notes 0:su")  # 2.1115.0 (#5951): stepup_at TIMESTAMPTZ
 r = Sv.post(B + U, json={})
 check(r.ok and r.json().get("ticket"), f"#2871: after the step-up 'su' the download ticket {r.status_code} {r.text[:150]}")
 check(Sv.get(B + U, params={"t": r.json().get("ticket", "") if r.ok else ""}).ok, "#2871: the ticket fetches the file")

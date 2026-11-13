@@ -23,7 +23,7 @@ import re
 import secrets
 
 from ..core.i18n import N_
-from .orgimport import OiT, _txt  # 2.362.0 (#3131): + _txt
+from .orgimport import OiT  # 2.362.0 (#3131): + _txt; 2.1115.0 (#5951): _txt no more (billed_at is TIMESTAMPTZ)
 from .oilock import oil_key, oil_lock  # #4300
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
@@ -615,7 +615,7 @@ def _receipt(c, run, src, d, ctx):
     if (src.get("billed_doc_id") or src.get("billed_at")) and not d.get("billed_doc_id"):  # 2.278.0 B (#3094): never silently open
         # 2.362.0 (#3131): it stays billed ("billed, invoice missing": billed_at without a document, office/outlays.py au_billed),
         # never open again (it would be billed twice); unbill frees it on purpose
-        d["billed_at"] = _txt(src.get("billed_at"), 40) or iso(now_utc())
+        d["billed_at"] = d.get("billed_at") or iso(now_utc())  # 2.1115.0 (#5951): TIMESTAMPTZ - the coerced value (umz_row), never the raw text
         d["billed_doc_id"], d["billed_item_id"] = None, None
         run.warning(N_("Billed receipts whose invoice did not come along stay billed (invoice missing): free them under Bookkeeping only if they were never billed"))
     return d

@@ -1,7 +1,7 @@
 """2.558.0 C (#4591): warranty end and maintenance of office equipment -- what a private device of Home & life can
 (life/model.py device_create / upkeep_create), in the office inventory (office_equipment, model.py MD "equipment").
 
-Columns (migrations.d/4591.py): warranty_until (YYYY-MM-DD, '' = none), warranty_task_id, maint = JSON
+Columns (migrations.d/4591.py): warranty_until (YYYY-MM-DD, NULL = none; DATE since 2.1115.0, #5951), warranty_task_id, maint = JSON
 [{id, kind (inspection | service | calibration | other), label, every_months (1..120), next (YYYY-MM-DD), lead_days, task_id}].
 Like a business contract's deadline (agreements.py bk_task_sync) every date keeps ONE task: the warranty end a task due on
 that day (reminder 30 days before, a deadline), a maintenance a repeating task (every N months from "next", reminder 7

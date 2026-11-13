@@ -32,6 +32,7 @@ from ..core.config import API_PREFIX, app
 from ..core.access import Denied, list_role, task_visible
 from ..core.db import db
 from ..core.errors import BadInput
+from ..core.pg import ts_canon  # 2.1115.0 (#5951)
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..collab.liste2e import le2e_is_cipher
@@ -220,7 +221,9 @@ def apvd_build(c, uid, ap, created_at, limit):
     rows, more = apvd_rows(d, limit)
     exp = b.get("expect_updated_at") or (ap.get("step") or {}).get("if_match")
     stamp = str(t.get("stamp") or "")
-    changed = bool(stamp) and (exp != stamp if isinstance(exp, str) and exp else bool(created_at) and stamp > str(created_at))
+    # 2.1115.0 (#5951): stamps are TIMESTAMPTZ read canonically; the card's stored version may be an older text form
+    changed = bool(stamp) and (ts_canon(exp) != ts_canon(stamp) if isinstance(exp, str) and exp
+                               else bool(created_at) and ts_canon(stamp) > ts_canon(created_at))
     return {**out, "name": t["name"], "ref": t["ref"], "added": sum(1 for x in d if x[0] == "+" and x[1].strip()),
             "removed": sum(1 for x in d if x[0] == "-" and x[1].strip()),  # an empty line is no line in words
             "rows": rows, "more": more, "changed": changed,

@@ -27,7 +27,7 @@ from ..tasks.validation import as_int
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
 from .hubmail import HBM_LIST_COLS, HBM_PAGE, _hbm_q_rows, _visible_client, hbm_can, hbm_list_read, hbm_public
 
-HMV_ORDER = "ORDER BY COALESCE(NULLIF(sent_at, '')::timestamptz, created_at::timestamptz) DESC, id DESC LIMIT 2000"
+HMV_ORDER = "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000"  # 2.1115.0 (#5951): sent_at TIMESTAMPTZ (no '' any more)
 HMV_LIMIT, HMV_LIMIT_MAX = 100, 500  # like api/v1.py API_PAGE_DEFAULT / API_PAGE_MAX
 HMV_DROP = ("mine", "can_write", "folder_id", "eml_id", "note")
 

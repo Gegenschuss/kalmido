@@ -7,7 +7,7 @@ MIGRATIONS = [
     ("tasks", "delivery_note", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_note TEXT NOT NULL DEFAULT ''"),
     ("tasks", "delivery_job_id", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_job_id BIGINT REFERENCES agent_jobs(id) ON DELETE SET NULL"),
     ("tasks", "delivery_task_id", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_task_id BIGINT REFERENCES tasks(id) ON DELETE SET NULL"),
-    ("tasks", "delivery_at", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_at TEXT"),
+    ("tasks", "delivery_at", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_at TIMESTAMPTZ"),
     ("tasks", "delivery_by", "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS delivery_by BIGINT REFERENCES users(id) ON DELETE SET NULL"),
 ]
 AFTER = [

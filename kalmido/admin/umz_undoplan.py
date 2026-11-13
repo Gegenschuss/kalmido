@@ -223,7 +223,7 @@ def _keep_final(c, plan):
     _spread (its client, contract, positions, payments), its stored PDF / XML by undo_files_left / oi_office_files_left."""
     for part in _chunks(plan.of("office_docs", plan.exist)):
         plan.final.update(("office_docs", r[0]) for r in c.execute(
-            f"SELECT id FROM office_docs WHERE id IN ({_qs(part)}) AND locked_at IS NOT NULL AND locked_at!=''", part).fetchall())
+            f"SELECT id FROM office_docs WHERE id IN ({_qs(part)}) AND locked_at IS NOT NULL", part).fetchall())
     if not plan.final:
         return
     plan.keep |= plan.final

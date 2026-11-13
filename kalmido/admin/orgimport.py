@@ -19,6 +19,7 @@ import os
 import re
 import secrets
 import uuid
+from datetime import datetime  # 2.1115.0 (#5951): _oi_after
 
 from ..accounts.pictures import AVATAR_MAX_MB, LIST_ICON_DIR, ORG_ICON_RE, list_icon_path, list_icon_process, org_icon_path
 from .oilock import oil_prepare  # #4300
@@ -36,7 +37,7 @@ from ..core.access import Denied  # 2.237.0 D (#2870)
 from ..accounts.orgs import org_role  # 2.237.0 D (#2870)
 from ..office.periodlock import pl_month  # 2.237.0 D (#2870)
 from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
-from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import system_ctx, ts_canon  # 2.1115.0 (#5951): ts_canon; 2.369.5 (#2517): pulled up from functions
 from ..files.scan import sc_needs_retry  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import pb_personal  # 2.369.5 (#2517): pulled up from functions
@@ -553,6 +554,16 @@ _OI_DATED = {"office_docs": "date", "office_payments": "date", "office_bank_tx":
              "office_trips": "date_from"}  # office/periodlock.py _DATED
 
 
+def _oi_after(a, b):
+    """2.1115.0 (#5951): the point in time a lies after b (b empty: yes); compared as moments (ts_canon), not as text."""
+    if not b:
+        return True
+    try:
+        return datetime.fromisoformat(ts_canon(a)) > datetime.fromisoformat(ts_canon(b))
+    except ValueError:
+        return str(a) > str(b)
+
+
 def oi_undo_check(c, uid, cr, since):
     """2.237.0 D (#2870): before an undo removes anything (Denied, nothing removed): every organisation the rows went into is
     administered by uid now (a personal office: uid's own); no row was finalised after the import (since = its created_at),
@@ -582,7 +593,7 @@ def oi_undo_check(c, uid, cr, since):
         r = c.execute(f"SELECT {', '.join(want)} FROM {table} WHERE id=?", (rid,)).fetchone()
         if r is None:
             continue
-        if "locked_at" in want and r["locked_at"] and str(r["locked_at"]) > str(since or ""):
+        if "locked_at" in want and r["locked_at"] and _oi_after(r["locked_at"], since):  # 2.1115.0 (#5951): one moment, not text
             raise Denied(409, tr(OI_UNDO_LOCKED))
         day = r[_OI_DATED[table]] if table in _OI_DATED else None
         if not day:

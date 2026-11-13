@@ -260,11 +260,12 @@ def gb_branches(c, r, k, get, prov):
                                          DO UPDATE SET task_id=excluded.task_id, sha=excluded.sha
                                          WHERE git_branches.task_id IS DISTINCT FROM excluded.task_id OR git_branches.sha<>excluded.sha""",
                                       (cid, n, t, heads[n])).rowcount)
-    for x in c.execute("SELECT name, cmp_sha, ahead FROM git_branches WHERE conn_id=? AND sha='' ORDER BY seen_at, name",
+    # 2.1115.0 (#5951): seen_at TIMESTAMPTZ, NULL = never compared (was '', sorted first): NULLS FIRST keeps that order
+    for x in c.execute("SELECT name, cmp_sha, ahead FROM git_branches WHERE conn_id=? AND sha='' ORDER BY seen_at NULLS FIRST, name",
                        (cid,)).fetchall():
         changed |= gb_gone(c, r, k, prov, x, budget)
     for x in c.execute("""SELECT name, sha, ahead FROM git_branches WHERE conn_id=? AND sha<>'' AND (ahead IS NULL OR sha<>cmp_sha OR cmp_main<>?)
-                          ORDER BY seen_at, name LIMIT ?""", (cid, main, max(budget[0], 0))).fetchall():
+                          ORDER BY seen_at NULLS FIRST, name LIMIT ?""", (cid, main, max(budget[0], 0))).fetchall():
         try:
             lst, n = _gb_cmp(_gb_get(k, git_api(prov, k, "compare", default, x["name"])), prov)
         except CalError:

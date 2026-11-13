@@ -35,13 +35,13 @@ from ..core.pg import insert_id  # 2.369.5 (#2517): pulled up from functions
 
 # (count key, legal kind, SQL of the years per row: org_id = ?) -- the year a period starts from (its end + N years)
 ODL_LEGAL = (
-    ("documents", "book", "SELECT substr(COALESCE(NULLIF(date, ''), locked_at), 1, 4) FROM office_docs "
+    ("documents", "book", "SELECT substr(COALESCE(NULLIF(date, ''), CAST(locked_at AS text)), 1, 4) FROM office_docs "  # 2.1115.0 (#5951): TIMESTAMPTZ
                           "WHERE org_id=? AND locked_at IS NOT NULL"),
     ("archive", "book", "SELECT substr(COALESCE(NULLIF(date, ''), CAST(created_at AS text)), 1, 4) FROM office_archive WHERE org_id=?"),
     ("bookarch", "book", "SELECT CAST(year AS TEXT) FROM office_bookarch WHERE org_id=?"),  # 2.414.0 (#3502): the booking archive
     # 2.152.0 review F5: the same rule as the purge hook (receipts/suggest.py olk_fs_locked): booked = paid_at or vat_pct
     # set at all, the year from the document date, else the paid / assigned day
-    ("receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), NULLIF(r.paid_at, ''), r.set_at), 1, 4) FROM rc_receipts r "
+    ("receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), CAST(r.paid_at AS text), CAST(r.set_at AS text)), 1, 4) FROM rc_receipts r "  # 2.1115.0 (#5951): DATE / TIMESTAMPTZ
                             "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND (r.paid_at IS NOT NULL OR r.vat_pct IS NOT NULL)"),
     ("trip_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(i.date, ''), t.date_from, CAST(i.created_at AS text)), 1, 4) FROM office_trip_items i "
                                  "JOIN office_trips t ON t.id=i.trip_id WHERE i.org_id=? AND i.datev=1"),
@@ -52,17 +52,17 @@ ODL_LEGAL = (
     ("cards", "book", "SELECT substr(day, 1, 4) FROM office_cc_lines WHERE org_id=?"),  # 2.444.0 (#3447): statements and their positions, as the bank
     ("meals", "receipt", "SELECT substr(date, 1, 4) FROM office_meals WHERE org_id=? AND status<>'draft'"),
     # 2.184.0 A (#2628): sent letters (business letters, 6 years from the year they went out)
-    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(sent_at, ''), NULLIF(letter_date, ''), CAST(created_at AS text)), 1, 4) FROM office_letters "
+    ("letters", "letter", "SELECT substr(COALESCE(NULLIF(CAST(sent_at AS text), ''), NULLIF(letter_date, ''), CAST(created_at AS text)), 1, 4) FROM office_letters "  # 2.1115.0 (#5951)
                           "WHERE org_id=? AND status<>'draft'"),
     # 2.239.0 C (#2874): the careful side -- received receipts not booked yet (an invoice received is kept, booked or not),
     # payments of documents (books), the procedure documentation (organisation records, 10 years), confirmed sign-offs
     # (business letters); e-invoices of the documents that are no receipt yet: odl_einvoice_years
-    ("open_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), r.set_at), 1, 4) FROM rc_receipts r "
+    ("open_receipts", "receipt", "SELECT substr(COALESCE(NULLIF(m.doc_date, ''), CAST(r.set_at AS text)), 1, 4) FROM rc_receipts r "  # 2.1115.0 (#5951): TIMESTAMPTZ
                                  "LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.org_id=? AND r.paid_at IS NULL AND r.vat_pct IS NULL"),
     ("payments", "book", "SELECT substr(COALESCE(NULLIF(date, ''), CAST(created_at AS text)), 1, 4) FROM office_payments WHERE org_id=?"),
     # 2.977.0 (#5282): its versions are rows of the core's obj_versions (kind procdoc, TIMESTAMPTZ)
     ("procdocs", "book", "SELECT CAST(EXTRACT(YEAR FROM created_at) AS TEXT) FROM obj_versions WHERE kind='procdoc' AND org_id=?"),
-    ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(signed_at, ''), CAST(created_at AS text)), 1, 4) FROM office_signoffs "
+    ("signoffs", "letter", "SELECT substr(COALESCE(NULLIF(CAST(signed_at AS text), ''), CAST(created_at AS text)), 1, 4) FROM office_signoffs "  # 2.1115.0 (#5951)
                            "WHERE org_id=? AND (state='accepted' OR signed_at IS NOT NULL)"),
     # 2.355.0 B (#2845): the asset register (a book) from the year of a device's last depreciation: purchase month + useful
     # life (without one the longest of the table, office/assets.py AST_LIFE: the careful side)
@@ -472,7 +472,8 @@ def odl_retired_prune(c, force=False):
     today = local_now().date().isoformat()
     with system_ctx(c):  # retention run over every organisation (no person's context, nothing handed out)
         due = [r[0] for r in c.execute("SELECT id FROM orgs WHERE retired_at IS NOT NULL AND retain_until IS NOT NULL "
-                                       "AND retain_until!='' AND retain_until<? AND ret_hold_at IS NULL", (today,)).fetchall()]  # 2.545.0 (#4595): not while held
+                                       "AND CAST(retain_until AS text)<>'' AND retain_until<? AND ret_hold_at IS NULL",  # review (#5951): '' if still TEXT
+                                       (today,)).fetchall()]  # 2.1115.0 (#5951): DATE, '' is NULL now  # 2.545.0 (#4595): not while held
     on, n = ret_on("trash"), 0
     for oid in due if on else ():
         until = odl_retention(c, oid)["until"]
@@ -647,7 +648,7 @@ def upg_rest(c, uid):
             c.execute(sql, (uid,))
         upg_alerts(c, uid)  # 2.239.0 C (#2866 / #2888): the admin alerts name the account by its number only
         # the inbox (the caller settled the rest); 2.186.0 A (#2566): not a project with receipts kept in the trash by law
-        for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND COALESCE(retain_until, '')=''", (uid,)).fetchall():
+        for (lid,) in c.execute("SELECT id FROM lists WHERE owner_id=? AND retain_until IS NULL", (uid,)).fetchall():  # 2.1115.0 (#5951): DATE
             files = hard_delete(c, [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=?", (lid,))], lists={lid})
             icon, lfiles = list_purge(c, lid, None)
             todo.append(lambda lid=lid, icon=icon, f=lfiles + files: otr_drop_files(lid, icon, f))

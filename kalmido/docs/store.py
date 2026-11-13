@@ -1126,7 +1126,8 @@ def redo_back(c, nid):
     if "title" in prev and not title_is_manual(m):  # 2.783.0 (#4882): the title from before; one set by hand since then stays
         vals["title"], vals["title_manual"] = prev["title"], prev.get("title_manual")
     sets = ", ".join(f"{k}=?" for k in vals)
-    c.execute(f"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at='', updated_at=? WHERE node_id=?",
+    vals["done_at"] = vals["done_at"] or None  # 2.1115.0 (#5951): a copy kept before may hold '' (TIMESTAMPTZ now)
+    c.execute(f"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at=NULL, updated_at=? WHERE node_id=?",
               (*vals.values(), json.dumps(auto, separators=(",", ":")), _now(), nid))
     set_tags(c, nid, prev["tags"], {t: "" for t in prev["tags"]})
     m = meta_row(c, nid)
@@ -1135,8 +1136,9 @@ def redo_back(c, nid):
 
 def redo_purge(c):
     """The queue's clean-up: what can no longer be taken back goes (the old texts stay no longer than needed)."""
-    c.execute("UPDATE doc_meta SET redo_prev='', redo_at='' WHERE redo_at<>'' AND redo_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))
-    c.execute("UPDATE doc_meta SET learn_prev='', learn_at='' WHERE learn_at<>'' AND learn_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))  # 2.607.0 (#4872)
+    # 2.1115.0 (#5951): redo_at / learn_at are TIMESTAMPTZ, NULL = nothing kept
+    c.execute("UPDATE doc_meta SET redo_prev='', redo_at=NULL WHERE redo_at IS NOT NULL AND redo_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))
+    c.execute("UPDATE doc_meta SET learn_prev='', learn_at=NULL WHERE learn_at IS NOT NULL AND learn_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))  # 2.607.0 (#4872)
 
 
 # 2.607.0 (#4872): "Apply what was learned" -- only the sorting (rules + the learned models, classify) with the stored text of a
@@ -1235,7 +1237,7 @@ def learn_back(c, nid, run):
         sets, args = sets + ", title=?, title_manual=?", [*args, prev["title"], prev.get("title_manual")]
     if m["updated_at"] == prev.get("stamp"):  # nothing saved since: the suggestions and "To review" as they were
         sets, args = sets + ", suggest=?, review=?", [*args, prev.get("suggest") or "", int(prev.get("review") or 0)]
-    c.execute(f"UPDATE doc_meta SET {sets}, learn_prev='', learn_at='', updated_at=? WHERE node_id=?", (*args, _now(), nid))
+    c.execute(f"UPDATE doc_meta SET {sets}, learn_prev='', learn_at=NULL, updated_at=? WHERE node_id=?", (*args, _now(), nid))
     m = meta_row(c, nid)
     doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], meta_text(c, m)))
     return True

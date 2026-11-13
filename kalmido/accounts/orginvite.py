@@ -424,7 +424,7 @@ OJN_TS = "CASE WHEN pg_input_is_valid(CAST({0} AS text), 'timestamptz') THEN {0}
 OJN_PURGE_SQL = """DELETE FROM org_joins j
   WHERE CASE WHEN pg_input_is_valid(CAST(j.created_at AS text), 'timestamptz') THEN j.created_at::timestamptz END < ?::timestamptz
     AND NOT EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite'
-          AND CASE WHEN pg_input_is_valid(v.used_at, 'timestamptz') THEN v.used_at::timestamptz END >= ?::timestamptz
+          AND CASE WHEN pg_input_is_valid(CAST(v.used_at AS text), 'timestamptz') THEN v.used_at::timestamptz END >= ?::timestamptz
           AND CASE WHEN pg_input_is_valid(CAST(v.created_at AS text), 'timestamptz') THEN v.created_at::timestamptz END
               >= CASE WHEN pg_input_is_valid(CAST(j.created_at AS text), 'timestamptz') THEN j.created_at::timestamptz END)"""
 # 2.1060.0 (#4949) with 2.1062.0 (#5786): the org_invites clean-up after the org_joins purge, written out the same way
