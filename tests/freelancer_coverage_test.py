@@ -21,7 +21,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from routes_ast import app_routes  # noqa: E402
+from routes_ast import app_routes, inherit_kind  # noqa: E402
 
 N = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(N, "..")
@@ -1711,6 +1711,25 @@ PUT /api/workload/capacity/{}
 """.strip().split("\n") if x.strip())
 
 
+def effective_routes(found, check):
+    """#4314 (Karte 17345): ROUTES as the code has them now -- a route the table does not name takes the area of its neighbours
+    when they all share ONE matrix area (routes_ast.inherit_kind; then the sweep of p287b_a_freelancer_api_test.py calls it as
+    the freelancer if it is a GET, and section 3 wants a call of a write route); otherwise it fails as before. A line of the
+    table whose route is gone is a hint, not red."""
+    out = {r: k for r, k in ROUTES.items() if r in found}
+    for r in sorted(found - set(ROUTES)):
+        k = inherit_kind(r, out, KINDS)  # #4314 (Fable review): only routes that exist are neighbours
+        if k:
+            out[r] = k
+            print(f"NOTE: {r}: area {k!r} from its neighbours (no line in ROUTES needed)", flush=True)
+        else:
+            check(False, f"route {r} is not in ROUTES and its neighbours give no one matrix area: add it with its area (and call "
+                         f"it as a freelancer) or an n/a area with the reason")
+    for r in sorted(set(ROUTES) - found):
+        print(f"HINT: ROUTES names {r}, which is no route (any more) -- can go", flush=True)
+    return out
+
+
 def found_routes():
     # 2.182.0 (#2718): via the Python parser (routes_ast.py, shared with tenant_coverage_test.py, which fails on its problems)
     return app_routes(ROOT)[0]
@@ -1727,11 +1746,7 @@ def main():
             print("FAIL:", what, flush=True)
 
     found = found_routes()
-    # ---- 1. every route is classified, nothing stale
-    for r in sorted(found - set(ROUTES)):
-        check(False, f"route {r} is not in ROUTES: add it with its area (and call it as a freelancer) or an n/a area with the reason")
-    for r in sorted(set(ROUTES) - found):
-        check(False, f"ROUTES names {r}, which is no route (any more)")
+    routes = effective_routes(found, check)
     check(len(found) > 1000, f"routes found: {len(found)}")
 
     # ---- 2. every area is known; a matrix area is really tested (marker in a suite that runs), an n/a area has a reason
@@ -1747,7 +1762,7 @@ def main():
             for k in re.sub(r"\S+-matrix\s*$", "", line).split(","):  # 2.421.0 (#2936): "... own  tenant-matrix: org" names the area own
                 if k.strip():
                     marked.setdefault(k.strip(), set()).add(name)
-    for r, k in sorted(ROUTES.items()):
+    for r, k in sorted(routes.items()):
         check(k in KINDS, f"{r}: unknown area {k!r}")
     for k, (what, why) in KINDS.items():
         check(what in ("matrix", "n/a") and len(why) > 20, f"area {k}: needs matrix / n/a and its reason")
@@ -1756,7 +1771,8 @@ def main():
             for name in sorted(marked.get(k, ())):
                 check(re.search(r"\s" + re.escape(name) + r"\b", run_all) is not None,
                       f"area {k}: the suite {name} with its marker does not run (tests/suites.txt / kalmido-suite marker)")
-        check(k in ROUTES.values(), f"area {k}: no route uses it (stale)")
+        if k not in routes.values():  # #4314: an area no route uses any more is a hint, not red
+            print(f"HINT: area {k}: no route uses it -- can go", flush=True)
 
     # ---- 3. 2.421.0 A (#2936): every write route of a matrix area is called by a suite of its area (WRITE_UNPROVEN = the old rest)
     runs = {name for name in tests if re.search(r"\s" + re.escape(name) + r"\b", run_all)}
@@ -1764,7 +1780,7 @@ def main():
     texts = {}
     n_w = 0
     can_go = []  # 2.1002.0 (#5696): in WRITE_UNPROVEN, but called now -- a hint, not red
-    for r, k in sorted(ROUTES.items()):
+    for r, k in sorted(routes.items()):
         if r.split(" ", 1)[0] not in WRITES or KINDS.get(k, ("",))[0] != "matrix":
             check(r not in WRITE_UNPROVEN, f"WRITE_UNPROVEN names {r}, no write route of a matrix area: remove it")
             continue
@@ -1779,7 +1795,7 @@ def main():
         else:
             check(verdict == "ok", f"{r}: no suite with the marker 'freelancer-matrix: {k}' calls it (method on the line, the path "
                           f"with its ids): call it there as the person without an organisation")
-    for r in sorted(WRITE_UNPROVEN - set(ROUTES)):
+    for r in sorted(WRITE_UNPROVEN - set(routes)):  # stays red (#4314 Fable review): a dormant entry would exempt a re-added route
         check(False, f"WRITE_UNPROVEN names {r}, which is no route of ROUTES: remove it")
 
     # 2.449.0 (#3800) self-test of the rule: a method on the line above counts only for an open call without a path of its own
@@ -1793,7 +1809,7 @@ def main():
     check(write_rule("PUT /b", False, {"PUT /a"}) == "fail" and write_rule("PUT /b", True, set()) == "ok"
           and write_rule("PUT /b", False, set(), {"PUT /b"}) == "ok", "write_rule: an unlisted write route without a call fails")
 
-    n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
+    n_m = sum(1 for k in routes.values() if KINDS.get(k, ("",))[0] == "matrix")
     print(f"freelancer_coverage: {oks[0]} ok, {len(fails)} failed -- {len(found)} routes, {n_m} checked without an organisation, "
           f"{len(found) - n_m} not relevant (with reason); {n_w} write routes, {n_w - len(WRITE_UNPROVEN) + len(can_go)} called by a suite of "
           f"their area, {len(WRITE_UNPROVEN)} old ones without (WRITE_UNPROVEN, may only shrink), {len(can_go)} of them can go "

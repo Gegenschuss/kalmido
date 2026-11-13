@@ -137,7 +137,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   w.close();
   w = await boot({user: 'bob', hash: 'today'}); d = w.document;
   w.eval(`settingsModal('notify')`); await idle(w);
-  check(!d.querySelector('[data-nm="usage"]') && [...d.querySelectorAll('#sp-notify .nmr')].filter(r => !r.querySelector('[data-nm="proposal"]')).length === 27, 'bob: no usage row (27 rows; with the proposal row seen: ' + [...d.querySelectorAll('#sp-notify .nmr')].length + '; 2.581.0 (#4803): + document flows; 2.555.0 (#4570): + budget warnings; 2.367.2 (#2969): + calendar subscriptions, 2.367.3 (#2971): + integrations, 2.367.4 (#2974): + server notices, 2.453.0 (#3781): + e-mail limits of public pages (the office row of 2.367.4 (#2972) and the receipt fetcher need the office, off here); 2.266.0 (#2965): + customer decisions; 2.125.0 (#2117 #2119): + vacation requests, timesheets; 2.3.0: + the proposal row, 2.7.0: + repeated reminders, 2.17.0: + team chat, 2.18.0: + new error reports, 2.60.0 #1512: + reviews, 2.122.0 #2097: + file requests)');  // 2.122.0 (#2097): + filereq
+  // #4314 (Karte 17345): no fixed number of rows (27 was raised by hand with every new kind of notification) -- the property:
+  // every row without a condition (and the social ones while working together is on) is there, the admins' row "usage" is not
+  const want = w.eval(`NOTIF_ROWS.filter(([r, , , f]) => !f && (collab() || !NM_SOCIAL.includes(r))).map(x => x[0])`);
+  const miss = want.filter(r => !d.querySelector(`#sp-notify [data-nm="${r}"]`));
+  check(!d.querySelector('[data-nm="usage"]') && want.length >= 15 && !miss.length && d.querySelectorAll('#sp-notify .nmr').length >= want.length,
+    `bob: no usage row, every general row (${want.length}, missing: ${miss.join(', ')}; shown: ${d.querySelectorAll('#sp-notify .nmr').length})`);
   w.close();
 
   // ================= German

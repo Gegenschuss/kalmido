@@ -71,9 +71,9 @@ try:
             f.write("# comment\nnowhere.js|'{0}'|gone  # a line that matches nothing\n")
         check_trh.OK_FILE = p
         out = subprocess.run([sys.executable, "-c", f"import sys; sys.path.insert(0, {os.path.join(ROOT, 'tools')!r}); import check_trh; "
-                              f"check_trh.OK_FILE = {p!r}; sys.exit(check_trh.main([]))"], capture_output=True, text=True, timeout=300)
+                              f"check_trh.OK_FILE = {p!r}; sys.exit(check_trh.main(['--strict']))"], capture_output=True, text=True, timeout=300)
         check(out.returncode == 1 and "no longer found, remove: nowhere.js|'{0}'|gone" in out.stdout,
-              "a stale line of the allow list is red: " + out.stdout[-300:])
+              "a stale line of the allow list is red with --strict (#4314: a note without): " + out.stdout[-300:])
         check("tr(} inserts 'when'" in out.stdout and "acctset.js" in out.stdout,
               "without the allow list the HTML on purpose (acctset.js: when) is a finding")
 finally:

@@ -14,8 +14,9 @@ A login role that is a superuser or has BYPASSRLS ignores every policy (the offi
 superuser). Then the app works through the role kalmido_app (NOLOGIN, no bypass; created and granted here, entered with SET
 ROLE on every pooled connection, core/pg.py) -- start-up, migrations and the backup keep the login role.
 
-apply() runs inside init_db's transaction on every start and is idempotent. TABLES is the reviewed list: a new table with an
-org_id that is missing here still gets the policy at start-up (with a warning), and tests/rls_static_test.py fails.
+apply() runs inside init_db's transaction on every start and is idempotent. The tables come from the database itself (every
+base table with a column org_id, org_tables), not from a hand-kept list (#4314): a new table with an org_id gets the policy at
+the next start without an entry anywhere.
 """
 
 import time
@@ -24,7 +25,10 @@ from .pg import qi, table_names  # 2.1079.0 (#5654): _lock_all
 
 APP_ROLE = "kalmido_app"
 
-# tables whose rows belong to an organisation (column org_id); orgs / org_members have their own policies below
+# #4314 (Karte 17345, 13.11.2026): NOT READ any more -- apply() takes every base table with a column org_id from the database
+# itself (org_tables) and gives it the policy; nobody has to add a table here. tests/rls_static_test.py checks that apply() does
+# exactly that, tests/rls_direct_test.py that every org_id table of a fresh database has ENABLE + FORCE and its policy. The tuple
+# stays only until no package in flight adds to it any more (a removal now would conflict with them); then it goes (task).
 TABLES = (
     "agents", "books", "clients", "ev_cals", "lists", "org_list_log",
     "office_company", "office_contracts", "office_doc_items", "office_doc_log", "office_docs", "office_equipment",
@@ -261,10 +265,7 @@ def _sig_get(c):
 def apply(c):
     """Policies + the app role (inside init_db's transaction; the caller commits). Returns True when row-level security
     holds for the app's requests (STATE["enforced"])."""
-    have = org_tables(c)
-    extra = sorted(set(have) - set(TABLES) - set(OWN_POLICY))
-    if extra:
-        print("warning: row-level security: table(s) with org_id missing in core/rls.py TABLES:", ", ".join(extra), flush=True)
+    have = org_tables(c)  # #4314: every base table with an org_id, no hand list (TABLES is not read)
     want = {t: rule(nullable) for t, nullable in have.items() if t not in OWN_POLICY}
     want.update(OWN_RULES)
     # 2.183.0 B (#2666): ALTER TABLE / CREATE POLICY lock the table exclusively; a second process that starts next to the

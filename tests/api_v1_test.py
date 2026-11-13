@@ -432,8 +432,16 @@ _one = lambda p: p if "{id}" not in p else p[:p.index("{id}") + 4] + re.sub(r"\{
 # 2.390.0 (#3353): GET /tasks/<key> (a ticket key like APP-12) is documented under /tasks/{id} - OpenAPI treats two
 # templated paths of the same shape as one
 v1r.setdefault("/tasks/{id}", set()).update(v1r.pop("/tasks/{key}", set()))
-v1r = {_one(p): ms for p, ms in v1r.items()}
-sp = {_one(p): ms for p, ms in spec["paths"].items()}
+# #4314 (Karte 17345): the NAMES of the placeholders do not count ({mid} in the route, {id} in the spec = the same path; a
+# package was rebuilt for that alone) -- only the shape and the methods: every route documented, nothing extra
+def _shape(p):
+    return re.sub(r"\{\w+\}", "{}", _one(p))
+
+
+v1r = {_shape(p): ms for p, ms in v1r.items()}
+sp = {}
+for p, ms in spec["paths"].items():
+    sp.setdefault(_shape(p), {}).update(ms)
 missing = [(p, m) for p, ms in v1r.items() for m in ms if m not in sp.get(p, {})]
 extra = [(p, m) for p, ms in sp.items() for m in ms if m not in v1r.get(p, set())]
 check(v1r and not missing and not extra, f"every route documented: missing {missing}, extra {extra}")

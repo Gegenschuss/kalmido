@@ -79,8 +79,10 @@ FILES = {
 }
 
 
-# 2.149.0 (#2517): check_layers also counts the function-local imports against tools/layers_budget.json (a generous one here)
-BUDGET_ANY = {"local_upward": 99, "local_needless": 99, "clock": 99}
+# 2.149.0 (#2517): check_layers also counts the function-local imports; #4314: per finding against tools/layers_baseline.json
+# ("module -> target" per kind, clock per module; a generous one here)
+BUDGET_ANY = {"local_upward": {"accounts.b -> agents.e": 9}, "local_needless": {"tasks.c -> core.a": 9}, "clock": {"tasks.c": 9}}
+UP1 = {"local_upward": {"accounts.b -> agents.e": 1}, "local_needless": {}, "clock": {}}
 
 
 def fake(extra=None, known=None, init=INIT, budget=BUDGET_ANY):
@@ -95,7 +97,7 @@ def fake(extra=None, known=None, init=INIT, budget=BUDGET_ANY):
             src = src[:a] + "KNOWN = " + repr(set(known)) + "\n" + src[b:]
         open(os.path.join(d, "tools", "check_layers.py"), "w", encoding="utf-8").write(src)
         if budget is not None:
-            open(os.path.join(d, "tools", "layers_budget.json"), "w", encoding="utf-8").write(json.dumps(budget))
+            open(os.path.join(d, "tools", "layers_baseline.json"), "w", encoding="utf-8").write(json.dumps(budget))
         files = dict(FILES, **(extra or {}))
         for p, body in files.items():
             os.makedirs(os.path.join(d, "kalmido", os.path.dirname(p)), exist_ok=True)
@@ -118,24 +120,30 @@ check(rc == 1 and "kalmido/accounts/b.py:1: module-level import of agents.e (age
 rc, out = fake({"accounts/b.py": "from ..agents.e import Y\n"}, known={("accounts.b", "agents.e")})
 check(rc == 0, f"check_layers: a KNOWN upward import passes ({out})")
 rc, out = fake(known={("tasks.c", "agents.e")})
-check(rc == 1 and "tasks.c -> agents.e is no upward import any more" in out, f"check_layers: a stale KNOWN entry fails ({out})")
+check(rc == 0 and "tasks.c -> agents.e is no upward import any more" in out, f"check_layers: a stale KNOWN entry is a note (#4314) ({out})")
 rc, out = fake({"misc/z.py": "X = 3\n"}, known=set(), init=INIT.replace('    "agents.e",\n', '    "agents.e",\n    "misc.z",\n'))
 check(rc == 1 and "package 'misc'" in out, f"check_layers: a package without a layer fails ({out})")
 # 2.149.0 (#2517): the budget of function-local imports (accounts.b imports agents.e inside a function = 1 upward)
-rc, out = fake(known=set(), budget={"local_upward": 1, "local_needless": 0, "clock": 0})
-check(rc == 0 and "1 upward" in out, f"check_layers: function-local imports within the budget pass ({out})")
-rc, out = fake(known=set(), budget={"local_upward": 0, "local_needless": 0, "clock": 0})
-check(rc == 1 and "local_upward: 1 > budget 0" in out, f"check_layers: one more upward function-local import fails ({out})")
+rc, out = fake(known=set(), budget=UP1)
+check(rc == 0 and "1 upward" in out, f"check_layers: function-local imports in the baseline pass ({out})")
+rc, out = fake(known=set(), budget={"local_upward": {}, "local_needless": {}, "clock": {}})
+check(rc == 1 and "local_upward: accounts.b -> agents.e 1 > 0" in out, f"check_layers: a new upward function-local import fails ({out})")
+# #4314 (Karte 17345): no total -- a finding elsewhere does not make room for a new one, a fixed one is a note only
+rc, out = fake(known=set(), budget={"local_upward": {"accounts.x -> agents.e": 5}, "local_needless": {}, "clock": {}})
+check(rc == 1 and "local_upward: accounts.b -> agents.e 1 > 0" in out and "baseline entries above" in out,
+      f"check_layers: room in another entry is no room for a new finding; the fixed entry is a note ({out})")
+rc, out = fake(known=set(), budget={"local_upward": {"accounts.b -> agents.e": 3}, "local_needless": {}, "clock": {}})
+check(rc == 0 and "--update shrinks" in out, f"check_layers: fewer than recorded passes with a note ({out})")
 rc, out = fake({"tasks/c.py": "from ..accounts.b import f\n\n\ndef g():\n    from ..core.a import X\n    return X\n"}, known=set(),
-               budget={"local_upward": 1, "local_needless": 0, "clock": 0})
-check(rc == 1 and "local_needless: 1 > budget 0" in out, f"check_layers: a needless function-local import fails ({out})")
+               budget=UP1)
+check(rc == 1 and "local_needless: tasks.c -> core.a 1 > 0" in out, f"check_layers: a needless function-local import fails ({out})")
 rc, out = fake({"tasks/c.py": "from datetime import datetime\n\n\ndef g():\n    return datetime.now()\n"}, known=set(),
-               budget={"local_upward": 1, "local_needless": 0, "clock": 0})
+               budget=UP1)
 # 2.488.0 (#4004): clock is hard now (was a warning only) -- the last 4 calls (orgretain, datevimp) use the test clock
-check(rc == 1 and "clock: 1 > budget 0" in out and "warning: clock" not in out,
+check(rc == 1 and "clock: tasks.c 1 > 0" in out and "warning: clock" not in out,
       f"check_layers: a wall-clock call outside core/db.py fails ({out})")
 rc, out = fake(known=set(), budget=None)
-check(rc == 1 and "no budget" in out, f"check_layers: a missing budget file fails ({out})")
+check(rc == 1 and "layers_baseline.json is missing" in out, f"check_layers: a missing baseline file fails ({out})")
 
 # ================================================================ 2. the @ts-check guard (static, no container)
 TSG = os.path.join(ROOT, "tools", "check_tscheck.py")

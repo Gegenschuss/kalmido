@@ -34,8 +34,8 @@ def frag(sql, name="9999_x.py"):
     return (f"kalmido/core/migrations.d/{name}", 'SCHEMA = """\n' + sql + '\n"""\n')
 
 
-def run(*frags, allow=None):
-    return cc.findings(srcs=[SCHEMA, *frags], allow={"tables": allow or {}}, code=False)[0]
+def run(*frags, allow=None, strict=True):
+    return cc.findings(srcs=[SCHEMA, *frags], allow={"tables": allow or {}}, code=False, strict=strict)[0]
 
 
 check(not run(), f"a plain schema: no finding {run()}")
@@ -64,7 +64,11 @@ check(not run(TAGS, DROPPED), f"a table a fragment drops does not count: {run(TA
 out = run(TAGS, DROPPED, allow={"meeting_tags": "a reason"})
 check(len(out) == 1 and "meeting_tags is gone" in out[0], f"an allow line of a dropped table is red: {out}")
 out = run(allow={"meeting_tags": "a reason", "meetings": "a reason"})
-check(len(out) == 2 and all("take the line out" in x for x in out), f"an allow line of a missing / plain table is red: {out}")
+check(len(out) == 2 and all("the line can go" in x for x in out), f"an allow line of a missing / plain table is red with --strict: {out}")
+# #4314 (Karte 17345): without --strict a gone allow line is a hint, not red
+check(not run(allow={"meeting_tags": "a reason", "meetings": "a reason"}, strict=False)
+      and len(cc.findings(srcs=[SCHEMA], allow={"tables": {"meetings": "a reason"}}, code=False)[1]) == 1,
+      "a gone allow line is a hint without --strict")
 
 # 2.846.0 (#5522): shares and role tables of an area
 SHARES = frag("CREATE TABLE IF NOT EXISTS meeting_shares (\n  id BIGSERIAL PRIMARY KEY,\n  meeting_id BIGINT,\n  token_hash TEXT);")
@@ -100,13 +104,13 @@ with open(os.path.join(tmp, "kalmido/meet/routes.py"), "w", encoding="utf-8") as
             "def meeting_search(q):\n    pass\n")
 with open(os.path.join(tmp, "kalmido/core/reacts.py"), "w", encoding="utf-8") as f:
     f.write("def obj_react(c, kind, oid):\n    pass\n")
-bad, hints = cc.findings(tmp, allow={})
+bad, hints = cc.findings(tmp, allow={}, strict=True)
 check(len(bad) == 3 and any("meeting_react (kalmido/meet/routes.py:5)" in x for x in bad) and any("need_meeting_say" in x for x in bad)
       and any("MENTION_RE (kalmido/meet/routes.py:2)" in x for x in bad), f"code: react / say / mention outside the core is red, in the core not: {bad}")
 check(len(hints) == 1 and "meeting_search (kalmido/meet/routes.py:13)" in hints[0], f"code: a search of its own is a hint: {hints}")
 bad, hints = cc.findings(tmp, allow={"code": {"kalmido/meet/routes.py:meeting_react": "r", "kalmido/meet/routes.py:need_meeting_say": "r",
                                               "kalmido/meet/routes.py:MENTION_RE": "r", "kalmido/meet/routes.py:gone_react": "r"},
-                                     "search_functions": {"kalmido/meet/routes.py:meeting_search": "r"}})
+                                     "search_functions": {"kalmido/meet/routes.py:meeting_search": "r"}}, strict=True)
 check(len(bad) == 1 and "gone_react is gone" in bad[0] and not hints, f"code: allowed ones are quiet, a gone one is red: {bad} {hints}")
 # 2.846.0 (#5522): rights checks of their own
 with open(os.path.join(tmp, "kalmido/meet/rights.py"), "w", encoding="utf-8") as f:
@@ -116,13 +120,13 @@ with open(os.path.join(tmp, "kalmido/core/meetkern.py"), "w", encoding="utf-8") 
     f.write("def need_meeting(c, mid):\n    pass\n\n\ndef obj_meeting_role(c):\n    pass\n\n\ndef obj_meeting_can(c):\n    pass\n")
 OLD = {"code": {"kalmido/meet/routes.py:meeting_react": "r", "kalmido/meet/routes.py:need_meeting_say": "r",
                 "kalmido/meet/routes.py:MENTION_RE": "r"}, "search_functions": {"kalmido/meet/routes.py:meeting_search": "r"}}
-bad, hints = cc.findings(tmp, allow=OLD)
+bad, hints = cc.findings(tmp, allow=OLD, strict=True)
 check(len(bad) == 3 and any("need_meeting (kalmido/meet/rights.py:1) is a rights check of its own" in x for x in bad)
       and any("meeting_role (kalmido/meet/rights.py:5)" in x for x in bad) and any("meeting_can (kalmido/meet/rights.py:9)" in x for x in bad)
       and not any("kalmido/core/" in x or "need_meeting_say" in x for x in bad),
       f"code: need_* / *_role / *_can outside the core red, in the core quiet, need_*_say only once (code): {bad}")
 bad, hints = cc.findings(tmp, allow=dict(OLD, rights={"kalmido/meet/rights.py:need_meeting": "r", "kalmido/meet/rights.py:meeting_role": "r",
-                                                      "kalmido/meet/rights.py:meeting_can": "r", "kalmido/meet/rights.py:gone_can": "r"}))
+                                                      "kalmido/meet/rights.py:meeting_can": "r", "kalmido/meet/rights.py:gone_can": "r"}), strict=True)
 check(len(bad) == 1 and "rights kalmido/meet/rights.py:gone_can is gone" in bad[0], f"code: allowed rights checks quiet, a gone one red: {bad}")
 # 2.857.0 (#5523): filters of their own
 RIGHTS = {"kalmido/meet/rights.py:need_meeting": "r", "kalmido/meet/rights.py:meeting_role": "r", "kalmido/meet/rights.py:meeting_can": "r"}
@@ -143,14 +147,14 @@ FILES = {
 for name, text in FILES.items():
     with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
         f.write(text)
-bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS))
+bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS), strict=True)
 check(len(bad) == 3 and any("meeting_filter_sql (kalmido/meet/flt.py:1) looks like a filter of its own" in x and "kern.md 'Filter'" in x for x in bad)
       and any("mtgFilterMatch (static/js/meet.js:1)" in x for x in bad) and any("mtgCondDlg (static/js/meet.js:9)" in x for x in bad),
       f"filter: an own evaluator in Python, one in the browser (a comment naming kflt_ is no use) and an own condition dialog are red: {bad}")
 check(not any(n in x for x in bad for n in ("meeting_filter_where", "_meet_cond_ok", "mtg_conds", "mtg_cfCond", "kflt_filter_match", "kfltCondRows")),
       f"filter: using the core (calls kflt_*, the cnd function handed to kflt_where, a catalog's cond) and the core itself stay quiet: {bad}")
 FLT = {"kalmido/meet/flt.py:meeting_filter_sql": "r", "static/js/meet.js:mtgFilterMatch": "r", "static/js/meet.js:mtgCondDlg": "r"}
-bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS, filter=dict(FLT, **{"static/js/meet.js:mtg_conds": "r"})))
+bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS, filter=dict(FLT, **{"static/js/meet.js:mtg_conds": "r"})), strict=True)
 check(len(bad) == 1 and "filter static/js/meet.js:mtg_conds is gone or uses the core's filter now" in bad[0],
       f"filter: allowed ones quiet, a line whose definition uses the core is red: {bad}")
 shutil.rmtree(tmp, ignore_errors=True)

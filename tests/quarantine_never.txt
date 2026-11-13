@@ -1,0 +1,46 @@
+# #4314: suites that never go quiet in quarantine (tests/skip.txt) - rights, encryption,
+# login and invoices. A line of tests/skip.txt for a suite that matches one of these fnmatch patterns (lower case, on the suite
+# name) is ignored by tests/run_all.sh: the suite runs and its red counts as always (tests/skip_test.py names it as a note).
+# rights / tenants / row-level security
+*rights*
+*perm*
+*roles*
+*tenant*
+*tenancy*
+*rls*
+*access*
+*freelancer*
+# encryption
+*crypt*
+*e2e*
+*twofa*
+*2fa*
+*totp*
+# login
+*login*
+*logout*
+*signin*
+*sign_in*
+*signup*
+*register*
+*auth*
+*oidc*
+*sso*
+*passkey*
+*webauthn*
+*password*
+*passwort*
+*token*
+*session*
+*invite*
+pw*
+*_pw*
+# invoices
+*invoice*
+*rechnung*
+*einvoice*
+*peppol*
+*_ubl*
+*zugferd*
+*xrechnung*
+*dunning*

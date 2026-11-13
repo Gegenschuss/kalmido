@@ -14,7 +14,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from routes_ast import app_routes  # noqa: E402
+from routes_ast import app_routes, inherit_kind  # noqa: E402
 
 N = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(N, "..")
@@ -1510,11 +1510,31 @@ ROUTES = {
 }
 
 # ---- 1. every route is classified, nothing stale
+# #4314 (Karte 17345): a new route whose neighbours (the routes under its nearest path prefix) all have ONE matrix kind takes
+# that kind without a line here (routes_ast.inherit_kind) -- and with it the duty of section 3: a stranger's 403 / 404 probe of
+# exactly its path and method in a suite of that kind. Never an n/a kind by itself, mixed neighbours = decide by hand. A line in
+# ROUTES that is no route any more is a hint now, not red (the table only names routes; a stale line protects nothing).
+INHERITED = {}
+LIVE_ROUTES = {r: k for r, k in ROUTES.items() if r in FOUND}  # #4314 (Fable review): gone lines are no neighbours
 for r in sorted(FOUND - set(ROUTES)):
-    check(False, f"route {r} is not in ROUTES: add it with its kind (matrix) or an n/a kind with the reason")
-for r in sorted(set(ROUTES) - FOUND):
-    check(False, f"ROUTES names {r}, which is no route (any more)")
+    k = inherit_kind(r, LIVE_ROUTES, KINDS)
+    if k:
+        INHERITED[r] = k
+        print(f"NOTE: {r}: kind {k!r} from its neighbours (no line in ROUTES needed; its cross-tenant probe is)", flush=True)
+    else:
+        check(False, f"route {r} is not in ROUTES and its neighbours give no one matrix kind: add it with its kind (matrix) or "
+                     f"an n/a kind with the reason")
+STALE_ROUTES = sorted(set(ROUTES) - FOUND)
+for r in STALE_ROUTES:
+    print(f"HINT: ROUTES names {r}, which is no route (any more) -- can go", flush=True)
+ROUTES = {r: k for r, k in ROUTES.items() if r in FOUND}
+ROUTES.update(INHERITED)
 check(len(FOUND) > 600, f"routes found: {len(FOUND)}")
+check(inherit_kind("GET /api/zz/{}/new", {"GET /api/zz/{}": "m", "PUT /api/zz/{}/x": "m"}, {"m": ("matrix", "")}) == "m"
+      and inherit_kind("GET /api/zz/{}/new", {"GET /api/zz/{}": "m", "GET /api/zz/{}/x": "n"}, {"m": ("matrix", ""), "n": ("n/a", "")}) is None
+      and inherit_kind("GET /api/zz/new", {"GET /api/zz/x": "n"}, {"n": ("n/a", "")}) is None
+      and inherit_kind("GET /api/zz", {"GET /api/yy/x": "m"}, {"m": ("matrix", "")}) is None,
+      "#4314: inherit_kind takes one matrix kind of the neighbours only, never n/a, never mixed, never across areas")
 
 # ---- 2. every kind is known; a matrix kind is really tested (marker in a suite), an n/a kind has a reason
 tests = {os.path.basename(p): open(p, encoding="utf-8").read() for p in glob.glob(os.path.join(N, "*.py"))
@@ -1527,7 +1547,8 @@ for k, (what, why) in KINDS.items():
     check(what in ("matrix", "n/a") and len(why) > 20, f"kind {k}: needs matrix / n/a and its reason")
     if what == "matrix":
         check(k in MARKED, f"kind {k}: no suite carries the marker 'tenant-matrix: {k}'")
-    check(k in ROUTES.values(), f"kind {k}: no route uses it (stale)")
+    if k not in ROUTES.values():  # #4314: a kind no route uses any more is a hint (it protects nothing, it hurts nothing)
+        print(f"HINT: kind {k}: no route uses it -- can go", flush=True)
 
 # ---- 3. 2.546.0 (#4291): a marker alone is no proof -- the path of a matrix route has to appear in a suite named for it (the
 # suites in its kind's reason, in the comment on its line or in the comment block above its group). The routes that do not
@@ -1691,19 +1712,20 @@ LEGACY_COUNT = 1422  # 2.1067.0 (#5789): 1424 -> 1422, the office trash's copy r
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())
 check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_coverage_legacy.txt: sorted, no entry twice")
 for r in sorted(UNPROVEN - set(LEGACY)):
-    check(False, f"{r}: its path appears in no suite named for kind {ROUTES[r]!r} -- test the route there (another organisation / "
-                 f"person: 403 / 404, nothing changed) or name the suite that does in the comment of its line")
+    check(False, f"{r}: its path appears in no suite of kind {ROUTES[r]!r} -- test the route (another organisation / person: "
+                 f"403 / 404 with its method, nothing changed) in a suite named for the kind, or name the suite that does in the comment of its line"
+                 + (" (its kind came from its neighbours; another kind: give it a line in ROUTES)" if r in INHERITED else ""))
 # 2.1002.0 (#5696): an entry whose route is proven now is a hint ("can go"), not a failure -- red is only an entry that is no
 # matrix route (any more) and, above, a matrix route without its proof that is not in the list (the list would grow)
 CAN_GO = []
 for r in sorted(set(LEGACY) - UNPROVEN):
-    if KINDS.get(ROUTES.get(r), ("",))[0] != "matrix":
-        check(False, f"tenant_coverage_legacy.txt names {r}, which is no matrix route (any more): remove it and lower LEGACY_COUNT")
+    if KINDS.get(ROUTES.get(r), ("",))[0] != "matrix":  # stays red (#4314 Fable review): a dormant entry would exempt a re-added route
+        check(False, f"tenant_coverage_legacy.txt names {r}, which is no matrix route (any more): remove it")
     else:
         CAN_GO.append(r)
         print(f"HINT: {r}: proven now -- can go: remove it from tenant_coverage_legacy.txt and lower LEGACY_COUNT", flush=True)
-check(len(LEGACY) <= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries, more than LEGACY_COUNT {LEGACY_COUNT}: the list only shrinks")
-check(len(LEGACY) >= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries: lower LEGACY_COUNT to that")
+# #4314 (Karte 17345): LEGACY_COUNT is not compared any more (a number to keep in step by hand); that the list only shrinks
+# holds where the branch is compared with main: kalmido-livezug.py legacy_anstieg refuses every new entry at einreihen
 
 n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
 print(f"tenant coverage: {len(FOUND)} routes, {n_m} in the cross-tenant matrix, {len(FOUND) - n_m} not relevant (with reason), "

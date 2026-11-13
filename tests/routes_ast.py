@@ -68,3 +68,21 @@ def app_routes(root):
                 found |= {f"{m if m.lower() in VERBS else 'DAV'} {norm(p)}" for m in ms}
     return found, problems
 
+
+
+def inherit_kind(route, routes, kinds):
+    """#4314 (Karte 17345): the kind of a route that its table does not name yet, derived from its neighbours: the routes under
+    the nearest path prefix that has any (the route's own path without its last segment, then one segment shorter ..., never
+    shorter than the area: /api/<area>/, /api/v1/<area>/, /<x>/<y>/). Only when ALL of them share ONE kind and that kind is
+    "matrix" (checked: the coverage suite has to prove the new route) -- an n/a kind or mixed neighbours return None (decide
+    by hand, the table entry stays required). routes: {"METHOD /path": kind}; kinds: {kind: (what, why)}."""
+    segs = route.split(" ", 1)[1].split("/")
+    floor = 4 if segs[1:3] == ["api", "v1"] else 3
+    paths = [(r.split(" ", 1)[1], k) for r, k in routes.items() if r != route]
+    for depth in range(len(segs) - 1, floor - 1, -1):
+        prefix = "/".join(segs[:depth]) + "/"
+        near = {k for p, k in paths if p.startswith(prefix) or p == prefix[:-1]}
+        if near:
+            k = next(iter(near))
+            return k if len(near) == 1 and kinds.get(k, ("",))[0] == "matrix" else None
+    return None

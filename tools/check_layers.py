@@ -7,11 +7,17 @@ higher layer belongs inside the function that needs it (function-local imports a
 upward imports the code already had when the check came stand in KNOWN below -- they are not rebuilt, but no new one
 may join, and an entry that is gone must leave the list (so it only shrinks).
 
-2.149.0 G (#2517): the function-local imports are counted per kind against tools/layers_budget.json (only sinks).
+2.149.0 G (#2517): the function-local imports are counted per kind (#4314: per finding in tools/layers_baseline.json).
 2.369.5 (#2517): 1.769 needless function-local imports pulled up (local_needless 2.022 -> 250).
 
-usage: python3 tools/check_layers.py [-v] [--update]     exit code 1 on a new upward import, an unknown package, a stale
-       entry or a count above its budget; --update lowers the budget to the counts of today
+#4314 (Karte 17345, 13.11.2026): no total any more -- the function-local imports stand per FINDING in
+tools/layers_baseline.json ("module -> target" per kind, the clock calls per module; no line numbers, so moving code is no
+finding). Red is only a NEW finding (a key above its recorded count); fewer than recorded is a note (the baseline shrinks with
+--update, never by hand), so two packages never compete for one total's headroom and nobody lowers a number. A KNOWN entry
+that is gone is a note too.
+
+usage: python3 tools/check_layers.py [-v] [--update]     exit code 1 on a new upward import at module level, an unknown
+       package or a new function-local import / wall-clock call; --update lowers the baseline to today (never adds)
 """
 import ast
 import json
@@ -97,14 +103,15 @@ def scan(mod, tree):
     return top, local
 
 
-# 2.149.0 G (#2517): the function-local imports are counted per kind against tools/layers_budget.json; a count may only
+# 2.149.0 G (#2517): the function-local imports are counted per kind (#4314: per finding, tools/layers_baseline.json); a count may only
 # sink (CI fails when one grows; -v names the modules, --update writes a lower count into the budget, never a higher one).
 #   local_upward:  a function imports from a HIGHER layer (allowed, but every new one is a new upward dependency)
 #   local_needless: the target comes EARLIER in ORDER and sits in the same or a lower layer -- the import could stand at
 #                  module level (it only hides the real cycle-avoiding imports)
 #   clock:         (hard since 2.488.0 #4004) datetime.now() / date.today() / datetime.utcnow() outside core/db.py (now_utc / local_now know the test
 #                  clock, 2.149.0 E #2512); CLOCK_OK are the places that need the real wall clock
-BUDGET = os.path.join(ROOT, "tools", "layers_budget.json")
+BASELINE = os.path.join(ROOT, "tools", "layers_baseline.json")  # #4314: per finding (was layers_budget.json: totals)
+KINDS = ("local_upward", "local_needless", "clock")
 CLOCK_OK = {"core.db", "admin.offsite", "office.terms", "docs.extract", "office.pdf",
             "accounts.bgjobs"}  # 2.193.0 D (#2220): the queue's process times (beats) on the real clock
 WARN_ONLY = set()  # 2.488.0 (#4004): clock is hard now (budget 0, was a warning only)
@@ -147,9 +154,14 @@ def main():
             pkg[p] = len(names) - 1
         return pkg[p]
 
-    def count(kind, mod, n=1):
+    found = {k: {} for k in KINDS}  # #4314: kind -> {"module -> target" (clock: "module"): count}
+
+    def count(kind, mod, n=1, key=None):
         counts[kind] += n
         where[kind][mod] = where[kind].get(mod, 0) + n
+        if kind in found:
+            key = key or mod
+            found[kind][key] = found[kind].get(key, 0) + n
 
     for mod in order:
         path = os.path.join(ROOT, "kalmido", *mod.split(".")) + ".py"
@@ -168,39 +180,57 @@ def main():
             count("local", mod)
             t = module_of(t, nm, pos)
             if layer_of(t) > own:
-                count("local_upward", mod)
+                count("local_upward", mod, key=f"{mod} -> {t}")
             elif t != mod and pos.get(t, len(order)) < pos[mod]:
-                count("local_needless", mod)
+                count("local_needless", mod, key=f"{mod} -> {t}")
         if mod not in CLOCK_OK:
             n = len(clock_calls(tree))
             if n:
                 count("clock", mod, n)
-    for k in sorted(KNOWN - seen):
-        err.append(f"tools/check_layers.py KNOWN: {k[0]} -> {k[1]} is no upward import any more, remove the entry")
-    budget = {}
-    if os.path.exists(BUDGET):
-        with open(BUDGET, encoding="utf-8") as f:
-            budget = json.load(f)
-    for k in ("local_upward", "local_needless", "clock"):
-        if k not in budget:
-            err.append(f"tools/layers_budget.json: no budget for {k!r} (now {counts[k]})")
-        elif counts[k] > budget[k]:
-            top5 = ", ".join(f"{m} {n}" for m, n in sorted(where[k].items(), key=lambda x: -x[1])[:5])
-            (warn if k in WARN_ONLY else err).append(f"{k}: {counts[k]} > budget {budget[k]} (tools/layers_budget.json) -- a new function-local "
-                       f"import of this kind; most in: {top5}")
-    if "--update" in sys.argv and not err:
-        new = {**budget, **{k: min(counts[k], budget.get(k, counts[k])) for k in ("local_upward", "local_needless", "clock")}}
-        with open(BUDGET + ".new", "w", encoding="utf-8") as f:
-            json.dump(new, f, indent=2)
+    notes = []
+    for k in sorted(KNOWN - seen):  # #4314: a note, the list only shrinks by it
+        notes.append(f"tools/check_layers.py KNOWN: {k[0]} -> {k[1]} is no upward import any more -- the entry can go")
+    if "--init" in sys.argv and not os.path.exists(BASELINE):  # #4314: once, to write the first file from today's code
+        with open(BASELINE + ".new", "w", encoding="utf-8") as f:
+            json.dump({"about": "tools/check_layers.py (#4314): function-local imports per 'module -> target' and wall-clock calls per "
+                                "module that stood in the code; a new one is red; only shrinks (--update)",
+                       **{k: dict(sorted(found[k].items())) for k in KINDS}}, f, indent=1, ensure_ascii=False)
             f.write("\n")
-        os.replace(BUDGET + ".new", BUDGET)
+        os.replace(BASELINE + ".new", BASELINE)
+    base = {}
+    if os.path.exists(BASELINE):
+        with open(BASELINE, encoding="utf-8") as f:
+            base = json.load(f)
+    else:
+        err.append("tools/layers_baseline.json is missing")
+    fewer = 0
+    for k in KINDS:
+        have, allowed = found[k], base.get(k, {})
+        for key, n in sorted(have.items()):
+            if n > allowed.get(key, 0):
+                what = {"local_upward": "a new function-local import from a HIGHER layer",
+                        "local_needless": "a new function-local import that could stand at module level (move it up)",
+                        "clock": "a new wall-clock call (use now_utc / local_now of core/db.py, they know the test clock)"}[k]
+                err.append(f"{k}: {key} {n} > {allowed.get(key, 0)} in tools/layers_baseline.json -- {what}")
+        fewer += sum(1 for key, n in allowed.items() if have.get(key, 0) < n)
+    if "--update" in sys.argv and not err:
+        new = {"about": base.get("about") or ("tools/check_layers.py (#4314): function-local imports per 'module -> target' and "
+                                              "wall-clock calls per module that stood in the code; a new one is red; only shrinks "
+                                              "(--update)")}
+        for k in KINDS:
+            new[k] = {key: min(n, found[k].get(key, 0)) for key, n in sorted(base.get(k, {}).items()) if found[k].get(key, 0)}
+        with open(BASELINE + ".new", "w", encoding="utf-8") as f:
+            json.dump(new, f, indent=1, ensure_ascii=False)
+            f.write("\n")
+        os.replace(BASELINE + ".new", BASELINE)
     if "-v" in sys.argv:
         print(f"{len(order)} modules, {len(seen)} known upward imports, {counts['local']} function-local kalmido imports: "
               f"{counts['local_upward']} upward, {counts['local_needless']} could stand at module level; "
               f"{counts['clock']} wall-clock calls outside core/db.py")
-        for k in ("local_upward", "local_needless", "clock"):
-            if budget.get(k, 0) > counts[k]:
-                print(f"  {k}: {counts[k]} < budget {budget[k]} -- lower it: python3 tools/check_layers.py --update")
+        if fewer:
+            print(f"  {fewer} baseline entries above today's count (fixed, good) -- python3 tools/check_layers.py --update shrinks it")
+        for n in notes:
+            print("  note:", n)
     for e in warn:
         print("check_layers: warning:", e)
     for e in err:

@@ -6,7 +6,7 @@
    may only shrink, a new one fails here. A check that passes either way says nothing. 2.755.0 (#5261): these rules live in
    tools/check_nosham.py (lint), called from here
  - the Firefox question lives in tests/ff.js only; without Firefox a check fails, KALMIDO_SKIP_FIREFOX=1 gives a skip line
- - tests/run_all.sh writes SKIPPED / PARTLY SKIPPED suites before its last line, which stays what a test runner reads
+ - tests/run_all.sh writes PARTLY SKIPPED suites and (#4314) the QUARANTINE red / green ones before its last line, which stays what a test runner reads
 usage: p2501_a_nosham_test.py"""
 import os
 import shutil
@@ -64,9 +64,11 @@ LIST = r"""fresh; run s_ok bash -c 'echo fine; echo the skip link; echo skipped_
 run s_part bash -c 'echo "s_part: Firefox part skipped (KALMIDO_SKIP_FIREFOX=1)"'
 run s_tool bash -c 'echo "s_tool: SKIP (no pwsh)"'
 run s_gone bash -c 'echo never'
+run s_wack bash -c 'echo "FAIL: flaky"; exit 2'
 """
 stubs = {"suites.py": "import sys\nsys.stdout.write(open(sys.argv[0].replace('suites.py', 'list.txt')).read())\n", "list.txt": LIST,
-         "skip.txt": "s_gone 2099-12-31 #1 flaky\n", "start.sh": "exit 0\n"}
+         "skip.txt": "s_gone 2099-12-31 #1 flaky\ns_wack 2020-01-01 #2 flaky, date long past\ns_rights 2099-12-31 #3 flaky\n",
+         "quarantine_never.txt": "# never quiet\n*rights*\n", "start.sh": "exit 0\n"}
 for name, text in stubs.items():
     with open(os.path.join(box, name), "w", encoding="utf-8") as f:
         f.write(text)
@@ -86,17 +88,28 @@ def run_all(**extra):
 
 
 rc, out = run_all()
-check(rc == 0 and out[-1] == "ALL SUITES PASSED", f"run_all: the last line stays as it is {rc} {out[-3:]}")
-check("SKIPPED suites (1): s_gone" in out, f"run_all: names the suite of skip.txt {out[-4:]}")
+check(rc == 0 and out[-1] == "ALL SUITES PASSED - QUARANTINE red, not counted: s_wack", f"run_all: the last line stays as it is, the quarantine's red named {rc} {out[-3:]}")
+# #4314 (Karte 17345): skip.txt is a quarantine - its suites run, red does not count, green is reported; the date ends nothing
+check("== s_gone: passed (QUARANTINE)" in out and "QUARANTINE green suites (1): s_gone" in out and not any(x.startswith("SKIPPED suites") for x in out),
+      f"run_all: a suite of skip.txt runs and reports its green {out[-6:]}")
+check("== s_wack: QUARANTINE red (wackelt, tests/skip.txt - zählt nicht)" in out and "QUARANTINE red suites (1, not counted): s_wack" in out,
+      f"run_all: a red suite in quarantine is reported, not counted, also after its date {out[-6:]}")
 check("PARTLY SKIPPED suites (2): s_part s_tool" in out, f"run_all: names the suites with a skip line, not s_ok {out[-4:]}")
 check(any("Firefox part skipped" in x and x.startswith(" ") for x in out), f"run_all: says what was skipped under the suite {out}")
 check(not any(x.startswith("::warning") for x in out), "run_all: no annotation outside GitHub")
 rc, out = run_all(GITHUB_ACTIONS="true")
-check(any(x.startswith("::warning") and "s_gone" in x and "s_part" in x for x in out), f"run_all: an annotation on GitHub {out[-4:]}")
+check(any(x.startswith("::warning") and "s_part" in x for x in out), f"run_all: an annotation on GitHub {out[-4:]}")
+check(any(x.startswith("::warning title=quarantine red: s_wack::") for x in out) and any(x.startswith("::notice title=quarantine green: s_gone::") for x in out),
+      f"run_all: the quarantine's red and green as annotations on GitHub {out[-8:]}")
+rc, out = run_all(ONLY="s_wack")
+check(rc == 1 and out[-1] == "FAILED suites: s_wack", f"run_all: ONLY naming just the quarantined suite counts its red (the fixer's run) {rc} {out[-3:]}")
+rc, out = run_all(KALMIDO_QUARANTAENE="aus")
+check(rc == 1 and out[-1] == "FAILED suites: s_wack", f"run_all: KALMIDO_QUARANTAENE=aus counts the red {rc} {out[-3:]}")
 with open(os.path.join(box, "list.txt"), "a", encoding="utf-8") as f:
-    f.write("run s_bad bash -c 'exit 3'\n")
+    f.write("run s_bad bash -c 'exit 3'\nrun s_rights bash -c 'exit 4'\n")
 rc, out = run_all()
-check(rc == 1 and out[-1] == "FAILED suites: s_bad" and "SKIPPED suites (1): s_gone" in out, f"run_all: red names the skipped ones too {rc} {out[-4:]}")
+check(rc == 1 and out[-1] == "FAILED suites: s_bad s_rights" and "QUARANTINE red suites (1, not counted): s_wack" in out,
+      f"run_all: red names the quarantine's red too; a never-quiet suite (rights) counts despite its skip.txt line {rc} {out[-5:]}")
 shutil.rmtree(tmp, ignore_errors=True)
 
 print(f"p2501_a_nosham: {OKS[0]} ok, {len(FAILS)} failed")

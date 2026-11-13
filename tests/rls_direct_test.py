@@ -121,6 +121,13 @@ TABLES = [r[0] for r in sql("SELECT c.relname FROM pg_class c JOIN pg_namespace 
 check(len(TABLES) >= 19 and {"lists", "agents", "orgs", "org_members", "office_docs", "ev_cals", "books", "clients"} <= set(TABLES),
       f"ENABLE + FORCE on every RLS table ({len(TABLES)}: {' '.join(TABLES)})")
 check(all(sql("SELECT COUNT(*) FROM pg_policies WHERE tablename=?", (t,))[0][0] == 1 for t in TABLES), "one policy per table")
+# #4314 (Karte 17345): core/rls.py keeps no hand list any more -- the property in the real database: EVERY base table with a
+# column org_id has ENABLE + FORCE and its policy (a new table needs no entry anywhere, and none slips through)
+ORG_COL = [r[0] for r in sql("SELECT c.table_name FROM information_schema.columns c JOIN information_schema.tables t "
+                             "ON t.table_schema=c.table_schema AND t.table_name=c.table_name WHERE c.table_schema=current_schema() "
+                             "AND c.column_name='org_id' AND t.table_type='BASE TABLE' ORDER BY 1")]
+check(len(ORG_COL) >= 19 and not sorted(set(ORG_COL) - set(TABLES)),
+      f"#4314: every table with an org_id has row-level security ({len(ORG_COL)}; without: {sorted(set(ORG_COL) - set(TABLES))})")
 ORG_T = [t for t in TABLES if t not in ("orgs", "org_members")]
 FK = {}
 for t, col, ref in sql("""SELECT tc.table_name, kcu.column_name, ccu.table_name FROM information_schema.table_constraints tc

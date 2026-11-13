@@ -227,10 +227,10 @@ def main(argv):
     stale = sorted(ok - seen)
     for x in out:
         print(x)
-    for x in stale:
-        print(f"tools/trh_ok.txt: no longer found, remove: {x}")
+    for x in stale:  # #4314 (Karte 17345): a note, red only with --strict (a check of the list itself)
+        print(f"{'' if '--strict' in argv else 'note: '}tools/trh_ok.txt: no longer found, remove: {x}")
     print(f"check_trh: {len(out)} finding(s), {n_ok} allowed, {len(stale)} stale")
-    return 1 if out or stale else 0
+    return 1 if out or (stale and "--strict" in argv) else 0
 
 
 if __name__ == "__main__":

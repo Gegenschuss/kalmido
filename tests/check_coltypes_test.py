@@ -3,7 +3,7 @@
 """2.755.0 (#5305): tools/check_coltypes.py. Static, no container.
  - a new table / ADD COLUMN step / AFTER ADD COLUMN with a point in time as TEXT, a yes / no as BIGINT 0/1 or JSON as TEXT: red,
    with file:line and the real type; the same with TIMESTAMPTZ / DATE / BOOLEAN / JSONB, a count, a plain text: quiet
- - a column on the baseline: quiet; a baseline line whose column was moved (ALTER COLUMN ... TYPE), dropped or is gone: red
+ - a column on the baseline: quiet; a baseline line whose column was moved (ALTER COLUMN ... TYPE), dropped or is gone: a note (#4314), red with --strict
  - a DEFAULT 'a,b' text is no second column; the marker coltype-ok on the line lets one column through
  - the repository: no finding
 usage: check_coltypes_test.py"""
@@ -26,8 +26,8 @@ def frag(text, name="9999_x.py"):
     return (f"kalmido/core/migrations.d/{name}", text)
 
 
-def run(*frags, base=None):
-    return ct.findings(srcs=[SCHEMA, *frags], base=base or {})
+def run(*frags, base=None, strict=True):
+    return ct.findings(srcs=[SCHEMA, *frags], base=base or {}, strict=strict)
 
 
 check(not run(), f"real types, a count, a plain text and a DEFAULT 'a,b' text: no finding {run()}")
@@ -71,7 +71,10 @@ out = run(EPOCH)
 check(len(out) == 3 and all(k in " ".join(out) for k in ("meetings.seen_at", "meetings.expires_at", "meetings.made_at")),
       f"BIGINT / INTEGER / TIMESTAMP without zone named *_at is red, TIMESTAMPTZ and DATE stay quiet: {out}")
 check(not run(MARKED), f"the marker coltype-ok lets one column through: {run(MARKED)}")
-check(len(run(base={"meetings.gone_at": "time"})) == 1, "a baseline line of a column that never was is red")
+check(len(run(base={"meetings.gone_at": "time"})) == 1, "a baseline line of a column that never was is red (--strict)")
+# #4314 (Karte 17345): without --strict a stale baseline line is a note, not a finding (fixing a column needs no second edit)
+check(not run(STEP, MOVED, base=BASE, strict=False) and len(ct.stale(srcs=[SCHEMA, STEP, MOVED], base=BASE)) == 2,
+      "a moved / dropped column's baseline line is a note without --strict")
 
 # the repository: no finding (paperless_links dropped by #5265 counts no more)
 bad = ct.findings()

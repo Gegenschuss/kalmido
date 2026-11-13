@@ -25,7 +25,7 @@
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
 # Exit code 0 = everything passed.
-# 2.501.0 (#4296): green says what it left out - before the last line "SKIPPED suites (N): a b" (skip.txt) and "PARTLY SKIPPED
+# 2.501.0 (#4296): green says what it left out - before the last line "SKIPPED suites (N): a b" (none since #4314) and "PARTLY SKIPPED
 #                                suites (N): c d" (passed, but their output has a skip line, SKIP_RE: Firefox part, no pwsh, a missing
 #                                tool); each passed suite with such a line prints the first three under its "== x: passed".
 #                                The last line stays "ALL SUITES PASSED" / "FAILED suites: ..." (the test runner and the release tooling read it).
@@ -151,18 +151,26 @@ FAILED=(); SKIPPED=(); PARTLY=()
 # 2.501.0 (#4296): a skip line of a suite: the words SKIP / SKIPPED / skipped / Skipped or "skip:" on their own (not skip_files, not "skip link")
 SKIP_RE='(^|[^[:alnum:]_])(SKIP|SKIPPED|skipped|Skipped|skip:)([^[:alnum:]_]|$)'
 skip_lines() { grep -E "$SKIP_RE" <<< "$1" | grep -vE '^FAIL|(^|[^0-9])0 skipped'; }
-SKIPS=" $(awk -v d="$(TZ=Europe/Berlin date +%F)" '!/^#/ && NF >= 3 && $2 >= d {printf "%s ", $1}' "$HERE/skip.txt" 2>/dev/null) "
+# #4314 (Karte 17345): tests/skip.txt is the QUARANTINE of proven flaky suites - a listed suite RUNS like every other one, its red
+# does not count (not in FAILED, "== S: QUARANTINE red", a warning annotation "quarantine red: S"), its green is reported
+# ("quarantine green: S", the train counts the greens in a row and takes the line out); the date of a line no longer ends it.
+# Never quiet: the suites of tests/quarantine_never.txt (rights, encryption, login, invoices) - their line is ignored. Not
+# either when ONLY names just that one suite (the run of the job that fixes it) or KALMIDO_QUARANTAENE=aus.
+SKIPS=" $(awk '!/^#/ && NF >= 3 {printf "%s ", $1}' "$HERE/skip.txt" 2>/dev/null) "
+NEVER_Q=$(grep -vE '^\s*(#|$)' "$HERE/quarantine_never.txt" 2>/dev/null | tr '\n' ' ')
+QRED=(); QGREEN=()
+in_quarantine() {  # in_quarantine <suite>: listed in skip.txt, not a never-quiet suite, not the one suite of ONLY, not switched off
+  [[ "${KALMIDO_QUARANTAENE:-an}" != aus && "$SKIPS" == *" $1 "* && "$(echo ${ONLY:-})" != "$1" ]] || return 1
+  local p; for p in $NEVER_Q; do [[ $1 == $p ]] && { echo "== $1: in tests/skip.txt, but never quiet (tests/quarantine_never.txt) - counts as usual"; return 1; }; done
+  return 0
+}
 run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   mine || return 0
   local name=$1; shift
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started, 2.180.0: before the first one that runs)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
-  # #1315: a proven flaky suite is skipped until the date of its line in skip.txt (tests/skip_test.py: CI red after it);
-  # a run naming it (ONLY=SUITE) runs it - that is how it gets fixed
-  if [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]]; then SKIPPED+=("$name"); echo "== $name: SKIPPED (wackelt, tests/skip.txt)"
-    [[ -n "$JUNIT_DIR" && -z "${KALMIDO_LIST_ONLY:-}" ]] && { "$PY" "$HERE/junit.py" --skipped "$JUNIT_DIR" "$name" "wackelt, tests/skip.txt" >/dev/null 2>&1 || true; }
-    return 0; fi
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
+  local quar=0; in_quarantine "$name" && quar=1  # #4314: a proven flaky suite runs, its red does not count
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0
   t0=$(_ms); GRAN=1
@@ -171,6 +179,16 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   _timing "$name" $(( $(_ms) - t0 )) $rc  # 2.149.0 E (#2514)
   # 2.623.0 (#4950): a summary line "... N failed" with N > 0 is red too, also at rc 0 (a suite that forgot sys.exit(done(...)))
   if [[ $rc -eq 0 ]] && grep -Eq "ok, [1-9][0-9]* failed" <<< "$out"; then rc=1; fi
+  if [[ $quar -eq 1 ]]; then  # #4314: the quarantine reports, it does not fail the run
+    echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
+    if [[ $rc -ne 0 ]]; then QRED+=("$name"); echo "== $name: QUARANTINE red (wackelt, tests/skip.txt - zählt nicht)"; echo "$out" | tail -15
+      [[ -n "$JUNIT_DIR" ]] && { "$PY" "$HERE/junit.py" --skipped "$JUNIT_DIR" "$name" "wackelt: rot in der Quarantaene (tests/skip.txt)" >/dev/null 2>&1 || true; }
+      [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::warning title=quarantine red: $name::$( { echo "$out" | grep -E "^FAIL|Error|Traceback|failed" | head -4; } | tr '\n' ' ' | sed 's/%/%25/g' | cut -c1-600)"
+    else QGREEN+=("$name"); echo "== $name: passed (QUARANTINE)"; _junit "$name" 0 $(( $(_ms) - t0 )) "$out"
+      [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::notice title=quarantine green: $name::passed in quarantine (tests/skip.txt)"
+    fi
+    return 0
+  fi
   _junit "$name" $rc $(( $(_ms) - t0 )) "$out"
   echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
@@ -200,8 +218,10 @@ docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAI
 # 2.501.0 (#4296): what this run did not check, red or green
 [[ ${#SKIPPED[@]} -gt 0 ]] && echo "SKIPPED suites (${#SKIPPED[@]}): ${SKIPPED[*]}"
 [[ ${#PARTLY[@]} -gt 0 ]] && echo "PARTLY SKIPPED suites (${#PARTLY[@]}): ${PARTLY[*]}"
+[[ ${#QRED[@]} -gt 0 ]] && echo "QUARANTINE red suites (${#QRED[@]}, not counted): ${QRED[*]}"  # #4314
+[[ ${#QGREEN[@]} -gt 0 ]] && echo "QUARANTINE green suites (${#QGREEN[@]}): ${QGREEN[*]}"
 if [[ -n "${GITHUB_ACTIONS:-}" && $(( ${#SKIPPED[@]} + ${#PARTLY[@]} )) -gt 0 ]]; then
   echo "::warning title=suites not fully run::skipped: ${SKIPPED[*]:-none}; partly skipped: ${PARTLY[*]:-none}"
 fi
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
-echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"
+echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")$([[ ${#QRED[@]} -gt 0 ]] && echo " - QUARANTINE red, not counted: ${QRED[*]}")"

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""tests/skip.txt well formed and not expired (#1315, CI lint step). Every line: <suite of run_all.sh> <YYYY-MM-DD> #<task> <evidence>;
-the date at most 14 days ahead (Berlin). A date in the past = red: run_all.sh runs that suite again, fix it and delete the line.
+"""tests/skip.txt well formed (#1315, CI lint step). Every line: <suite of run_all.sh> <YYYY-MM-DD> #<task> <evidence>.
+#4314 (Karte 17345): skip.txt is the QUARANTINE of proven flaky suites (tests/run_all.sh runs them, their red does not count) - the
+date (when the line came) no longer ends it and is never red: a line goes with the fix (its task) or when the train has seen the
+suite green often enough in a row. A line of a never-quiet suite (tests/quarantine_never.txt: rights, encryption, login,
+invoices) is a note: run_all.sh ignores it, the suite counts as always.
 Python standard library only."""
+import fnmatch
 import datetime
 import os
 import re
@@ -22,17 +26,22 @@ def problems(text, suites, today):
         if not m:
             out.append(f"line {no}: not '<suite> <YYYY-MM-DD> #<task> <evidence>': {ln}")
             continue
-        s, day = m.group(1), datetime.date.fromisoformat(m.group(2))
+        s = m.group(1)
+        datetime.date.fromisoformat(m.group(2))  # a real date (ValueError = the line is broken)
         if s not in suites:
             out.append(f"line {no}: {s} is no suite of run_all.sh")
         if s in seen:
             out.append(f"line {no}: {s} twice")
         seen.add(s)
-        if day < today:
-            out.append(f"line {no}: {s} expired on {day} - fix it (task #{m.group(3)}) and delete the line")
-        elif (day - today).days > 14:
-            out.append(f"line {no}: {s} until {day} - at most 14 days ahead")
+        # #4314: the date (day) ends nothing any more - quarantine; it only says when the line came
     return out
+
+
+def never_quiet(text, never):
+    """#4314: the lines of suites that never go quiet (patterns of tests/quarantine_never.txt) - a note, run_all.sh ignores them."""
+    pats = [p.strip() for p in never.splitlines() if p.strip() and not p.strip().startswith("#")]
+    return [ln.split()[0] for ln in text.splitlines() if ln.strip() and not ln.startswith("#")
+            and any(fnmatch.fnmatchcase(ln.split()[0], p) for p in pats)]
 
 
 def main():
@@ -42,7 +51,7 @@ def main():
     today = datetime.datetime.now(ZoneInfo("Europe/Berlin")).date()
     d = datetime.date(2026, 10, 25)
     t = "# c\napi 2026-11-01 #1 CI v1\nui 2026-10-24 #2 x\nnone 2026-10-26 #3 x\napi 2026-10-30 #4 x\nui 2026-12-01 #5 x\nui 2026-10-30\n"
-    want = ["line 3: ui expired", "line 4: none is no", "line 5: api twice", "line 6: ui twice", "line 6: ui until", "line 7: not"]
+    want = ["line 4: none is no", "line 5: api twice", "line 6: ui twice", "line 7: not"]  # #4314: no expiry, no 14 days
     got = problems(t, {"api", "ui"}, d)
     bad = [w for w in want if not any(g.startswith(w) for g in got)] + ([] if len(got) == len(want) else [f"{len(got)} problems"])
     if bad:
@@ -55,11 +64,18 @@ def main():
         if r.returncode != rc or txt not in r.stdout:
             print(f"skip_test: run_all.sh ONLY={only}: exit {r.returncode}, want {rc} and {txt!r}:", r.stdout[-300:], r.stderr[-300:])
             return 1
-    out = problems(open(os.path.join(HERE, "skip.txt")).read(), suites, today)
+    if never_quiet("a 2026-01-01 #1 x\np_rights_ui 2026-01-01 #2 x\n", "# c\n*rights*\n") != ["p_rights_ui"]:
+        print("skip_test: self check of never_quiet failed")
+        return 1
+    text = open(os.path.join(HERE, "skip.txt")).read()
+    out = problems(text, suites, today)
     for x in out:
         print("tests/skip.txt " + x)
-    n = sum(1 for ln in open(os.path.join(HERE, "skip.txt")) if ln.strip() and not ln.startswith("#"))
-    print(f"skip_test: {n} suite(s) skipped, {len(out)} problem(s)")
+    nq_file = os.path.join(HERE, "quarantine_never.txt")
+    for x in never_quiet(text, open(nq_file).read() if os.path.exists(nq_file) else ""):
+        print(f"note: tests/skip.txt names {x}, a never-quiet suite (tests/quarantine_never.txt) - run_all.sh counts it as always")
+    n = sum(1 for ln in text.splitlines() if ln.strip() and not ln.startswith("#"))
+    print(f"skip_test: {n} suite(s) in quarantine, {len(out)} problem(s)")
     return 1 if out else 0
 
 

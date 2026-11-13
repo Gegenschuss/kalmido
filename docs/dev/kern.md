@@ -39,7 +39,7 @@ the history, undo and the version check (`expect_updated_at`, `ccf_check` compar
 (`deleted_at IS NULL` / `IS NOT NULL`), and a trigger never takes one as `to_jsonb(row)->>'..._at'` (that text carries the
 session's zone, not the canonical form): use `to_char(x AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')`.
 
-Add the table to `kalmido/core/rls.py` TABLES (it has an `org_id`) and to the export lists (`tools/check_export_tables.py`
+Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and add it to the export lists (`tools/check_export_tables.py`
 says where). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`
 on the object's reference node in the file store.
 

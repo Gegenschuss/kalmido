@@ -13,7 +13,7 @@ column (DROP TABLE / DROP COLUMN in a fragment) is gone.
   json   a TEXT column named *_json or with DEFAULT '{}' / '[]'                                 -> JSONB
 
 What is there today stands in tools/coltypes_baseline.txt ("table.column rule"). A stage that moves an old column takes its line
-out; a line whose column has a real type by now, or is gone, is a finding too (the list only shrinks). A column the rule reads
+out; a line whose column has a real type by now, or is gone, is a note (#4314; --strict: a finding). A column the rule reads
 wrongly (a text that only ends in _at) gets the marker "coltype-ok: <why>" on its line.
 
 usage: python3 tools/check_coltypes.py [-v] [--list]      exit 1 on a finding (--list: every column the rules catch, as baseline lines)
@@ -142,16 +142,26 @@ def baseline(root=ROOT):
     return out
 
 
-def findings(root=ROOT, srcs=None, base=None):
-    """The findings as lines (empty: all fine). srcs / base: texts and a baseline of their own (the test's fragments)."""
+def findings(root=ROOT, srcs=None, base=None, strict=False):
+    """The findings as lines (empty: all fine). srcs / base: texts and a baseline of their own (the test's fragments).
+    #4314 (Karte 17345): a baseline line whose column has a real type by now or is gone is a note (stale()), not red -- unless
+    strict (--strict, a check of the list itself): fixing a column never needs a second edit in the baseline."""
     srcs = sources(root) if srcs is None else srcs
     base = baseline(root) if base is None else base
     now = caught(srcs)
     bad = [f"check_coltypes: {k} ({p}:{ln}): {WHY[r]} (or '{OK}: <why>' on its line when the rule reads it wrongly)"
            for k, (r, p, ln) in sorted(now.items()) if base.get(k) != r]
-    for k in sorted(set(base) - set(now)):
-        bad.append(f"{BASELINE}: {k} has a real type by now or is gone - take the line out, the list only shrinks")
+    if strict:
+        bad += stale(root, srcs, base)
     return bad
+
+
+def stale(root=ROOT, srcs=None, base=None):
+    """#4314: the baseline lines whose column has a real type by now or is gone (a note: the line can go)."""
+    srcs = sources(root) if srcs is None else srcs
+    base = baseline(root) if base is None else base
+    now = caught(srcs)
+    return [f"{BASELINE}: {k} has a real type by now or is gone - the line can go" for k in sorted(set(base) - set(now))]
 
 
 if __name__ == "__main__":
@@ -159,9 +169,12 @@ if __name__ == "__main__":
         for k, (r, _p, _ln) in sorted(caught(sources()).items()):
             print(f"{k} {r}")
         sys.exit(0)
-    out = findings()
+    out = findings(strict="--strict" in sys.argv)
     for x in out:
         print(x)
+    if "--strict" not in sys.argv:
+        for x in stale():
+            print("note:", x)
     if "-v" in sys.argv or out:
         print(f"check_coltypes: {len(baseline())} old column(s) in the baseline, {len(out)} finding(s)")
     sys.exit(1 if out else 0)

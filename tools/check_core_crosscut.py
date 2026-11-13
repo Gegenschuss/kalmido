@@ -215,7 +215,7 @@ def load_allow(root=ROOT):
         return json.load(f)
 
 
-def findings(root=ROOT, srcs=None, allow=None, code=True):
+def findings(root=ROOT, srcs=None, allow=None, code=True, strict=False):
     """(findings, hints) as lines. srcs / allow: texts and an allow dict of their own (the test's fragments)."""
     srcs = sources(root) if srcs is None else srcs
     allow = load_allow(root) if allow is None else allow
@@ -239,7 +239,7 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
             bad.append(f"check_core_crosscut: table {name} ({path}:{line}) looks like {kind} - the shared core has it (obj_*, "
                        f"docs/dev/kern.md 'Cross-cutting parts'); an exception only with its reason in {ALLOW}")
     for name in sorted(set(ok_tab) - seen):
-        bad.append(f"{ALLOW}: table {name} is gone or no longer looks like a cross-cutting part or a share - take the line out")
+        (bad if strict else hints).append(f"{ALLOW}: table {name} is gone or no longer looks like a cross-cutting part or a share - the line can go")
     if code:
         red, hint, rights = code_defs(root)
         for k, ln in sorted(red.items()):
@@ -248,13 +248,13 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
                 bad.append(f"check_core_crosscut: {n} ({f}:{ln}) - mentions, the say rule and reactions come once from the core "
                            f"(docs/dev/kern.md 'Cross-cutting parts'); an exception only with its reason in {ALLOW} code")
         for k in sorted(set(ok_code) - set(red)):
-            bad.append(f"{ALLOW}: code {k} is gone - take the line out")
+            (bad if strict else hints).append(f"{ALLOW}: code {k} is gone - the line can go")
         for k, ln in sorted(hint.items()):
             if k not in ok_search:
                 f, n = k.rsplit(":", 1)
                 hints.append(f"hint: {n} ({f}:{ln}) is a search of its own - register it with the one search (kalmido/core/srchreg.py srch_register)")
         for k in sorted(set(ok_search) - set(hint)):
-            bad.append(f"{ALLOW}: search_functions {k} is gone - take the line out")
+            (bad if strict else hints).append(f"{ALLOW}: search_functions {k} is gone - the line can go")
         for k, ln in sorted(rights.items()):
             if k not in ok_rights:
                 f, n = k.rsplit(":", 1)
@@ -262,7 +262,7 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
                            f"core (core/access.py AccessCtx, obj_role / obj_need, docs/dev/kern.md section 3); an exception only "
                            f"with its reason in {ALLOW} rights")
         for k in sorted(set(ok_rights) - set(rights)):
-            bad.append(f"{ALLOW}: rights {k} is gone - take the line out")
+            (bad if strict else hints).append(f"{ALLOW}: rights {k} is gone - the line can go")
         flt, ok_flt = filter_code(root), allow.get("filter", {})
         for k, ln in sorted(flt.items()):
             if k not in ok_flt:
@@ -272,13 +272,13 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
                            f"docs/dev/kern.md 'Filter'): describe the fields in a catalog / a cnd function and hand them to "
                            f"kflt_*; an exception only with its reason in {ALLOW} filter")
         for k in sorted(set(ok_flt) - set(flt)):
-            bad.append(f"{ALLOW}: filter {k} is gone or uses the core's filter now - take the line out")
+            (bad if strict else hints).append(f"{ALLOW}: filter {k} is gone or uses the core's filter now - the line can go")
     return bad, hints
 
 
 if __name__ == "__main__":
     root = sys.argv[sys.argv.index("--root") + 1] if "--root" in sys.argv else ROOT
-    out, hints = findings(root)
+    out, hints = findings(root, strict="--strict" in sys.argv)  # #4314: a gone allow line is a hint, red only with --strict
     for x in hints + out:
         print(x)
     if "-v" in sys.argv or out:

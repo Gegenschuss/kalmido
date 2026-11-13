@@ -4,7 +4,7 @@
    `if is_agent(g.user): raise Denied(...)` is left (the code / text of each place moved into the call unchanged)
  - joined_lists_sql() in kalmido/core/access.py is THE raw "lists an account owns or is a member of" subquery; the
    hand-written copies of it are gone (vis_sql stays the request's own scope)
- - tools/check_layers.py is green and the budget of the needless function-local imports is below 1.000 (it was 2.022)
+ - tools/check_layers.py is green and the needless function-local imports are below 1.000 (it was 2.022)
  - the module-level import graph has no import cycle beyond the three known pairs (a pulled-up import must never close one:
    the module would load half-done)
 freelancer-matrix: n/a (no route of its own; the gates and queries keep their behaviour)
@@ -81,8 +81,9 @@ ck("no hand-written copy of the owner-or-member subquery is left (joined_lists_s
 # ---- check_layers + budget
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_layers.py"), "-v"], capture_output=True, text=True)
 ck("tools/check_layers.py is green", r.returncode == 0, (r.stdout + r.stderr)[-800:])
-budget = json.loads(read(os.path.join(ROOT, "tools", "layers_budget.json")))
-ck("budget local_needless below 1.000 (was 2.022 before 2.369.5)", budget.get("local_needless", 10 ** 6) < 1000, budget)
+base = json.loads(read(os.path.join(ROOT, "tools", "layers_baseline.json")))  # #4314: per finding (was the total layers_budget.json)
+ck("needless function-local imports below 1.000 (was 2.022 before 2.369.5)", sum(base.get("local_needless", {"?": 10 ** 6}).values()) < 1000,
+   sum(base.get("local_needless", {}).values()))
 
 # ---- no new import cycle at module level
 CL.ROOT = ROOT

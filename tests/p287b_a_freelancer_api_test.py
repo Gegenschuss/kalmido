@@ -264,11 +264,12 @@ ok(F.post(B + "/api/life/health", json={"type": "appointment", "title": "Checkup
 # freelancer-matrix: own
 ok(F.patch(B + "/api/settings", json={"week_start": "mon"}), "own: settings")
 ok(F.post(B + "/api/account/export", json={}), "own: an account export", (200, 201, 202))
-tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": [x for x in ("read", "write", "comments", "structure", "delete",
+tk_scopes = [x for x in ("read", "write", "comments", "structure", "delete",
                                                                                   "attachments:read", "attachments:write", "time", "export",
                                                                                   "calendar", "contacts", "private", "account", "files:read",
                                                                                   "files:write", "office", "pinboard", "layouts", "import",
-                                                                                  "sheets:read", "wiki:read", "wiki:write", "integrations")]}),  # 2.89.1: tables of 2.89.0; 2.200.0 (#1781): knowledge pages; 2.391.0 (#3362): integrations (/api/v1/me/tokens, /api/v1/me/webhooks)
+                                                                                  "sheets:read", "wiki:read", "wiki:write", "integrations")]
+tk = ok(F.post(B + "/api/me/tokens", json={"name": "all", "scopes": tk_scopes}),  # 2.89.1: tables of 2.89.0; 2.200.0 (#1781): knowledge pages; 2.391.0 (#3362): integrations (/api/v1/me/tokens, /api/v1/me/webhooks)
         "own: a personal API token", (200, 201))
 PT = {"Authorization": "Bearer " + tk.get("token", "")}
 
@@ -438,7 +439,7 @@ QUERY = {
 }
 
 
-def fill(path, route=""):
+def fill(path, route="", used=None):
     out = ""
     for part in path.split("{}")[:-1]:
         out += part
@@ -446,21 +447,40 @@ def fill(path, route=""):
         key = USE.get(route, {}).get(key, key)
         if not key or not IDS.get(key):
             return None
+        if used is not None:
+            used.append(key)
         out += str(IDS[key])
     return out + path.split("{}")[-1]
 
 
-swept, skipped, bad, expected = 0, [], [], set()
-for route, kind in sorted(cov.ROUTES.items()):
+def own_ids(keys):
+    """#4314: do these IDS keys name objects of the freelancer (an id), not a fixed word (a kind, "nojob", "bs")?"""
+    return any(not (isinstance(IDS.get(k), str) and re.fullmatch(r"[a-z_]+", IDS[k])) for k in keys)
+
+
+# #4314 (Karte 17345): Alice (an organisation's admin) with a personal token of the same scopes -- a 4xx the sweep gets on a
+# route WITHOUT an own object of the freelancer in its address (a 400 / 404 only) is compared with hers: the same status AND
+# body = "the same for every person" (a needed ?query=, a switch of the operator, nothing of that kind on the test server)
+APT = {"Authorization": "Bearer " + ok(A.post(B + "/api/me/tokens", json={"name": "same", "scopes": tk_scopes}),
+                                       "alice: a personal API token for the comparison", (200, 201)).get("token", "")}
+
+
+swept, skipped, bad, expected, same, fixed = 0, [], [], set(), [], []
+# #4314 (Karte 17345): the routes as the code has them (a route without a line in the coverage table takes the area of its
+# neighbours there, freelancer_coverage_test.effective_routes) - a new GET of a matrix area is swept without an entry anywhere
+SWEEP_ROUTES = cov.effective_routes(cov.found_routes(), lambda cond, what: None)
+for route, kind in sorted(SWEEP_ROUTES.items()):
     m, path = route.split(" ", 1)
     if m != "GET" or cov.KINDS[kind][0] != "matrix":
         continue
-    url = fill(path, route)
+    used = []
+    url = fill(path, route, used)
     if url is None:
         skipped.append(route)
         continue
     if route in QUERY:
         url += "?" + urlencode({k: v.format(**IDS) for k, v in QUERY[route].items()})
+        used += re.findall(r"\{(\w+)\}", " ".join(QUERY[route].values()))
     if path.startswith("/api/v1/agent"):
         r = requests.get(B + url, headers=AT)
     elif path.startswith("/api/v1/"):
@@ -476,17 +496,31 @@ for route, kind in sorted(cov.ROUTES.items()):
         continue
     if route in EXPECT_4XX:  # 2.421.0 A (#2936): the listed answer, nothing else
         expected.add(route)
+        if r.status_code < 400 and "the same for every person" in EXPECT_4XX[route][1]:  # #4314: fixed - a hint, not red
+            fixed.append(route)
+            continue
         check(r.status_code == EXPECT_4XX[route][0], f"sweep: {route} -> {r.status_code}, EXPECT_4XX says {EXPECT_4XX[route][0]} "
-                                                     f"(fixed? then remove the exception) {r.text[:120]}")
+                                                     f"{r.text[:120]}")
         continue
+    if r.status_code in (400, 404) and not own_ids(used) \
+            and not path.startswith("/api/v1/agent"):  # #4314: the same answer for an organisation's admin = not the freelancer's
+        ra = requests.get(B + url, headers=APT) if path.startswith("/api/v1/") else A.get(B + url, headers={"Sec-Fetch-Site": "same-origin"})
+        if ra.status_code == r.status_code and ra.text.strip() == r.text.strip():  # Fable review: the same body too
+            same.append(f"{route} -> {r.status_code}")
+            continue
     if r.status_code >= 400:  # 2.421.0 A (#2936): a 400 / 404 / 409 is a failure, too (was a note)
         bad.append(f"{route} -> {r.status_code}")
         check(False, f"sweep: {route} as the freelancer -> {r.status_code} {r.text[:160]}")
-for route in ALLOW:
-    check(route in cov.ROUTES, f"ALLOW names {route}, which is no route of the coverage list")
+for route in ALLOW:  # stays red (#4314 Fable review): a dormant ALLOW would let a re-added route answer 401 / 403
+    check(route in SWEEP_ROUTES, f"ALLOW names {route}, which is no route of the coverage list")
 for route, (st, why) in EXPECT_4XX.items():
     check(400 <= st < 500 and st not in (401, 403) and len(why) > 15, f"EXPECT_4XX {route}: a 4xx other than 401 / 403 and its reason")
-    check(route in expected, f"EXPECT_4XX names {route}, which the sweep did not call (no GET of a matrix area, or skipped)")
+    if route not in expected:
+        print(f"HINT: EXPECT_4XX names {route}, which the sweep did not call (no GET of a matrix area, or skipped) -- can go")
+for route in fixed:
+    print(f"HINT: EXPECT_4XX names {route}, which answers 2xx now -- can go")
+if same:
+    print(f"sweep: {len(same)} routes answer the freelancer as an organisation's admin (the same 4xx, #4314): " + "; ".join(same))
 print(f"sweep: {swept} GET routes as the freelancer, {len(bad)} refused / broken, {len(skipped)} without a known id: "
       + ", ".join(skipped))
 if bad:
