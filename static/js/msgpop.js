@@ -33,7 +33,7 @@ function mp_text(m) {
 }
 function mp_pic(m) {
   if (avUrl(m.from) || !m.avatar) return av(m.from, m.name, 'avatar');
-  return `<span class="avatar pic"><img src="${esc(m.avatar)}" alt="" loading="lazy" decoding="async" draggable="false"></span>`;
+  return `<span class="avatar pic"><img src="${esc(m.avatar)}" alt="" loading="lazy" decoding="async" draggable="false"></span>`;  // sprung-ok: the .avatar box has its fixed size (app.css), the card is fixed over the page
 }
 // the card's title: one sender or several, one message or several
 function mp_title(items) {
