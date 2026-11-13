@@ -82,7 +82,9 @@ def tp_hubmail(c, cut, purge):
         return len(rows)
     ts = iso(now_utc())
     for r in rows:
-        # 2.536.0 (#4338): deleting the mail put them into the trash already (hbm_mail_del); this catches the older ones
+        # 2.536.0 (#4338): deleting the mail put them into the trash already (hbm_mail_del); this catches the older ones.
+        # 2.1093.0 (#5472): kept by hand on purpose -- a run without a person (no deleted_by, no core history of nobody);
+        # the nodes are fs_entry objects all the same and the core's run deletes them after the period
         for nid in hbm_mail_nodes(c, r):
             c.execute(f"UPDATE fs_nodes SET deleted_at=? WHERE id=? AND {live_sql()}", (ts, nid))
         c.execute("DELETE FROM hub_mails WHERE id=?", (r["id"],))
@@ -131,7 +133,7 @@ def tp_tick(c, force=False):
                         counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount
                         if key in ("sheet_rows", "sheet_columns") and counts[key]:
                             # 2.152.0 (#2165, review C-M2): a file the purged cells held (and no other cell holds) goes to the
-                            # files' trash; shk_tick (sheets/shkinds.py) removes it with its scan / text rows after its period
+                            # files' trash; the core's run (part kind sheet_file, 2.1093.0 #5472) removes it after its period
                             c.execute(f"UPDATE sheet_files SET deleted_at=? WHERE {live_sql()} AND NOT EXISTS (SELECT 1 FROM sheet_cells x "
                                       "WHERE x.sheet_id=sheet_files.sheet_id AND trim(x.raw)='file:' || sheet_files.id)", (iso_ms(now_utc()),))
                     else:

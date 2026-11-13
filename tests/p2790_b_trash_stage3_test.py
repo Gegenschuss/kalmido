@@ -13,6 +13,9 @@ Invented names and texts only.
  - a receipt kept by law (doc_meta.kept_until): deleting it for good 409, the core's run leaves it in the trash and counts it
    (fs_entry_locked)
  - rights as before: someone else gets 404 on restoring / deleting for good the person's page, table or file
+ - 2.1093.0 (#5472): a folder of the knowledge tree / of the tables into the file store's trash puts its page (with its files)
+   / table into the core's trash (deleted_by, the core's 'trash') and its restore brings them back ('restore'); the undo of
+   an agent's new table lands in the core's trash; files deleted on their own (wiki_file, sheet_file) go with the core's run
 freelancer-matrix: files, wiki, sheets (the flows run as a person without an organisation)
 tenant-matrix: files, wiki, sheets (a person of an organisation cannot restore / purge the freelancer's objects)
 usage: p2790_b_trash_stage3_test.py <datadir>"""
@@ -212,10 +215,74 @@ for s in (S2, S3):
     check(Fr.delete(B + f"/api/sheets/{s}").ok, f"tables: {s} into the trash")
 sql("UPDATE sheets SET deleted_at=? WHERE id=?", (old_iso(), S2))
 
+# ================================================================== 2.1093.0 (#5472): the rest of stage 3
+# a folder of the knowledge tree into the file store's trash: its page goes into the core's trash with its files (children,
+# the same time), noted by the core ('trash'); the folder's restore brings both back ('restore')
+W6 = page("Stage3Dir/Inside", "Invented folder page")
+WF6, _ = wfile(W6, "inside.pdf")
+WD = one("SELECT parent_id FROM fs_nodes WHERE kind='ref' AND ref_kind='wiki' AND ref_id=?", (W6,))
+check(WD and Fr.delete(B + f"/api/files/nodes/{WD}").ok, "folder (wiki): into the file store's trash")
+t = sql("SELECT p.deleted_at, f.deleted_at, p.deleted_by FROM wiki_pages p JOIN wiki_files f ON f.page_id=p.id WHERE p.id=? AND f.id=?", (W6, WF6))
+check(t and t[0][0] and t[0][0] == t[0][1] and t[0][2] == FID and core_note("wiki_page", W6, "trash"),
+      f"folder (wiki): the page in the core's trash with its file, the same time, who deleted it {t}")
+check(Fr.post(B + f"/api/files/nodes/{WD}/restore").ok, "folder (wiki): restored")
+check(trashed("wiki_pages", W6) == (False, None) and one("SELECT deleted_at FROM wiki_files WHERE id=?", (WF6,)) is None
+      and core_note("wiki_page", W6, "restore"), f"folder (wiki): the page and its file came back {trashed('wiki_pages', W6)}")
+r = Fr.get(B + f"/api/wiki/pages/{W6}")
+check(r.ok and "Invented folder page" in r.text, f"folder (wiki): the page reads again {r.status_code}")
+# the same for a table filed in a folder of the tables
+r = Fr.post(B + "/api/sheets/folders", json={"name": "Stage3 folder", "space": "private"})
+check(r.ok, f"setup: a folder of the tables {r.text[:160]}")
+SD = r.json()["folder"]["id"]
+r = Fr.post(B + "/api/sheets", json={"title": "Stage3 filed", "space": "private", "folder_id": SD})
+check(r.status_code == 201, f"setup: a table in the folder {r.text[:160]}")
+S6 = r.json()["id"]
+check(Fr.delete(B + f"/api/files/nodes/{SD}").ok, "folder (tables): into the file store's trash")
+check(trashed("sheets", S6) == (True, FID) and core_note("sheet_table", S6, "trash"),
+      f"folder (tables): the table in the core's trash, who deleted it, noted {trashed('sheets', S6)}")
+check(Fr.post(B + f"/api/files/nodes/{SD}/restore").ok and trashed("sheets", S6) == (False, None)
+      and core_note("sheet_table", S6, "restore"), f"folder (tables): the table came back {trashed('sheets', S6)}")
+# an agent's new table taken back (the batch's undo): into the core's trash (deleted_by, the core's 'trash'), not by hand
+r = Fr.post(B + "/api/sheets", json={"title": "Stage3 agent made", "space": "private"})
+S7 = r.json()["id"] if r.status_code == 201 else 0
+sql("INSERT INTO sheet_changes(sheet_id, batch, agent_id, kind, created_at) VALUES(?, 'agt5472', NULL, 'create', ?)",
+    (S7, testclock.now().astimezone(timezone.utc).isoformat(timespec="milliseconds")))
+r = Fr.post(B + f"/api/sheets/{S7}/batches/agt5472/undo")
+check(r.ok and r.json().get("undone") == 1, f"undo of a new table: taken back {r.status_code} {r.text[:160]}")
+check(trashed("sheets", S7) == (True, FID) and core_note("sheet_table", S7, "trash"),
+      f"undo of a new table: in the core's trash with the core's note {trashed('sheets', S7)}")
+tl = Fr.get(B + "/api/sheets/trash", params={"space": "private"}).json()
+check(S7 in [x["id"] for x in tl.get("sheets") or []], "undo of a new table: the tables' trash lists it")
+check(Fr.post(B + f"/api/sheets/{S7}/restore").ok and trashed("sheets", S7) == (False, None), "undo of a new table: restorable")
+# the files deleted on their own (the runs wka_tick / shk_tick went): the core's run takes them (part kinds wiki_file /
+# sheet_file), a file of a live page / table past the period; one of today stays
+WF7, WP7 = wfile(W6, "lone-old.pdf")
+WF8, WP8 = wfile(W6, "lone-young.pdf")
+for f in (WF7, WF8):
+    check(Fr.delete(B + f"/api/wiki/files/{f}").ok, f"wiki file {f}: deleted on its own")
+sql("UPDATE wiki_files SET deleted_at=? WHERE id=?", (old_iso(), WF7))
+S8 = table("Stage3 files", "f")
+sh = Fr.get(B + f"/api/sheets/{S8}").json()
+rows8 = [x["id"] for x in sh.get("rows") or []]
+r = Fr.post(B + f"/api/sheets/{S8}/columns", json={"title": "Doc", "kind": "file"})
+check(r.status_code == 201 and rows8, f"setup: a file column {r.text[:160]}")
+col8 = r.json()["column"]["id"]
+r = Fr.post(B + f"/api/sheets/{S8}/files", data={"row_id": str(rows8[0]), "col_id": str(col8)},
+            files={"file": ("cell.pdf", PDF, "application/pdf")})
+check(r.status_code == 201, f"setup: a file in a cell {r.text[:160]}")
+SF8 = r.json()["file"]["id"]
+SP8 = one("SELECT path FROM sheet_files WHERE id=?", (SF8,))
+check(Fr.put(B + f"/api/sheets/{S8}/cells", json={"cells": [{"row_id": rows8[0], "col_id": col8, "raw": ""}]}).ok,
+      "table file: the cell emptied (its file into the trash)")
+check(one("SELECT deleted_at FROM sheet_files WHERE id=?", (SF8,)) is not None, "table file: in the trash")
+sql("UPDATE sheet_files SET deleted_at=? WHERE id=?", (old_iso(), SF8))
+
 # ================================================================== the core's retention run over the three areas
 n = tick(False)
 check(n.get("fs_entry") == 2 and n.get("wiki_page") == 1 and n.get("sheet_table") == 1,
       f"switch off: counted (the old file + the receipt, the old page, the old table) {n}")
+check(n.get("wiki_file") == 1 and n.get("sheet_file") == 1 and stored(WP7) and stored(SP8),
+      f"switch off (#5472): the old wiki file and table file counted, not deleted {n}")
 check(trashed("fs_nodes", F2) and trashed("wiki_pages", W2) and trashed("sheets", S2) and stored(P2) and stored(WP2), "switch off: nothing deleted")
 n = tick(True)
 check(n.get("fs_entry_locked") == 1, f"switch on: the receipt kept by law is counted as locked {n}")
@@ -225,6 +292,10 @@ check(trashed("fs_nodes", R1) == (True, FID), "switch on: the receipt kept by la
 check(trashed("wiki_pages", W2) is None and not stored(WP2), "switch on: the old page and its stored file gone")
 check(trashed("sheets", S2) is None, "switch on: the old table gone")
 check(trashed("fs_nodes", F3) and trashed("wiki_pages", W3) and trashed("sheets", S3), "switch on: the ones deleted today stay")
+check(n.get("wiki_file") == 1 and n.get("sheet_file") == 1, f"switch on (#5472): the old wiki file and table file counted {n}")
+check(not sql("SELECT 1 FROM wiki_files WHERE id=?", (WF7,)) and not stored(WP7), "switch on (#5472): the old wiki file gone with its stored file")
+check(not sql("SELECT 1 FROM sheet_files WHERE id=?", (SF8,)) and not stored(SP8), "switch on (#5472): the old table file gone with its stored file")
+check(sql("SELECT 1 FROM wiki_files WHERE id=?", (WF8,)) and stored(WP8), "switch on (#5472): the wiki file deleted today stays")
 # 2.809.0 (#5365, review): one batch per kind and run (one advisory lock each), the rest in the next run
 out = subprocess.run(["docker", "exec", CT, "python", "-c",
                       "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core import writes\n"

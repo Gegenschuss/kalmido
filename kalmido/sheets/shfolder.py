@@ -28,7 +28,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
 from ..core.dlock import dl_list_hidden  # 2.560.0 B (#4699)
-from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
+from ..core.db import body, bump, db, insert_id
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, lang, tr
 from ..accounts.orgroles import org_writes, user_orgs_full
@@ -83,7 +83,11 @@ def _on_trash(c, uid, rid, restore):
     """2.199.0 F (#2742, review G3): a folder's trash takes the table into the tables' trash and notes it on the node (fs_log
     'trash', detail "area:<deleted_at>"); coming back it restores only a table that this mark still names (not one its
     owner deleted on their own before or after) and only for who may write it through its space / project -- 2.373.0 (#3335):
-    without that right "stays" (the folder's restore tells the person: the table stays in the tables' trash)."""
+    without that right "stays" (the folder's restore tells the person: the table stays in the tables' trash).
+    2.1093.0 (#5472): in and out through the core's trash (sheets/shkern.py shk_trash / shk_restore, kind sheet_table;
+    checked: the folder's route checked the file store's rights, the way back checks sh_may here) -- deleted_by, rev and the
+    core's history 'trash' / 'restore' as for a table deleted on its own."""
+    from .shkern import shk_restore, shk_trash  # shkern loads sheets/core.py, which this module's area loads first
     r = _row(c, rid)
     if r is None or bool(r["deleted_at"]) != bool(restore):
         return
@@ -95,12 +99,11 @@ def _on_trash(c, uid, rid, restore):
             return
         if not sh_may(c, uid, r, write=True, share=False):
             return "stays"
-        c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (r["id"],))
+        shk_restore(c, uid, r["id"], checked=True)
     else:
-        ts = iso_ms(now_utc())
-        c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (ts, r["id"]))
-        if n is not None:
-            fs_log_add(c, n["id"], "trash", f"area:{ts}")
+        shk_trash(c, uid, r["id"], checked=True)
+        if n is not None:  # the mark = the time as the row gives it back (the restore above compares the read value)
+            fs_log_add(c, n["id"], "trash", f"area:{_row(c, rid)['deleted_at']}")
     sh_touch(c, r["id"], uid)
 
 

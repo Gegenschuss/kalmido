@@ -99,7 +99,7 @@ def start(s, space, uid):
 
 def run(fn, purge):
     """A watchdog run inside the app container, called directly (force), with the retention switch of the trash on / off."""
-    mod = {"wkx_tick": "kalmido.wiki.wkhist", "wka_tick": "kalmido.wiki.wikiatt"}[fn]
+    mod = {"wkx_tick": "kalmido.wiki.wkhist"}[fn]  # 2.1093.0 (#5472): wka_tick went (the core's run, part kind wiki_file)
     code = (f"import json, app\nfrom {mod} import {fn}\nfrom kalmido.core.db import connect\nc = connect()\n"
             f"try:\n    print(json.dumps({fn}(c, force=True)))\nfinally:\n    c.close()")
     out = subprocess.run(["docker", "exec", "-e", f"KALMIDO_PURGE_TRASH={1 if purge else 0}", CT, "python", "-c", code],

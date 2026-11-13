@@ -360,7 +360,8 @@ def _trash_node(c, uid, n, ts):
         with c.savepoint():
             pl_tree_need_open(c, n["id"])
             refs = [r for r in fs_ref_subtree(c, n) if r["ref_kind"] in (WKF_KIND, SHF_KIND)]
-            c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, n["id"]))
+            from ..files.fskern import fsk_trash  # 2.1093.0 (#5472): the core's trash (checked: the move's undo is the right)
+            fsk_trash(c, uid, n["id"], checked=True, ts=ts)
             fs_log_add(c, n["id"], "trash")
             for r in refs:
                 fs_ref_trashed(c, uid, r, False)
@@ -394,7 +395,11 @@ def undo_trash(c, uid, plan):
             n = c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at IS NULL", (kind, rid)).fetchone()
             if n is not None:
                 _trash_node(c, uid, n, ts)
-            c.execute(f"UPDATE {table} SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, rid))  # no node, or a locked page
+            # no node, or a locked page: 2.1093.0 (#5472) through the core's trash too (the kinds of wiki/wkkern.py and
+            # sheets/shkern.py, checked: the move's undo is the right), with the undo's time
+            from ..sheets.shkern import shk_trash
+            from ..wiki.wkkern import wkk_trash
+            (wkk_trash if table == "wiki_pages" else shk_trash)(c, uid, rid, checked=True, ts=ts)
     for rid in plan.of("clients", plan.roots):
         if c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone():
             cl_trash(c, rid)

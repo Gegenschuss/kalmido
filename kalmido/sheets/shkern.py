@@ -74,14 +74,17 @@ obj_register(SHK_KIND, "sheets", label=N_("Table"), fields={}, area="sheets", ro
 obj_on_purge(SHK_KIND, _shk_purge)
 
 
-def shk_trash(c, uid, sid):
-    """Into the core's trash (the route checked the rights). No step of the core's list: the tables' own Undo brings it back."""
-    return obj_trash(c, uid, SHK_KIND, sid, step=False)
+def shk_trash(c, uid, sid, checked=False, ts=None):
+    """Into the core's trash (the route checked the rights). No step of the core's list: the tables' own Undo brings it back.
+    2.1093.0 (#5472): checked / ts as core/writes.py obj_trash (a folder's trash, the undo of an agent's new table with the
+    time of its undo, a move's undo)."""
+    return obj_trash(c, uid, SHK_KIND, sid, step=False, checked=checked, ts=ts)
 
 
-def shk_restore(c, uid, sid):
-    """Out of the core's trash (the route checked the rights and the name of a further sheet)."""
-    return obj_restore(c, uid, SHK_KIND, sid, step=False)
+def shk_restore(c, uid, sid, checked=False):
+    """Out of the core's trash (the route checked the rights and the name of a further sheet). 2.1093.0 (#5472): checked = a
+    folder's restore that checked the right itself (core/writes.py obj_restore checked)."""
+    return obj_restore(c, uid, SHK_KIND, sid, step=False, checked=checked)
 
 
 def shk_purge(c, uid, sid):

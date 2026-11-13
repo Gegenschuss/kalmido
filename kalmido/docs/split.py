@@ -599,7 +599,8 @@ def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
                 extra["no_asn"] = True  # the pages before the first code
                 c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (pid,))
             _put(c, pid, extra)
-    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
+    from ..files.fskern import fsk_trash  # 2.1093.0 (#5472): the core's trash (core/objects.py loads the file store at its top)
+    fsk_trash(c, uid, nid, checked=True)  # the callers checked the trash rules (_sp_trash_need) and the rights
     fs_log_add(c, nid, "trash", "split")
     _put(c, nid, {**v, "state": "done", "parts": ids, "asn": own_asn, **({"auto": 1} if auto else {})})
     c.execute("UPDATE doc_meta SET review=0 WHERE node_id=?", (nid,))
@@ -728,12 +729,14 @@ def docs_unsplit(nid):
         if not pn["deleted_at"]:
             _sp_trash_need(c, uid, pn)  # 2.237.0 B (#2864): every part checked before any of them moves
         parts.append(pid)
+    from ..files.fskern import fsk_restore, fsk_trash  # 2.1093.0 (#5472): the core's trash, rights checked above (checked)
     for pid in parts:
         c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (pid,))
-        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, pid))
+        fsk_trash(c, uid, pid, checked=True, ts=ts)  # one in the trash already keeps its own time
         fs_log_add(c, pid, "trash", "unsplit")
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
-    c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
+    c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, nid))
+    fsk_restore(c, uid, nid, checked=True)
     fs_log_add(c, nid, "restore", "unsplit")
     a = v.get("asn")
     if isinstance(a, int):

@@ -1468,8 +1468,9 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None, stayed=None):
             c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, r["row_id"]))
         elif r["kind"] == "col":
             c.execute("UPDATE sheet_columns SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, r["col_id"]))
-        elif r["kind"] == "create":
-            c.execute("UPDATE sheets SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, sheet_row["id"]))
+        elif r["kind"] == "create":  # 2.1093.0 (#5472): into the core's trash (the route checked the rights; the undo's time)
+            from .shkern import shk_trash  # shkern loads this module at its top
+            shk_trash(c, uid, sheet_row["id"], checked=True, ts=ts)
         c.execute("UPDATE sheet_changes SET undone_at=? WHERE id=?", (ts, r["id"]))
         n += 1
     if n:

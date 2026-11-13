@@ -27,9 +27,9 @@ from flask import jsonify, request, send_file
 from ..core.config import app, ATT_DIR
 from ..core.i18n import N_, tr as _tr_base, tr_stored
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
-from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
+from ..core.objparts import part_kind  # 2.1093.0 (#5472): the core's trash run of the files deleted on their own
 from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput, BadKey, err_stored
@@ -37,7 +37,6 @@ from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql)
 from ..docs.pagesize import PG_MAX, pg_of  # #5227: a picture's size from its header
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from .wikie2e import wke_mode, wke_page_mode  # 2.369.5 (#2517): pulled up from functions; 2.637.0 (#4745): wke_mode
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
@@ -77,7 +76,6 @@ WKA_PAGELINK_RE = re.compile(r"\[\[([^\[\]|#\n]{1,1000})((?:#[^\[\]|\n]*)?(?:\|[
 WKA_MDLINK_RE = re.compile(r"(!?)\[([^\[\]\n]*)\]\(\s*(<[^<>\n]{1,500}>|[^\s()<>]{1,500}(?:\([^\s()]*\)[^\s()<>]*)*)"
                            r"(?:\s+(?:\"[^\"\n]*\"|'[^'\n]*'))?\s*\)")
 WKA_TMP = os.path.join(ATT_DIR, ".wikitmp")  # the export ZIP while it is written (the backup skips this folder)
-WKA_TRASH_DAYS = 30  # review M1: a file in the trash (undo possible) is deleted for good after this (2.272.0 A #3026: ret_trash_days)
 
 
 def wka_space(r):
@@ -470,33 +468,25 @@ def wka_pages_have_files(c, page_ids):
     return bool(ids) and bool(c.execute(f"SELECT 1 FROM wiki_files WHERE page_id IN ({','.join('?' * len(ids))}) LIMIT 1", ids).fetchone())
 
 
-def wka_tick(c, force=False):
-    """Watchdog (review M1, rule "deleting = really gone"): a file deleted on its own (its page is not in the trash) is removed
-    for good after WKA_TRASH_DAYS -- row, scan / text marks, the stored file after the commit. Files of a page in the trash
-    stay with it (undo of the page); they go with the final deletion of pages (wka_page_files)."""
-    if not ret_due("wiki_files", force=force):  # 2.272.0 A (#3026): hourly (was every watchdog tick)
-        return
-    cut, purge = ret_trash_cut(), ret_on("trash")  # 2.272.0 A (#3026): the trash period + switch of every retention run
-    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        if not purge:
-            ret_report(c, "trash", {"files": c.execute("SELECT COUNT(*) FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE "
-                                                       "f.deleted_at IS NOT NULL AND f.deleted_at<? AND p.deleted_at IS NULL",
-                                                       (cut,)).fetchone()[0]}, False, run="wiki_files")
-            c.commit()
-            return
-        rows = c.execute("SELECT f.id, f.path FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE f.deleted_at IS NOT NULL "
-                         "AND f.deleted_at<? AND p.deleted_at IS NULL ORDER BY f.id LIMIT 500", (cut,)).fetchall()
-        ret_report(c, "trash", {"files": len(rows)}, True, run="wiki_files")
-        if not rows:
-            c.commit()
-            return
-        ids = [r["id"] for r in rows]
-        q = ",".join("?" * len(ids))
-        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM wiki_files WHERE id IN ({q})", ids)
-    c.commit()
-    unlink_files([r["path"] for r in rows])
+def _wka_prune(c, where, args):
+    """2.1093.0 (#5472): the part of the core's retention run (core/objparts.py part_trash_purge, kind WKA_KIND) for the files
+    deleted on their own (was wka_tick, review M1: "deleting = really gone"): their scan / text marks go before the rows ->
+    the stored files (relative to ATT_DIR), unlinked after the commit."""
+    rows = c.execute(f"SELECT id, path FROM wiki_files WHERE {where}", args).fetchall()
+    ids = [r["id"] for r in rows]
+    if ids:
+        c.execute("DELETE FROM upload_scan WHERE kind='wiki' AND ref_id = ANY(CAST(? AS BIGINT[]))", (ids,))
+        c.execute("DELETE FROM file_text WHERE kind='wiki' AND ref_id = ANY(CAST(? AS BIGINT[]))", (ids,))
+    return [r["path"] for r in rows if r["path"]]
+
+
+# 2.1093.0 (#5472): a file deleted on its own (its page live) is a side object of the core's trash run (core/writes.py
+# obj_trash_tick: the trash period, the switch "trash", its report): deleted for good with its scan / text marks and its
+# stored file. The files of a page in the trash are its children (wiki/wkkern.py) and go with the page. The own run wka_tick
+# (report slot wiki_files) is gone. Held files of a locked space keep their own run (wiki/wkhist.py wkx_tick).
+WKA_KIND = "wiki_file"
+part_kind(WKA_KIND, "wiki_files", lock="wiki-file-{id}", agent=False, live=live_sql(), trash_prune=True,
+          prune=" AND page_id IN (SELECT p.id FROM wiki_pages p WHERE p.deleted_at IS NULL)", on_prune=_wka_prune)
 
 
 def wka_page_files(c, page_ids):

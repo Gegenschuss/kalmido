@@ -29,9 +29,10 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   - (files/trashpurge.py tp_tick)       trash    trash             hub mails, deleted table rows / columns, deals, series, tombstones
                                                                     2.223.3 A (#2879): + absences, dispo bookings, polls with votes,
                                                                     appointment types, file requests
-  wiki_files (wiki/wikiatt.py)          trash    trash             files trashed on their own
+  obj_trash (core/writes.py)            trash    trash             2.1093.0 (#5472): + knowledge files trashed on their own
+                                                                    (part kind wiki_file) and table files no cell holds any more
+                                                                    (sheet_file); the runs wiki_files / sheet_files went
   wiki_e2e_held (wiki/wkhist.py)        trash    trash             2.528.0 D (#4306): versions held when a space's lock went on
-  sheet_files (sheets/shkinds.py)       trash    trash             table files no cell holds any more
   videos (videos/review.py)             trash    trash             comments trashed on their own (2.947.0 #5367: reviews = obj_trash)
   events (events/model.py)              trash    trash             events trashed on their own (2.947.0 #5367: calendars = obj_trash)
   (feeds: fetched articles are a cache, 30 days, no switch; 2.947.0 #5367: bookmarks and feeds = obj_trash)

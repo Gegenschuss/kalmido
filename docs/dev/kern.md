@@ -187,10 +187,17 @@ c.commit()
   without routes, node or listing: their routes check the area's rights, then call `obj_trash` / `obj_restore` / `obj_purge`
   (no core step: the areas keep their own undo); `base_role` mirrors the area's rule of deleting / restoring, the space hook
   names no organisation (the area's rule checks it). Their own purge runs (`tp_files`, `wiki_trash_tick`, the tables' line
-  of `tp_tick`, `wiki_purge`, `shx_purge`) are gone. Not yet on the core: files trashed on their own (knowledge files
-  `wka_tick`, table files `shk_tick`, held versions `wkx_tick`), deleted table rows / columns, and the followers that put
-  a table / page into the trash with a folder (`sheets/shfolder.py`, `wiki/wkfolder.py`): they write `deleted_at` directly,
-  the core's run deletes them all the same.
+  of `tp_tick`, `wiki_purge`, `shx_purge`) are gone. 2.1093.0 (#5472, the rest of stage 3): `obj_trash(..., checked=True,
+  ts=...)` = the trash of a way that checked the rights itself (as `obj_restore(checked=True)`), `ts` = one time for
+  several things that go as one. Every way that put a node, page or table into the trash by hand goes through
+  `fsk_trash` / `wkk_trash` / `shk_trash` (and back through `fsk_restore` / `wkk_restore` / `shk_restore`) now: the
+  followers of a folder's trash (`sheets/shfolder.py`, `wiki/wkfolder.py`: a page takes its files along), the undo of an
+  agent's new table (`sheets/core.py sh_undo_batch`), a split stack and its undo (`docs/split.py`), a mail's folder
+  (`hub/hubmail.py`), a move's undo (`admin/umz_undoplan.py`). Files trashed on their own are part kinds of the core's
+  run (`core/objparts.py part_kind`: `wiki_file` in `wiki/wikiatt.py`, `sheet_file` in `sheets/shkinds.py`; the runs
+  `wka_tick` / `shk_tick` are gone). Kept on purpose: `wkx_tick` (held versions and files of a locked space: it runs with
+  the switch off too and deletes versions that are in no trash), deleted table rows / columns (no objects: the file
+  store's run `tp_tick`), and the mail rows themselves (`hub_mails`, no core kind).
 - 2.905.0 (#5414, stage 4c): the master data (`omd_services`, `omd_equipment`, `omd_sets`, `omd_texts`, `omd_contracts`,
   `omd_roles` for roles and crew), the rights groups (`orgroup`, `base=` = who manages the office rights, checked after the
   office gates of #5418), the fixed costs and an import of them taken back (`ofixed`, one row each), the cash flow's

@@ -218,7 +218,11 @@ def _on_trash(c, uid, rid, restore):
     """A folder of the tree went into the file store's trash (restore False) / came back: its pages into the knowledge trash
     and back -- back only a page this mark still names (not one deleted on its own before or after). 2.528.0 D (#4306, B27):
     a name taken meanwhile no longer leaves it in the trash, it comes back as "Name (2)" ...; without the area's edit right
-    it stays and says so ("stays": the folder's restore tells the person, as for tables)."""
+    it stays and says so ("stays": the folder's restore tells the person, as for tables).
+    2.1093.0 (#5472): in and out through the core's trash (wiki/wkkern.py wkk_trash / wkk_restore, kind wiki_page; checked:
+    the folder's route checked the file store's rights, the way back checks wkf_base here): the page's files go with it and
+    come back with it (children), deleted_by, rev and the core's history as for a page deleted on its own."""
+    from .wkkern import wkk_restore, wkk_trash  # wkkern loads this module at its top
     r = _row(c, rid)
     if r is None or bool(r["deleted_at"]) != bool(restore) or wkf_locked(c, r):
         return
@@ -232,19 +236,19 @@ def _on_trash(c, uid, rid, restore):
             return "stays"
         try:
             with c.savepoint():
-                c.execute("UPDATE wiki_pages SET deleted_at=NULL WHERE id=?", (r["id"],))
+                wkk_restore(c, uid, r["id"], checked=True)
         except IntegrityError:  # its name was taken meanwhile: back with a free one (2.528.0 D, #4306)
             path = _wke_free_path(c, r["org_id"], r["owner_id"], r["id"], r["path"])
             try:
                 with c.savepoint():
-                    c.execute("UPDATE wiki_pages SET deleted_at=NULL, path=? WHERE id=?", (path, r["id"]))
+                    c.execute("UPDATE wiki_pages SET path=? WHERE id=?", (path, r["id"]))
+                    wkk_restore(c, uid, r["id"], checked=True)
             except IntegrityError:
                 return "stays"
     else:
-        ts = iso_ms(now_utc())
-        c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (ts, r["id"]))
-        if n is not None:
-            fs_log_add(c, n["id"], "trash", f"area:{ts}")
+        wkk_trash(c, uid, r["id"], checked=True)
+        if n is not None:  # the mark = the time as the row gives it back (the restore above compares the read value)
+            fs_log_add(c, n["id"], "trash", f"area:{_row(c, rid)['deleted_at']}")
 
 
 fs_ref_register(WKF_KIND, label=N_("Page"), open_url=lambda rid: f"wiki/{int(rid)}", base_role=_base, space=_space,

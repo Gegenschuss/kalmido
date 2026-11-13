@@ -4,8 +4,9 @@ Kinds (sheets/core.py SH_KINDS): checkbox (raw "1" / "0"; 1 / 0 in formulas, so 
 account id; shown with the name only for the people who may see the table, anyone else / a deleted account reads "Unknown"),
 link (http / https / mailto only, anything else is refused) and file (raw "file:<id>" of a row in sheet_files: the bytes
 sealed like task files, ATT_DIR/sheets/<sheet id>/, read only with the right to read the table). A cell that no longer holds
-its file puts the file into the trash (deleted_at; Undo of the cell brings it back), the watchdog removes it for good after
-SHK_TRASH_DAYS. Changing a column's kind keeps every input as it was (an input that does not fit reads as text).
+its file puts the file into the trash (deleted_at; Undo of the cell brings it back), the core's trash run removes it for good
+after the trash period (2.1093.0, #5472: part kind sheet_file). Changing a column's kind keeps every input as it was (an
+input that does not fit reads as text).
 
 freeze_rows / freeze_cols (sheets columns): the first N rows / columns stay in view while scrolling (the client makes them
 sticky); changed with the right to write the table. Not to be mixed up with sh_freeze (a cell's value kept as a copy).
@@ -18,17 +19,16 @@ import uuid
 
 from flask import jsonify, request
 
-from ..core.access import Denied, list_people, need_feat
+from ..core.access import Denied, list_people, live_sql, need_feat
 from ..core.config import ATT_DIR, MAX_FILE_MB, app
 from ..core.db import db, err, insert_id, iso_ms, now_utc, body
-from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..accounts.session import me
 from ..collab.comments import user_names
 from ..core.errors import BadInput
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.objparts import part_kind  # 2.1093.0 (#5472): the core's trash run of the files no cell holds
 from ..tasks.attachments import safe_name, send_stored  # 2.369.5 (#2517): pulled up from functions
 
 SHK_KINDS = ("checkbox", "person", "link", "file")
@@ -38,7 +38,6 @@ SHK_LINK_RE = re.compile(r"(?i)(?:https?://[^\s<>\"']+|mailto:[^\s<>\"']+)")
 SHK_BARE_RE = re.compile(r"(?i)(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:[/?#][^\s<>\"']*)?")
 SHK_FILE_RE = re.compile(r"file:(\d{1,15})")
 SHK_LINK_MAX = 2000
-SHK_TRASH_DAYS = 30  # 2.272.0 A (#3026): the run uses ret_trash_cut (KALMIDO_TRASH_DAYS); kept for older callers
 SHK_FREEZE_ROWS, SHK_FREEZE_COLS = 50, 20
 SHX_MOVE_FILE_FAIL = N_("A file could not be copied into the other workspace; nothing was moved")  # 2.528.0 (#4306 B25)
 
@@ -333,32 +332,25 @@ def shk_fixed(sid):
 
 
 # ---------------------------------------------------------------- the files' life (watchdog, move, purge)
-def shk_tick(c, force=False):
-    """Watchdog (rule "deleting = really gone"): a file no cell holds any more is removed for good after SHK_TRASH_DAYS --
-    row, scan / text marks, the stored file after the commit. Files of a table in the trash stay with it (its Undo).
-    2.272.0 A (#3026): hourly, the trash period (ret_trash_cut) and the switch ret_on("trash"); off = count only."""
-    if not ret_due("sheet_files", force=force):
-        return
-    cut, purge = ret_trash_cut(), ret_on("trash")
-    q0 = ("FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE f.deleted_at IS NOT NULL "
-          "AND f.deleted_at<? AND s.deleted_at IS NULL")
-    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        if not purge:
-            ret_report(c, "trash", {"files": c.execute(f"SELECT COUNT(*) {q0}", (cut,)).fetchone()[0]}, False, run="sheet_files")
-            c.commit()
-            return
-        rows = c.execute(f"SELECT f.id, f.path {q0} ORDER BY f.id LIMIT 500", (cut,)).fetchall()
-        ret_report(c, "trash", {"files": len(rows)}, True, run="sheet_files")
-        if not rows:
-            c.commit()
-            return
-        ids = [r["id"] for r in rows]
-        q = ",".join("?" * len(ids))
-        c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM sheet_files WHERE id IN ({q})", ids)
-    c.commit()
-    unlink_files([r["path"] for r in rows])
+def _shk_prune(c, where, args):
+    """2.1093.0 (#5472): the part of the core's retention run (core/objparts.py part_trash_purge, kind SHK_FILE_KIND) for the
+    files no cell holds any more (was shk_tick, rule "deleting = really gone"): their scan / text marks go before the rows ->
+    the stored files (relative to ATT_DIR), unlinked after the commit."""
+    rows = c.execute(f"SELECT id, path FROM sheet_files WHERE {where}", args).fetchall()
+    ids = [r["id"] for r in rows]
+    if ids:
+        c.execute("DELETE FROM upload_scan WHERE kind='sheet' AND ref_id = ANY(CAST(? AS BIGINT[]))", (ids,))
+        c.execute("DELETE FROM file_text WHERE kind='sheet' AND ref_id = ANY(CAST(? AS BIGINT[]))", (ids,))
+    return [r["path"] for r in rows if r["path"]]
+
+
+# 2.1093.0 (#5472): a file no cell holds any more (its sheet live) is a side object of the core's trash run (core/writes.py
+# obj_trash_tick: the trash period, the switch "trash", its report): deleted for good with its scan / text marks and its
+# stored file. The files of a table in the trash go with the table (sheets/shkern.py _shk_purge). The own run shk_tick
+# (report slot sheet_files) is gone.
+SHK_FILE_KIND = "sheet_file"
+part_kind(SHK_FILE_KIND, "sheet_files", lock="sheet-file-{id}", agent=False, live=live_sql(), trash_prune=True,
+          prune=" AND sheet_id IN (SELECT s.id FROM sheets s WHERE s.deleted_at IS NULL)", on_prune=_shk_prune)
 
 
 def shk_move_files(c, sid, to, uid, new_paths, old_paths, strict=True):

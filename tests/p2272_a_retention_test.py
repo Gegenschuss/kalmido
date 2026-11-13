@@ -9,6 +9,7 @@
    "obj_trash" with list / list_kept / task / task_kept); otr_prune and ttp_tick went
  - wiki: restoring a page brings its files back from the trash; the page run (wiki_trash_tick) and the files run (wka_tick)
    only count while the switch is off and delete the stored file with the switch on
+   2.1093.0 (#5472): the files run is the core's too (part kind wiki_file); wka_tick and shk_tick went
  - GET /api/admin/retention lists the new runs
  - a person without an organisation (freelancer fixture): a private list in the trash follows the same rule
 usage: p2272_a_retention_test.py <datadir>"""
@@ -173,10 +174,11 @@ check(c.execute("SELECT deleted_at FROM wiki_files WHERE id=?", (WF2,)).fetchone
       "#3026: a file deleted on its own before stays in the trash")
 # the files run: the lone trashed file (older than the period)
 c.execute("UPDATE wiki_files SET deleted_at=? WHERE id=?", ("2020-01-01T00:00:00.000+00:00", WF2))
-box("from kalmido.wiki.wikiatt import wka_tick\nwka_tick(c, force=True)\nprint('ok')")
-check(exists("wiki_files", WF2) and ((runs().get("wiki_files") or {}).get("counts") or {}).get("files") == 1,
-      f"#3026: switch off: the wiki file stays, counted {runs().get('wiki_files')}")
-box("from kalmido.wiki.wikiatt import wka_tick\nwka_tick(c, force=True)\nprint('ok')", on=True)
+# 2.1093.0 (#5472): the files deleted on their own go through the core's run (part kind wiki_file, report slot obj_trash);
+# wka_tick and its slot wiki_files are gone
+n = json.loads(box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, True)))") or "{}")
+check(exists("wiki_files", WF2) and n.get("wiki_file") == 1, f"#3026: switch off: the wiki file stays, counted {n}")
+box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, True)))", on=True)
 check(not exists("wiki_files", WF2), "#3026: switch on: the wiki file goes")
 # the page run
 check(A.delete(B + f"/api/wiki/pages/{WP}").ok, "setup: the page into the trash again")
@@ -191,9 +193,9 @@ check(not exists("wiki_pages", WP) and not os.path.exists(WFP), f"#3026: switch 
 # ---------------------------------------------------------------- the other runs report too (dry run)
 # 2.993.0 (#5413): the contract files and the entertainment receipts go through the core's run (obj_trash) now;
 # 2.981.0 (#5273): vdr_trash_prune is gone (the review comments go with the core's run of every comment)
-box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nprint('ok')")
-# 2.936.0 (#5364): the runs lists / tasks are the core's obj_trash now
-check({"obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
+# 2.936.0 (#5364): the runs lists / tasks are the core's obj_trash now; 2.1093.0 (#5472): the table files (shk_tick) and
+# the wiki files (wka_tick) too -- the slots sheet_files / wiki_files are gone
+check({"obj_trash"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.809.0 (#5365): wiki -> obj_trash
 
 # ---------------------------------------------------------------- freelancer: a private list in the trash
 FIDF, Fr = freelancer(B, A, features=FEAT)

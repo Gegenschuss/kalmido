@@ -689,8 +689,11 @@ def hbm_mail_del(mid):
     for nid in nodes:  # review of 2.536.0: a receipt of a locked month among them -> 409, the mail stays (as the file trash)
         pl_tree_need_open(c, nid)
     c.execute("UPDATE hub_mails SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, mid))
+    # 2.1093.0 (#5472): the nodes through the core's trash (files/fskern.py, kind fs_entry; checked: the mail's write right
+    # above is the right, as before) with the mail's time; the mail row itself is no core object (the file store's run)
+    from ..files.fskern import fsk_trash
     for nid in nodes:  # a node already in the trash keeps its own time stamp (it stays there on Undo)
-        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, nid))
+        fsk_trash(c, uid, nid, checked=True, ts=ts)
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -708,9 +711,11 @@ def hbm_mail_restore(mid):
     for n in back:  # review of 2.536.0: like the restore in the file trash, a receipt of a locked month -> 409
         pl_tree_need_open(c, n["id"])
     c.execute("UPDATE hub_mails SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (mid,))
+    from ..files.fskern import fsk_restore  # 2.1093.0 (#5472): out of the core's trash (checked: the mail's right above)
     for n in back:
-        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?",
+        c.execute("UPDATE fs_nodes SET name=? WHERE id=?",
                   (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"]), n["id"]))
+        fsk_restore(c, me(), n["id"], checked=True)
     bump(c)
     c.commit()
     return jsonify(ok=True)

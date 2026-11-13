@@ -876,13 +876,10 @@ def _watchdog_tick(c):
     # 2.993.0 (#5413): trashed contract PDFs and entertainment receipts go through the core's run ("core trash", office/okern.py)
     from ..office.terms import agb_purge_tick
     _wd_section(c, "terms files", agb_purge_tick)  # 2.143.0 D (#2259): replaced terms PDFs nobody names go after 30 days
-    from ..wiki.wikiatt import wka_tick
-    _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
-    # 2.809.0 (#5365): pages in the trash go through the core's run above ("core trash", wiki/wkkern.py)
+    # 2.809.0 (#5365): pages in the trash go through the core's run above ("core trash", wiki/wkkern.py); 2.1093.0 (#5472):
+    # so do the knowledge files and table files deleted on their own (part kinds wiki_file / sheet_file; wka_tick, shk_tick gone)
     from ..wiki.wkhist import wkx_tick
     _wd_section(c, "wiki held versions", wkx_tick)  # 2.528.0 D (#4306): versions held at a lock, after the trash period
-    from ..sheets.shkinds import shk_tick
-    _wd_section(c, "table files", shk_tick)  # 2.124.0 B (#2110): files no cell holds any more, for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)
 
 

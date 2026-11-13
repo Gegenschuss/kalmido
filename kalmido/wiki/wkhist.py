@@ -326,7 +326,11 @@ def wkx_tick(c, force=False):
     """Watchdog (hourly): held versions and held trash files of spaces still locked go after the trash period. Review 2.528
     (Fable 1): also with the retention switch off -- the person agreed to the period when switching the lock on, readable
     copies of an encrypted space must not stay for good. A space open again keeps them (its people see them again,
-    wkx_may_see). Holds no row names any more are cleared."""
+    wkx_may_see). Holds no row names any more are cleared.
+    2.1093.0 (#5472): kept on purpose, not moved onto the core's trash run (obj_trash_tick): it runs with the retention
+    switch off too (the core's run only counts then), it deletes held versions (obj_versions.held_at) that are in no
+    trash at all, and it decides by the space's lock and wkx_held_at, not by deleted_at alone. The files deleted on their
+    own of an open space are the core's (wiki/wikiatt.py part kind wiki_file)."""
     if not ret_due("wiki_e2e_held", force=force):
         return {}
     cut = ret_trash_cut()

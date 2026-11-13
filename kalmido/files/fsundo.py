@@ -24,7 +24,7 @@ from ..office.periodlock import pl_tree_need_open
 from .fslock import fsl_move_guard, fsl_of
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored
 from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_of, fs_area_root_need_free
-from .store import DEPTH_MAX, _free_name, _now, fs_chain, fs_deleted, fs_height, fs_log_add, need_node
+from .store import DEPTH_MAX, _free_name, fs_chain, fs_deleted, fs_height, fs_log_add, need_node
 
 FSU_KIND = "fs_node"
 FSU_KEEP = {"fs_nodes": {"kind", "agent_id", "ref_kind", "ref_id", "org_access", "created_by"}}
@@ -95,7 +95,9 @@ def fsu_need(c, uid, rid, oid):
             raise Denied(403)
         fs_ref_need_move(c, uid, x, restore=True)
         nm = _free_name(c, x["parent_id"], x["owner_id"], x["org_id"], x["name"], skip=int(rid))  # review F5: as the restore route
-        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, int(rid)))
+        c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, int(rid)))
+        from .fskern import fsk_restore  # 2.1093.0 (#5472): the core's trash (checked above; fskern loads the core at its top)
+        fsk_restore(c, uid, rid, checked=True)
         fs_log_add(c, rid, "restore")
         fs_trash_restored(c, uid, x)
 
@@ -103,7 +105,8 @@ def fsu_need(c, uid, rid, oid):
         if x["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
         _kept, refs = fs_trash_prepare(c, uid, x)
-        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, int(rid)))
+        from .fskern import fsk_trash  # 2.1093.0 (#5472): the core's trash (checked above)
+        fsk_trash(c, uid, rid, checked=True)
         fs_log_add(c, rid, "trash")
         for r in refs:
             fs_ref_trashed(c, uid, r, False)

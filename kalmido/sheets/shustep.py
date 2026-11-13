@@ -29,7 +29,7 @@ from ..core.undoweb import undo_need_reg
 from ..files.fsref import fs_ref_rename
 from .core import SH_STEP_KINDS, ShBook, sh_check_list, sh_freeze, sh_may_rebind, sh_need, sh_reload, sh_set_name, sh_touch
 from .shbook import SHB_TABS_MAX, _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
-from ..core.pg import qi, table_columns
+from ..core.pg import qi, table_columns, ts_canon
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
 from .shshare import shs_need_own
 from .web import sh_order_apply, shx_col_apply, shx_place
@@ -197,8 +197,13 @@ def _tab_trash(added):
         out = (not redo) if added else redo  # into the trash
         # 2.884.0 (#5479): a deleted sheet deleted again (redo) gets the time of now, like the rows / columns (_trash)
         when = ts if out else (ch["undone_at"] if added else ch["new_raw"])
+        # 2.1093.0 (#5472): in and out through the core's trash (sheets/shkern.py, checked: the step's rights were checked by
+        # the undo), with the step's time -- the way back compares it
+        from .shkern import shk_restore, shk_trash  # shkern loads sheets/core.py, as this module does
         if out:
-            n = c.execute(f"UPDATE sheets SET deleted_at=? WHERE id=? AND {live_sql()}", (when, t["id"])).rowcount
+            n = 0 if t["deleted_at"] else 1
+            if n:
+                shk_trash(c, uid, t["id"], checked=True, ts=when)
             if n and not added:
                 c.execute("UPDATE sheet_changes SET new_raw=? WHERE id=?", (ts, ch["id"]))
         else:
@@ -207,7 +212,9 @@ def _tab_trash(added):
                 return False, _tab_name(t)
             if any(shb_label(x).casefold() == shb_label(t).casefold() for x in tabs):
                 return False, _tab_name(t)  # its name is taken meanwhile
-            n = c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=? AND deleted_at=?", (t["id"], when)).rowcount
+            n = 1 if t["deleted_at"] and ts_canon(t["deleted_at"]) == ts_canon(when) else 0
+            if n:
+                shk_restore(c, uid, t["id"], checked=True)
         if not n:
             return False, _tab_name(t)
         sh_touch(c, r["id"], uid)

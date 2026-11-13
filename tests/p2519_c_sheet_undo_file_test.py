@@ -66,8 +66,9 @@ def purge_run():
     finally:
         c.close()
     out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", kt.CT, "python", "-c",
-                          "import app\nc = app.connect()\ntry:\n    from kalmido.sheets.shkinds import shk_tick\n"
-                          "    shk_tick(c, force=True)\nfinally:\n    c.close()\nprint('ok')"], capture_output=True, text=True)
+                          # 2.1093.0 (#5472): the files no cell holds go through the core's run (part kind sheet_file; shk_tick went)
+                          "import app\nc = app.connect()\ntry:\n    from kalmido.core.writes import obj_trash_tick\n"
+                          "    obj_trash_tick(c, True)\nfinally:\n    c.close()\nprint('ok')"], capture_output=True, text=True)
     check(out.returncode == 0 and out.stdout.strip().endswith("ok"), f"the trash run works {out.stdout[-200:]} {out.stderr[-800:]}")
 
 

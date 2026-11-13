@@ -77,20 +77,22 @@ obj_register(WKK_KIND, "wiki_pages", label=N_("Knowledge page"), fields={}, area
 obj_on_purge(WKK_KIND, _wkk_purge)
 
 
-def wkk_trash(c, uid, pid):
+def wkk_trash(c, uid, pid, checked=False, ts=None):
     """Into the core's trash (the route checked the rights): the page and its live files with the same time. No step of the
-    core's list: the app's own Undo brings it back (POST /api/wiki/restore)."""
-    return obj_trash(c, uid, WKK_KIND, pid, step=False)
+    core's list: the app's own Undo brings it back (POST /api/wiki/restore). 2.1093.0 (#5472): checked = a way that checked
+    the rights itself (a folder of the tree into the file store's trash, wkfolder._on_trash; a move's undo), ts its time."""
+    return obj_trash(c, uid, WKK_KIND, pid, step=False, checked=checked, ts=ts)
 
 
-def wkk_restore(c, uid, pid):
+def wkk_restore(c, uid, pid, checked=False):
     """Out of the core's trash with the files that went with it (a file deleted on its own before stays in the trash). A file
     held when the space's lock went on (wkx_held_at, 2.528.0 D #4306) stays in the trash here: only wikiatt.wkx_files_back
-    brings it back, for who could read the space then."""
+    brings it back, for who could read the space then. 2.1093.0 (#5472): checked as core/writes.py obj_restore (a folder's
+    restore that checked the space's edit right itself)."""
     held = c.execute(f"SELECT id, deleted_at FROM wiki_files WHERE page_id=? AND wkx_held_at IS NOT NULL AND {trash_sql()}",
                      (int(pid),)).fetchall()
     _wkk_align_old(c, pid)
-    out = obj_restore(c, uid, WKK_KIND, pid, step=False)
+    out = obj_restore(c, uid, WKK_KIND, pid, step=False, checked=checked)
     for f in held:
         c.execute(f"UPDATE wiki_files SET deleted_at=? WHERE id=? AND {live_sql()}", (f["deleted_at"], f["id"]))
     return out

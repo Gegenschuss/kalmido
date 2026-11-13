@@ -544,14 +544,23 @@ def obj_trash_step(c, uid, kind, rid, oid, op):
     _trash_step(c, uid, kind, rid, oid, op)
 
 
-def obj_trash(c, uid, kind, rid, step=True):
+def obj_trash(c, uid, kind, rid, step=True, checked=False, ts=None):
     """Into the trash (deleted_at): restorable by who manages it (obj_restore). 2.773.0 (#5292): THE trash of the core -- its
-    children go with it (obj_register children) and the step can be taken back (step=False: the undo itself)."""
+    children go with it (obj_register children) and the step can be taken back (step=False: the undo itself).
+    2.1093.0 (#5472): checked=True = the area checked the rights itself (as obj_restore checked: a folder's trash taking its
+    pages / tables along, the undo of an agent's new table, a mail's folder): no check of the core; gone = None. ts = the
+    time of a caller that puts several things into the trash as one (a mail with its nodes, a move's undo): its own way
+    back compares that time."""
     reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no write path of the core
-    row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
+    if checked:
+        row = obj_row(c, kind, rid)
+        if row is None:
+            return None
+    else:
+        row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
     write_lock(c, f"obj-{kind}-{int(rid)}")
     _kids_lock(c, reg, rid)  # 2.1017.0 (#5630): its children first, in id order (the order of a child's own save)
-    ts = _now()
+    ts = ts or _now()
     n = c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND {live_sql()}",
                   (ts, uid, ts, uid, int(rid))).rowcount
     if not n:

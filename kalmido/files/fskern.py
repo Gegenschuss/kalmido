@@ -62,15 +62,17 @@ obj_register(FSK_KIND, "fs_nodes", label=N_("File"), fields={}, area="other", ro
 obj_on_purge(FSK_KIND, _fsk_purge, lock=lambda c, rid: fs_purge_lock(c, fs_subtree(c, rid)))  # 2.1047.0 (#5835)
 
 
-def fsk_trash(c, uid, nid):
+def fsk_trash(c, uid, nid, checked=False, ts=None):
     """Into the core's trash (the route checked the rights, the locks and moved the protected nodes up). No step of the core's
-    list: the file store records its own (files/fsundo.py)."""
-    return obj_trash(c, uid, FSK_KIND, nid, step=False)
+    list: the file store records its own (files/fsundo.py). 2.1093.0 (#5472): checked / ts as core/writes.py obj_trash (a way
+    of another area that checked the rights itself: a split stack, a mail's folder, a move's undo)."""
+    return obj_trash(c, uid, FSK_KIND, nid, step=False, checked=checked, ts=ts)
 
 
-def fsk_restore(c, uid, nid):
-    """Out of the core's trash (the route freed the name first)."""
-    return obj_restore(c, uid, FSK_KIND, nid, step=False)
+def fsk_restore(c, uid, nid, checked=False):
+    """Out of the core's trash (the route freed the name first). 2.1093.0 (#5472): checked = the caller checked the rights
+    (core/writes.py obj_restore checked: it bumps itself)."""
+    return obj_restore(c, uid, FSK_KIND, nid, step=False, checked=checked)
 
 
 def fsk_purge(c, uid, nid):
