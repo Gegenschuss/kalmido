@@ -390,6 +390,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // A12: a toast above an open sheet
     await nav(B + '?p=4#l/' + P); await ready(ev, idle);
     await ev(`(() => { toast('Erledigt', () => {}); snoozeSheet(${T[1]}); return 1; })()`);
+    // 2.1102.0 (#4744): openPop places the toast in the next frame (requestAnimationFrame); a browser window without focus runs
+    // that frame late, the measuring below was done before it - wait until the page drew two frames after opening the sheet
+    await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`);
     // 2.308.0 (#3250): measure once the sheet and the toast stopped moving (same rects twice in a row) instead of after a fixed time
     const TSQ = `(() => { const t = document.querySelector('#toast').getBoundingClientRect(), s = document.querySelector('#pop.sheet').getBoundingClientRect(); return {tb: Math.round(t.bottom), st: Math.round(s.top), tt: Math.round(t.top), overlap: !(t.bottom <= s.top + 1 || t.top >= s.bottom)}; })()`;
     let ts = await ev(TSQ).catch(() => null);
