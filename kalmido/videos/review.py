@@ -811,7 +811,7 @@ def vdr_sig_row(c, s):
 
 
 def vdr_sig_valid(c, s):
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (s["created_by"],)).fetchone():
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (s["created_by"],)).fetchone():
         return False  # 2.666.0 (#5112): a disabled account's approval link is void (as the list links, signoff.py sig_check)
     r = vdr_sig_row(c, s)
     vs = vdr_versions(c, r["id"]) if r else []
@@ -1175,7 +1175,7 @@ def vdr_home(c, r, uid):
     if q and c.execute(q, (r[place], uid)).fetchone():
         new[place] = r[place]
     else:
-        new["list_id"] = (c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1 AND org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
+        new["list_id"] = (c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox AND org_id IS NULL ORDER BY id LIMIT 1", (uid,)).fetchone() or [None])[0]
         if not new["list_id"]:
             return False
     vid, ts = r["id"], iso(now_utc())

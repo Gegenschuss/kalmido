@@ -455,7 +455,7 @@ def rk_real_projects(c, oid, uid):
     basket, archived, end-to-end encrypted (no readable name) or health / budget lists. [{id, name}]; the trip / drive keeps
     the chosen name as its text "project" (the free text stays the fallback, nothing new is stored)."""
     org = None if pb_owner(c, oid) is not None else oid
-    rows = c.execute(f"SELECT id, name FROM lists WHERE is_inbox=0 AND {list_state_sql()} AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
+    rows = c.execute(f"SELECT id, name FROM lists WHERE NOT is_inbox AND {list_state_sql()} AND e2e IS NULL AND COALESCE(life, '') NOT IN ('health', 'budget') "
                      f"AND {'org_id IS NULL' if org is None else 'org_id=?'} AND id IN {vis_sql()} ORDER BY lower(name), id LIMIT 500",
                      ((uid, uid) if org is None else (org, uid, uid))).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows if (r["name"] or "").strip()]
@@ -477,7 +477,7 @@ def rk_trips_get():
     else:
         missing = c.execute(f"SELECT COUNT(*) FROM office_trip_items WHERE org_id=? AND datev=0 AND {live_sql()}", (oid,)).fetchone()[0]
     clients = [{"id": r["id"], "name": r["name"]} for r in
-               c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
+               c.execute(f"SELECT id, name FROM clients WHERE {rk_cl_where(c, oid)[0]} AND NOT archived AND deleted_at IS NULL ORDER BY lower(name)", rk_cl_where(c, oid)[1])]
     projects = [r[0] for r in c.execute(f"SELECT DISTINCT project_title FROM office_docs WHERE org_id=? AND project_title<>'' AND {live_sql()} ORDER BY 1",
                                         (oid,))][:300]  # 2.1005.0 (#5415): not the trash
     if own is not None:  # 2.187.0 B (#2476): the project names of the invoices are not part of "own"

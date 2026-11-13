@@ -266,7 +266,7 @@ check(Bo.put(B + f"/api/lists/{L1}/org-fields/{OFX}", json={"on": True}).status_
 PA = tok(A, ("read",))
 r = requests.get(V + "/tasks", headers=PA, params={"fkey_region": "north"})
 check(r.ok, f"setup: fkey_region works {r.status_code} {r.text[:120]}")
-dbw("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at,org_field_id) SELECT ?, 'Region ' || g, 'text', '{}', 0, 1000 + g, "
+dbw("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at,org_field_id) SELECT ?, 'Region ' || g, 'text', '{}', false, 1000 + g, "
     "'2026-01-01T00:00:00Z', ? FROM generate_series(1, 200) g", (L1, OFL))
 r = requests.get(V + "/tasks", headers=PA, params={"fkey_region": "north"})
 check(r.status_code == 400 and "200" in r.text, f"F9: more than 200 linked fields: 400 {r.status_code} {r.text[:160]}")

@@ -137,7 +137,7 @@ def _notify_admins(c, uid):
     data = {"user_id": uid, "name": u["display_name"], "username": u["username"], "email": u["email"] or ""}
     with system_ctx(c):  # the new account joined by its domain; nobody is signed in
         oids = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=?", (uid,)).fetchall()]
-        ops = [r[0] for r in c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0").fetchall()]
+        ops = [r[0] for r in c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled").fetchall()]
         org = {x: oid for oid in oids for x in org_admin_people(c, oid) if x not in ops}
     for aid in ops + list(org):
         s = usettings(c, aid)
@@ -154,7 +154,7 @@ def signup_confirmed(c, u):
         c.execute("UPDATE users SET signup='pending' WHERE id=?", (u["id"],))
         _notify_admins(c, u["id"])
         return True
-    c.execute("UPDATE users SET signup='', disabled=0 WHERE id=?", (u["id"],))
+    c.execute("UPDATE users SET signup='', disabled=false WHERE id=?", (u["id"],))
     return False
 
 
@@ -193,7 +193,7 @@ def auth_signup():
         print("registration ignored (domain or address)", "from", login_log_ip(client_ip()), flush=True)
         return answer
     uid = create_user(c, _username(c, email), name, pw if not mail else None, onboard=True)
-    c.execute("UPDATE users SET email=?, disabled=1, signup=? WHERE id=?", (email, "confirm" if mail else "pending", uid))
+    c.execute("UPDATE users SET email=?, disabled=true, signup=? WHERE id=?", (email, "confirm" if mail else "pending", uid))
     # 2.360.0 A (#2496): without e-mail the address is never confirmed: no organisation by its domain (an admin adds the
     # person after the approval)
     oid = org_for_email(c, email) if mail else None
@@ -225,7 +225,7 @@ def user_approve(uid):
     inst = ua8_may_approve(c, u, uid)  # 2.28.0 (#935)
     if u["signup"] != "pending":
         return err(tr("This account does not wait for an approval"), 409)
-    c.execute("UPDATE users SET signup='', disabled=0 WHERE id=?", (uid,))
+    c.execute("UPDATE users SET signup='', disabled=false WHERE id=?", (uid,))
     bump(c)
     c.commit()
     from .secmail import sec_mail

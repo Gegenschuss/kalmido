@@ -77,7 +77,7 @@ def disc_ref(c, uid, other):
 
 def _findable_sql():
     return ("SELECT u.id, u.display_name, u.username, u.avatar, u.email FROM disc_profiles p JOIN users u ON u.id=p.user_id "
-            "WHERE p.email=? AND p.confirmed_at IS NOT NULL AND u.disabled=0 AND u.kind='user' AND u.kid=0 AND u.signup=''")
+            "WHERE p.email=? AND p.confirmed_at IS NOT NULL AND NOT u.disabled AND u.kind='user' AND u.kid=0 AND u.signup=''")
 
 
 def _findable(c, email):
@@ -168,7 +168,7 @@ def disc_get():
     with system_ctx(c):  # the accounts of my own requests / connections / blocks (rows that name me)
         ppl = lambda sql, *a: c.execute(sql, a).fetchall()  # noqa: E731
         inc = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
-                     JOIN users u ON u.id=r.from_id WHERE r.to_id=? AND r.status='open' AND u.disabled=0 ORDER BY r.id DESC""", uid)
+                     JOIN users u ON u.id=r.from_id WHERE r.to_id=? AND r.status='open' AND NOT u.disabled ORDER BY r.id DESC""", uid)
         # 2.58.0 (#1792): a disabled target stays in "sent" (L4) -- dropping the row would tell the sender about the deactivation
         out = ppl("""SELECT r.id, r.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_requests r
                      JOIN users u ON u.id=r.to_id WHERE r.from_id=? AND r.status NOT IN ('wd_open','wd_declined','wd_hidden')
@@ -177,7 +177,7 @@ def disc_get():
                      ORDER BY r.id DESC""", uid)
         lk = ppl("""SELECT l.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_links l
                     JOIN users u ON u.id=CASE WHEN l.a_id=? THEN l.b_id ELSE l.a_id END
-                    WHERE (l.a_id=? OR l.b_id=?) AND l.deleted_at IS NULL AND u.disabled=0 ORDER BY u.display_name""", uid, uid, uid)
+                    WHERE (l.a_id=? OR l.b_id=?) AND l.deleted_at IS NULL AND NOT u.disabled ORDER BY u.display_name""", uid, uid, uid)
         bl = ppl("""SELECT b.created_at, u.id AS uid, u.display_name, u.username, u.avatar FROM conn_blocks b
                     JOIN users u ON u.id=b.blocked_id WHERE b.user_id=? ORDER BY b.created_at DESC""", uid)
     pp = lambda r: {"id": r["uid"], "name": r["display_name"] or r["username"], "avatar": _avatar(c, {**dict(r), "id": r["uid"]}),  # noqa: E731
@@ -348,7 +348,7 @@ def _accept(c, rid, me_):
     if not r:
         raise Denied(404)
     with system_ctx(c):  # the sender's account (they asked me)
-        s = c.execute("SELECT id FROM users WHERE id=? AND disabled=0 AND kind='user' AND kid=0", (r["from_id"],)).fetchone()
+        s = c.execute("SELECT id FROM users WHERE id=? AND NOT disabled AND kind='user' AND kid=0", (r["from_id"],)).fetchone()
     if not s:
         raise Denied(404)
     c.execute("UPDATE conn_requests SET status='accepted', decided_at=? WHERE id=?", (iso(now_utc()), rid))
@@ -406,7 +406,7 @@ def _ref_target(c, uid, ref):
     with system_ctx(c):  # candidates: findable accounts and the people of my own request / connection rows (ids only)
         ids = [r[0] for r in c.execute(
             """SELECT p.user_id FROM disc_profiles p JOIN users u ON u.id=p.user_id WHERE p.confirmed_at IS NOT NULL
-               AND u.disabled=0 AND u.kind='user' AND u.kid=0 AND u.signup=''
+               AND NOT u.disabled AND u.kind='user' AND u.kid=0 AND u.signup=''
                UNION SELECT to_id FROM conn_requests WHERE from_id=? UNION SELECT from_id FROM conn_requests WHERE to_id=?""",
             (uid, uid))]
     hit = 0
@@ -416,7 +416,7 @@ def _ref_target(c, uid, ref):
     if not hit:
         return 0
     with system_ctx(c):
-        r = c.execute("SELECT id, email FROM users WHERE id=? AND disabled=0 AND kind='user' AND kid=0", (hit,)).fetchone()
+        r = c.execute("SELECT id, email FROM users WHERE id=? AND NOT disabled AND kind='user' AND kid=0", (hit,)).fetchone()
         p = c.execute("SELECT email FROM disc_profiles WHERE user_id=? AND confirmed_at IS NOT NULL", (hit,)).fetchone()
     if not r:
         return 0
@@ -432,7 +432,7 @@ def disc_findable(c, uid, other):
     if c.execute("SELECT 1 FROM conn_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)", (uid, other, other, uid)).fetchone():
         return True
     with system_ctx(c):
-        r = c.execute("""SELECT u.email, p.email AS pe FROM users u JOIN disc_profiles p ON p.user_id=u.id WHERE u.id=? AND u.disabled=0
+        r = c.execute("""SELECT u.email, p.email AS pe FROM users u JOIN disc_profiles p ON p.user_id=u.id WHERE u.id=? AND NOT u.disabled
                          AND u.kind='user' AND u.kid=0 AND u.signup='' AND p.confirmed_at IS NOT NULL""", (other,)).fetchone()
     return bool(r and r["pe"] == disc_norm(r["email"] or ""))
 

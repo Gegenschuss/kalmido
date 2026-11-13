@@ -1008,7 +1008,7 @@ def v1_tasks():
     if a.get("pinned") not in (None, ""):  # 2.16.0 (#648): only pinned tasks (true) / only the others (false)
         if a["pinned"] not in ("1", "true", "0", "false"):
             raise BadInput(tr("Invalid value: {0}", "pinned"))
-        where.append("pinned=1" if a["pinned"] in ("1", "true") else "pinned=0")
+        where.append("pinned" if a["pinned"] in ("1", "true") else "NOT pinned")
     if a.get("milestone") not in (None, ""):  # 2.18.0 (#430): only milestones (true) / only the other tasks (false)
         if a["milestone"] not in ("1", "true", "0", "false"):
             raise BadInput(tr("Invalid value: {0}", "milestone"))
@@ -1986,7 +1986,7 @@ def v1_admin_status():
     latest, cur = semver(info.get("latest")), semver(APP_VERSION)
     with system_ctx(c):  # 2.37.0 (#1150): instance counts over every organisation (numbers only)
         n_lists = n("SELECT COUNT(*) FROM lists")
-    return jsonify(version=APP_VERSION, users=n("SELECT COUNT(*) FROM users WHERE disabled=0"), lists=n_lists,
+    return jsonify(version=APP_VERSION, users=n("SELECT COUNT(*) FROM users WHERE NOT disabled"), lists=n_lists,
                    open_tasks=n("SELECT COUNT(*) FROM tasks WHERE status=0 AND deleted_at IS NULL"),
                    update_available=bool(latest and cur and latest > cur), latest_version=info.get("latest") or None,
                    update_checked_at=info.get("checked_at") or None, update_error=info.get("error") or None,

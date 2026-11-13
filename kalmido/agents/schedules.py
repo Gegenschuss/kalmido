@@ -249,7 +249,7 @@ def sched_fire(c, r, now, manual=False, manual_by=None):
         if not prop_agent_ok(c, a, uid) and agent_active(a):  # the person may no longer ask the agent for proposals
             state = "no_access"
     if state:  # the plan cannot work any more: it switches itself off (the person sees why)
-        c.execute("UPDATE agent_schedules SET enabled=0, next_at=NULL, last_state=?, updated_at=? WHERE id=?", (state, iso(now), r["id"]))
+        c.execute("UPDATE agent_schedules SET enabled=false, next_at=NULL, last_state=?, updated_at=? WHERE id=?", (state, iso(now), r["id"]))
         return state
     if triage:
         return ast2_sched_triage(c, r, a, now, manual)
@@ -342,13 +342,13 @@ def sched_wait_wake(c, aid=None, uid=None, asked=False):
     Nothing else changes: the plan keeps its person, rhythm and text. Called by the watchdog (sched_tick). The caller commits."""
     with system_ctx(c):  # the plans of every person of this agent (structure: the check below is the person's own act and reach)
         rows = c.execute("SELECT s.id, s.agent_id, s.user_id FROM agent_schedules s JOIN users u ON u.id=s.user_id WHERE s.share_wait=1 "
-                         "AND u.disabled=0" + (" AND s.agent_id=?" if aid else "") + (" AND s.user_id=?" if uid else "")
+                         "AND NOT u.disabled" + (" AND s.agent_id=?" if aid else "") + (" AND s.user_id=?" if uid else "")
                          + " ORDER BY s.id LIMIT 500", tuple(x for x in (aid, uid) if x)).fetchall()
         n = 0
         for r in rows:
             if not (asked or agent_shared_by(c, r["agent_id"], r["user_id"])) or not agent_shares(c, r["agent_id"], r["user_id"]):
                 continue
-            c.execute("UPDATE agent_schedules SET enabled=1, share_wait=0, last_state='', updated_at=? WHERE id=? AND share_wait=1",
+            c.execute("UPDATE agent_schedules SET enabled=true, share_wait=0, last_state='', updated_at=? WHERE id=? AND share_wait=1",
                       (iso(now_utc()), r["id"]))
             _sched_set_next(c, r["id"])
             n += 1
@@ -364,7 +364,7 @@ def sched_tick(c):
     except Exception as e:  # noqa: BLE001 -- the due plans below still run
         c.rollback()
         print("agent schedules: waking waiting plans failed:", type(e).__name__, flush=True)
-    rows = c.execute("SELECT * FROM agent_schedules WHERE enabled=1 AND next_at IS NOT NULL AND next_at<=? ORDER BY next_at LIMIT ?",
+    rows = c.execute("SELECT * FROM agent_schedules WHERE enabled AND next_at IS NOT NULL AND next_at<=? ORDER BY next_at LIMIT ?",
                      (iso(now), SCHED_TICK_MAX)).fetchall()
     for r in rows:
         try:

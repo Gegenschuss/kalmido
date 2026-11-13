@@ -114,7 +114,7 @@ def abs_people(c, oid):
             q, a = "SELECT * FROM users WHERE id=?", (own[0],)
         else:
             q, a = "SELECT u.* FROM users u JOIN org_members m ON m.user_id=u.id WHERE m.org_id=?", (oid,)
-        return c.execute(f"SELECT * FROM ({q}) x WHERE disabled=0 AND kid=0 AND COALESCE(kind,'user')!='agent' "
+        return c.execute(f"SELECT * FROM ({q}) x WHERE NOT disabled AND kid=0 AND COALESCE(kind,'user')!='agent' "
                          "ORDER BY lower(display_name), id", a).fetchall()
 
 

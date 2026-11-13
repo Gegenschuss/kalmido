@@ -211,7 +211,7 @@ def _p_bank_account(c, run, src, d, ctx):
             run.oi_bank_warned = True
             run.warning(N_("The target office keeps its own bank accounts; the bank accounts of the archive were left out."))
         return False
-    if d.get("is_default") and c.execute("SELECT 1 FROM office_bank_accounts WHERE org_id=? AND is_default=1", (ctx.space,)).fetchone():
+    if d.get("is_default") and c.execute("SELECT 1 FROM office_bank_accounts WHERE org_id=? AND is_default", (ctx.space,)).fetchone():
         d["is_default"] = 0
     return d
 

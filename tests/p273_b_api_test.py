@@ -302,7 +302,7 @@ res = j.get("result") or {}
 check(res.get("import_id") and res.get("created", {}).get("tasks") == len([t for t in D["tasks"] if not t.get("deleted_at")]),
       f"result {res.get('created')}")
 check(not os.path.exists(os.path.join(DATA, "exports", "account-import", str(DAVE), iid, "upload.bin")), "the upload is gone after the run")
-dl = {r_["name"]: r_ for r_ in dbx("SELECT id, name, org_id FROM lists WHERE owner_id=? AND is_inbox=0", (DAVE,))}
+dl = {r_["name"]: r_ for r_ in dbx("SELECT id, name, org_id FROM lists WHERE owner_id=? AND NOT is_inbox", (DAVE,))}
 check({"Umzug Privatliste", "Alpha Orgliste"} <= set(dl) and all(dl[n]["org_id"] is None for n in ("Umzug Privatliste", "Alpha Orgliste")),
       f"dave's new lists, private {list(dl)}")
 check(dl["Umzug Privatliste"]["id"] != LP, "new ids")

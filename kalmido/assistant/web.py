@@ -72,7 +72,7 @@ def asst_lists(c, uid, own=True):
     -> [{id, name}] in the order of the sidebar."""
     mine = " AND l.owner_id=?" if own else ""
     rows = c.execute(f"""SELECT l.id, l.name FROM assistant_access a JOIN lists l ON l.id=a.list_id
-                         WHERE a.user_id=? AND l.id IN {vis_sql()} AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL
+                         WHERE a.user_id=? AND l.id IN {vis_sql()} AND NOT l.is_inbox AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL
                          AND {list_archived_sql('l')}=0{mine} ORDER BY l.sort, l.id""", (uid, uid, uid) + ((uid,) if own else ())).fetchall()
     return [{"id": r["id"], "name": r["name"]} for r in rows]
 
@@ -134,7 +134,7 @@ def asst_put_lists():
     ok = set()
     if want:
         ok = {r[0] for r in c.execute(f"""SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(want))}) AND l.id IN {vis_sql()}
-                                         AND l.is_inbox=0 AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL AND {list_archived_sql('l')}=0""",
+                                         AND NOT l.is_inbox AND COALESCE(l.life, '') NOT IN ('health', 'budget') AND NOT {org_trip_sql()} AND l.e2e IS NULL AND {list_archived_sql('l')}=0""",
                                       (*want, uid, uid))}
         foreign = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(ok))}) AND owner_id IS DISTINCT FROM ?",
                                            (*sorted(ok), uid))} if ok else set()
@@ -216,7 +216,7 @@ def asst_joined_notice(c, lid, actor):
     if not l:
         return
     people = {l["owner_id"]} | {r[0] for r in c.execute("""SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id
-                                                          WHERE m.list_id=? AND u.kind!='agent' AND u.disabled=0""", (lid,))}
+                                                          WHERE m.list_id=? AND u.kind!='agent' AND NOT u.disabled""", (lid,))}
     info = A.asst_info() or {}
     for uid in people:
         if uid and uid != actor:
@@ -232,7 +232,7 @@ def asst_comments_notice(c, oid, actor):
     if not r or r["asst_comments"] or not A.asst_on():
         return
     for (uid,) in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
-                               WHERE m.org_id=? AND u.kind!='agent' AND u.disabled=0""", (oid,)).fetchall():
+                               WHERE m.org_id=? AND u.kind!='agent' AND NOT u.disabled""", (oid,)).fetchall():
         if uid != actor:
             news_add(c, uid, "orglist", data={"action": "asstcomments", "name": "", "org": r["name"], "org_id": oid}, actor=actor)  # 2.540.0 (#4383): org_id
 

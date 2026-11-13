@@ -1645,7 +1645,7 @@ def rck_tell(c, oid, actor, action):
         if not org or org["personal_of"]:
             return 0
         ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
-                                       "AND u.kind!='agent' AND u.disabled=0 ORDER BY m.user_id", (int(oid),))]
+                                       "AND u.kind!='agent' AND NOT u.disabled ORDER BY m.user_id", (int(oid),))]
         by = ""
         if actor:
             a = c.execute("SELECT display_name, username FROM users WHERE id=?", (int(actor),)).fetchone()
@@ -1681,7 +1681,7 @@ def rck_admin_gone(c, oid, uid):
         a = c.execute("SELECT display_name, username FROM users WHERE id=?", (int(uid),)).fetchone()
         by = (a["display_name"] or a["username"]) if a else ""
         ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
-                                       "AND m.role='admin' AND u.kind!='agent' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id",
+                                       "AND m.role='admin' AND u.kind!='agent' AND NOT u.disabled AND m.user_id!=? ORDER BY m.user_id",
                                        (int(oid), int(uid)))]
         for x in ids:  # actor_id NULL: the account may be deleted next (the name stays in the item)
             c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",

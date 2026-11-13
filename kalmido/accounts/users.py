@@ -111,7 +111,7 @@ def _admin_struct(c, u):
         d = {"orgs": [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (u["id"],))]}
         if (u["kind"] or "user") == "agent":
             d["org_id"] = (c.execute("SELECT org_id FROM agents WHERE user_id=?", (u["id"],)).fetchone() or [None])[0]
-        d["lists"] = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (u["id"],)).fetchone()[0]
+        d["lists"] = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND NOT is_inbox", (u["id"],)).fetchone()[0]
     return d
 
 
@@ -182,7 +182,7 @@ def users_list():
     # carry the workspace they work in
     with system_ctx(c):  # 2.37.0 (#1150): which accounts are agents and of which workspace (ids, structure; vis filters people)
         ag_org = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents")}
-        rows = c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
+        rows = c.execute("""SELECT * FROM users WHERE NOT disabled AND id NOT IN
                             (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,)).fetchall()
     from ..accounts.orgs import user_orgs
     # 2.627.0 (#4526): the caller's organisations (not retired; an agent: its workspace), once; each person's list is cut to them
@@ -223,7 +223,7 @@ def _proxy_taken(c, login, uid=None):
 
 
 def _active_admins(c, without=None):
-    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin=1 AND disabled=0 AND id IS DISTINCT FROM ?", (without,)).fetchone()[0]
+    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin AND NOT disabled AND id IS DISTINCT FROM ?", (without,)).fetchone()[0]
 
 
 @app.post("/api/users")
@@ -342,7 +342,7 @@ def user_update(uid):
                         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
                     org_leave(c, o, uid, heir)
                     continue
-                heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
+                heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
                 heir = heir if heir != uid else me()
                 if heir == me():
                     org_heir_lift(c, o, heir)  # 2.538.0 (#4371, review 2646 finding 8): in it as guest / read-only: admin first, no 409 halfway
@@ -505,7 +505,7 @@ def user_delete_run(c, uid, actor, along=False, settle=None, how=None):
         c.execute("SELECT node_id FROM doc_meta WHERE node_id IN (SELECT id FROM fs_nodes WHERE owner_id=?) "
                   "OR org_id IN (SELECT id FROM orgs WHERE personal_of=?) ORDER BY node_id FOR UPDATE", (uid, uid)).fetchall()
     with system_ctx(c):  # 2.37.0 (#1150): a count over every organisation (lists the admin cannot see still block the deletion)
-        n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()[0]
+        n = c.execute("SELECT COUNT(*) FROM lists WHERE owner_id=? AND NOT is_inbox", (uid,)).fetchone()[0]
     icons, lfiles, audit = [], [], (None, ())
     if n and settle is None:
         c.rollback()
@@ -593,7 +593,7 @@ def _user_purge(c, uid, made):
     c.execute("DELETE FROM habits WHERE user_id=?", (uid,))
     c.execute("DELETE FROM pomos WHERE user_id=?", (uid,))
     c.execute("DELETE FROM time_entries WHERE user_id=?", (uid,))  # 2.152.0 A: the private ones (organisation time stays, upg_rest)
-    c.execute("DELETE FROM filters WHERE user_id=? AND shared=0", (uid,))
+    c.execute("DELETE FROM filters WHERE user_id=? AND NOT shared", (uid,))
     c.execute("UPDATE filters SET user_id=NULL WHERE user_id=?", (uid,))  # 2.577.0 (#3356): a shared view stays with its project
     c.execute("DELETE FROM obj_tags WHERE scope_kind='user' AND scope_id=?", (str(uid),))  # 2.955.0 (#5276): the personal tags (were task_tags)
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE assignee_id=?", (uid,))
@@ -652,7 +652,7 @@ def _user_purge(c, uid, made):
                 c.execute("UPDATE rss_feeds SET user_id=? WHERE user_id=? AND org_id=?", (h, uid, o))
         # 2.172.1 A (#2689): an organisation's bookmarks stay with it the same way (private ones go with the account)
         for (o,) in c.execute("SELECT DISTINCT org_id FROM bookmarks WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
-            h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
+            h = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone()
             if h:
                 c.execute("UPDATE bookmarks SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
         from ..sheets.shshare import shs_forget

@@ -459,7 +459,7 @@ def mbr_run(M, box):
     """The document rules of mailbox box (a row as dict) on the logged-in connection M; stores the state. -> documents taken."""
     if not mbr_due(box):
         return 0
-    rules = _bg(lambda c: [dict(x) for x in c.execute("SELECT * FROM hub_mailbox_rules WHERE box_id=? AND active=1 ORDER BY pos, id",
+    rules = _bg(lambda c: [dict(x) for x in c.execute("SELECT * FROM hub_mailbox_rules WHERE box_id=? AND active ORDER BY pos, id",
                                                        (box["id"],)).fetchall()])
     if not rules:
         if box["docs_due"]:

@@ -234,8 +234,8 @@ R1, R2, R3 = receipt(Fr, "Lizenz Eins", "119.00"), receipt(Fr, "Lizenz Zwei", "5
 FAKE = upload(Fr, "Lizenz Kopie.pdf")
 done(Fr, FAKE)
 # a possible duplicate of a document that is no receipt (FAKE) and one of a receipt (R1)
-sql("UPDATE doc_meta SET dup_of=?, dup_ok=0 WHERE node_id=?", (FAKE, R2), write=True)
-sql("UPDATE doc_meta SET dup_of=?, dup_ok=0 WHERE node_id=?", (R1, R3), write=True)
+sql("UPDATE doc_meta SET dup_of=?, dup_ok=false WHERE node_id=?", (FAKE, R2), write=True)
+sql("UPDATE doc_meta SET dup_of=?, dup_ok=false WHERE node_id=?", (R1, R3), write=True)
 P = f"?from={MONTH}-01&to={TODAY}"
 r = Fr.get(B + O + "/datev/extf" + P)
 bel = {x[10].strip('"') for x in (ln.split(";") for ln in r.content.decode("cp1252").split("\r\n")[2:-1])} if r.ok else set()

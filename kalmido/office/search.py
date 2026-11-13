@@ -82,7 +82,7 @@ def bs_office_hits(c, uid, q):
     low, cf = q.lower(), q.casefold()
     out = []
     if _clients_ok(c, uid, oid):
-        for r in c.execute(f"""SELECT id, name, contact, customer_no FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL
+        for r in c.execute(f"""SELECT id, name, contact, customer_no FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL
                 AND (name ILIKE ? ESCAPE '\\' OR contact ILIKE ? ESCAPE '\\' OR customer_no ILIKE ? ESCAPE '\\')
                 ORDER BY (lower(name) LIKE ? ESCAPE '\\') DESC, lower(name), id LIMIT {BS_LIMIT} -- pg-ok: both sides lower-cased""",
                            (like, like, like, f"{like_escape(low)}%")).fetchall():

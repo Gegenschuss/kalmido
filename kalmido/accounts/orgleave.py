@@ -93,7 +93,7 @@ def olv_info(c, oid, uid, heir):
     """What uid leaving oid means (heir = who gets their projects, calendars, address books): back (names of the projects
     uid brought in, they go back private), to_heir {lists, calendars, books}, heir (name), stays + stays_text, assigned."""
     with system_ctx(c):
-        lists = c.execute("SELECT id, name, brought_by, deleted_at FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0 ORDER BY name",
+        lists = c.execute("SELECT id, name, brought_by, deleted_at FROM lists WHERE owner_id=? AND org_id=? AND NOT is_inbox ORDER BY name",
                           (uid, oid)).fetchall()
         back = [x["name"] for x in lists if x["brought_by"] == uid and not x["deleted_at"]]
         given = sum(1 for x in lists if not (x["brought_by"] == uid and not x["deleted_at"]))
@@ -125,14 +125,14 @@ def olv_leave_info(oid):
     if not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone():
         return err(tr("unknown"), 404)
     heir = me() if uid != me() else (c.execute(
-        "SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 "
+        "SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND NOT u.disabled "
         "AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
     if uid != me() and request.args.get("to"):  # review: the admin hands the lists to another member (?to=, as the removal)
         heir = org_heir_to(c, oid, uid, request.args["to"])  # 2.512.0 (#4076): never the name of an account from outside
         if heir is None:
             return err(tr("The projects can only go to another active person of the organisation"), 400)
     if heir is None and not _operator_apart():  # review: the only admin leaves: the operator takes over (as org_member_remove)
-        heir = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
+        heir = (c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
                           (uid,)).fetchone() or [None])[0]
     return jsonify(olv_info(c, oid, uid, heir))
 

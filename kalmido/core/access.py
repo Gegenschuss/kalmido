@@ -55,7 +55,7 @@ def addr_account(c, em):
     em = str(em or "").strip().lower()[:200]
     if not em:
         return None
-    r = c.execute("SELECT id FROM users WHERE lower(email)=? AND email_proved=? AND disabled=0 AND COALESCE(kind,'user')!='agent' "
+    r = c.execute("SELECT id FROM users WHERE lower(email)=? AND email_proved=? AND NOT disabled AND COALESCE(kind,'user')!='agent' "
                   "ORDER BY id LIMIT 1", (em, em)).fetchone()
     return r[0] if r else None
 
@@ -165,7 +165,7 @@ def org_admin_people(c, oid):
     """2.367.4 (#2974): the ids of the active people who are admins of organisation oid: they hear of its events, not the operator."""
     with pg_system(c):  # structure; the caller may be an agent or a sign-in without a context
         return [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
-                                        "AND u.disabled=0 AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id", (oid,))]
+                                        "AND NOT u.disabled AND COALESCE(u.kind,'')!='agent' ORDER BY m.user_id", (oid,))]
 
 
 # Background threads, the watchdog and migrations use system_ctx() (greppable). In 2.37 (Postgres) exactly these values are
@@ -943,7 +943,7 @@ def need_list(c, lid, write=True, owner=False, manage=False):
 
 # list types (package D2): time tracking, dependencies, custom fields and project status only in project lists
 # 2.352.0 B (#2752): every list is a project except the inbox; kind stays in the database but is not read any more
-PROJ_SQL = "(SELECT id FROM lists WHERE is_inbox=0)"
+PROJ_SQL = "(SELECT id FROM lists WHERE NOT is_inbox)"
 
 
 def is_project(c, lid):
@@ -1033,11 +1033,11 @@ def list_people(c, lid):
 
 def my_inbox(c, uid=None):
     uid = uid or me()
-    r = c.execute("SELECT id FROM lists WHERE is_inbox=1 AND owner_id=?", (uid,)).fetchone()
+    r = c.execute("SELECT id FROM lists WHERE is_inbox AND owner_id=?", (uid,)).fetchone()
     if r:
         return r[0]
     ensure_inbox(c, uid)
-    return c.execute("SELECT id FROM lists WHERE is_inbox=1 AND owner_id=?", (uid,)).fetchone()[0]
+    return c.execute("SELECT id FROM lists WHERE is_inbox AND owner_id=?", (uid,)).fetchone()[0]
 
 
 def my_max_sort(c, uid):

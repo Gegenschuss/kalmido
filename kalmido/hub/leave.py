@@ -123,7 +123,7 @@ def lv_status_edit(c, uid, r, v):
 def lv_admins(c, oid):
     with system_ctx(c):  # membership structure of the caller's own organisation (checked by abs_org)
         return [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
-                                        "AND m.role='admin' AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'", (oid,)).fetchall()]
+                                        "AND m.role='admin' AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent'", (oid,)).fetchall()]
 
 
 def lv_notify(c, rcpts, kind, r, data):

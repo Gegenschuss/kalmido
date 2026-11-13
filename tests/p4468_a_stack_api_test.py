@@ -58,7 +58,7 @@ for who, s in (("alice", A), ("frida", F)):
     old = up(s, f"{who}-older.pdf", "Older letter")
     nid = up(s, f"{who}-stack.pdf", "Stack of letters")
     check(done(s, old) and done(s, nid), f"{who}: both documents processed")
-    kt.dbx("UPDATE doc_meta SET extracted=?, dup_of=?, dup_ok=0 WHERE node_id=?", (json.dumps(X), old, nid))
+    kt.dbx("UPDATE doc_meta SET extracted=?, dup_of=?, dup_ok=false WHERE node_id=?", (json.dumps(X), old, nid))
     # control first: not a stack -> the values, the hints and the duplicate warning are there
     d0 = doc(s, nid)
     check(d0 and (d0.get("extracted") or {}).get("invoice_no") == "SW-2026-4411" and d0.get("duplicate_of"),

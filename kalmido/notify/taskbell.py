@@ -110,7 +110,7 @@ def tbl_urgent_users(c, tid):
     ids = sorted(u for u, r in tbl_rows(c, tid).items() if r["level"] == "urgent")
     if not ids:
         return set()
-    return {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind!='agent' AND disabled=0 AND id IN ({','.join('?' * len(ids))})", ids)}
+    return {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind!='agent' AND NOT disabled AND id IN ({','.join('?' * len(ids))})", ids)}
 
 
 def tbl_sent(uid, tid):

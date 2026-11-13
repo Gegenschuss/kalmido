@@ -112,7 +112,7 @@ alice_job = next(x[0] for x in rows if x[2] == ALICE)
 check(Bo.get(B + "/api/agents/jobs", params={"id": alice_job}).json()["jobs"] == [], "#1432: ?id= of a job not mine: empty")
 
 # ================================================================== completed / trash
-INBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
+INBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
 SHL = A.post(B + "/api/lists", json={"name": "Shared desk", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/lists/{SHL}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: Bob edits Alice's list")
 ids = [Bo.post(B + "/api/tasks", json={"title": f"Errand {i}", "list_id": INBOX}).json()["id"] for i in range(250)]

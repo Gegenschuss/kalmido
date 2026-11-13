@@ -1001,7 +1001,7 @@ def cal_loop():
             try:
                 with GATE.bg():  # 2.506.1 (#3377): read in the gate and commit: no open transaction (locks) while GATE.bg() below waits for a restore (git_loop)
                     rows = c.execute("""SELECT s.id, s.tried_at, s.interval, s.fails FROM cal_subs s JOIN users u ON u.id=s.user_id
-                                        WHERE u.disabled=0 ORDER BY s.tried_at IS NOT NULL, s.tried_at""").fetchall()
+                                        WHERE NOT u.disabled ORDER BY s.tried_at IS NOT NULL, s.tried_at""").fetchall()
                     c.commit()
                 now = now_utc()
                 for r in rows:
@@ -1072,7 +1072,7 @@ def cal_sig(c, uid):
 
 def cal_sig_q(uid):
     """2.149.0 C (#2507): the query of cal_sig (one row, 3 columns; /api/version runs it inside one statement)."""
-    return "SELECT COUNT(*), MAX(changed_at), SUM(visible) FROM cal_subs WHERE user_id=?", (uid,)
+    return "SELECT COUNT(*), MAX(changed_at), SUM(CAST(visible AS INTEGER)) FROM cal_subs WHERE user_id=?", (uid,)
 
 
 def cal_sig_fmt(r):
@@ -1335,10 +1335,10 @@ def cal_events():
         return jsonify(events=own, subs={}, evcals=evcals)
     # 2.52.0 B (#1128): w = a writable CalDAV subscription; its events carry uid, dvw_write and dvw_rec (a repeating series)
     subs = {r["id"]: {"name": r["name"], "color": r["color"], "w": bool(r["kind"] == "caldav" and r["dav_write"] and r["dav_can_write"])}
-            for r in c.execute("SELECT id, name, color, kind, dav_write, dav_can_write FROM cal_subs WHERE user_id=? AND visible=1", (uid,))}
+            for r in c.execute("SELECT id, name, color, kind, dav_write, dav_can_write FROM cal_subs WHERE user_id=? AND visible", (uid,))}
     rows = c.execute("""SELECT e.*, d.href AS dvw_href, d.rec AS dvw_rec FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
                         LEFT JOIN cal_dav_res d ON d.sub_id=e.sub_id AND d.uid=e.uid
-                        WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start, e.id LIMIT 20000""",
+                        WHERE s.user_id=? AND s.visible AND e.d1>=? AND e.d0<=? ORDER BY e.start, e.id LIMIT 20000""",
                      (uid, lo.isoformat(), hi.isoformat())).fetchall()
     return jsonify(events=[{"id": r["id"], "sub": r["sub_id"], "title": r["title"], "location": r["location"],
                             "description": r["description"], "all_day": bool(r["all_day"]), "start": r["start"], "end": r["end"],

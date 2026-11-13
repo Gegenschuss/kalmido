@@ -104,7 +104,7 @@ def ms_clients_bulk(c, uid, b):
                 sk += 1
             elif i in used:
                 if not r["archived"]:
-                    c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (ts, i))
+                    c.execute("UPDATE clients SET archived=true, updated_at=? WHERE id=?", (ts, i))
                 ar.append(i)
             else:
                 cl_trash(c, i)  # 2.272.0 D (#3029): into the trash (undo: action untrash)

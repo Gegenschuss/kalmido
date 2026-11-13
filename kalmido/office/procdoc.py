@@ -197,7 +197,7 @@ def pd_auto(c, oid, L):
     out["numbers"] = "\n".join([f"- {t(de, en)}: {s.get(k) or num.get(kind) or '-'}" for kind, de, en, k in labels] + [
         t("Nummern werden fortlaufend je Nummernkreis vergeben und sind je Büro eindeutig.",
           "Numbers are given in sequence per number range and are unique per office.")])
-    books = _count(c, "SELECT COUNT(*) FROM office_cashbooks WHERE org_id=? AND archived=0", (oid,))
+    books = _count(c, "SELECT COUNT(*) FROM office_cashbooks WHERE org_id=? AND NOT archived", (oid,))
     out["cashbook"] = (t(f"{books} Kassenbuch/Kassenbücher in Gebrauch. ", f"{books} cash book(s) in use. ") if books
                        else t("Kein Kassenbuch angelegt. ", "No cash book set up. ")) + t(
         "Einträge werden je Kasse lückenlos nummeriert und nie gelöscht; Rücknahme nur per Gegenbuchung (Storno). "

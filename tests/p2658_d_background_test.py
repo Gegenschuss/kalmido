@@ -95,7 +95,7 @@ def maybe(t, *a, **k):
     return orig(t, *a, **k)
 P.wd_rem_maybe = maybe
 with system_ctx(c):
-    users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
+    users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE NOT disabled")}
     S = P._wd_settings(c, users)
     LG = {u: "en" for u in users}
     for u in S:

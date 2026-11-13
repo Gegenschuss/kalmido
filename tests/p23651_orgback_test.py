@@ -263,7 +263,7 @@ check(pp == ("Second (2)", CAROL), f"a page path taken gets (2) ({pp})")
 g = Ca.get(B + f"/api/wiki/pages/{P1}")
 check(g.ok and "[[Second (2)]]" in g.json().get("body", ""), f"the link follows the new path ({g.text[:200]})")
 check(sql("SELECT list_id, client_id, task_id FROM video_reviews WHERE id=?", (V2,))[0] == (OWNL, None, None), "a review at a project that went back stays there")
-inbox = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1 AND org_id IS NULL", (CAROL,))[0][0]
+inbox = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox AND org_id IS NULL", (CAROL,))[0][0]
 check(sql("SELECT list_id FROM video_reviews WHERE id=?", (V1,))[0][0] == inbox, "a review of an Alpha project lands in the inbox")
 acts = [json.loads(d) if isinstance(d, str) else d for (d,) in sql("SELECT detail FROM org_list_log WHERE org_id=? AND action='moveout'", (ORG,))]
 kinds = sorted(a["kind"] for a in acts)

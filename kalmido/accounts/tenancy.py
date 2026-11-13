@@ -249,7 +249,7 @@ CHECKS = {
     # pauses itself when it runs: lists/rules.py rul_target_ok)
     # 2.115.0 A (#2061): an organisation's webhook (switched on) whose owner is no admin of it any more (it turns itself off at the
     # next event: integrations/webhooks.py who_admin_ok; counted only) -- (webhook, its owner)
-    "org_webhook": ("SELECT w.id, w.user_id FROM webhooks w WHERE w.org_id IS NOT NULL AND w.enabled=1 AND NOT EXISTS "
+    "org_webhook": ("SELECT w.id, w.user_id FROM webhooks w WHERE w.org_id IS NOT NULL AND w.enabled AND NOT EXISTS "
                     "(SELECT 1 FROM org_members om WHERE om.org_id=w.org_id AND om.user_id=w.user_id AND om.role='admin')"),
     "list_rule": ("SELECT r.id, r.created_by FROM list_rules r JOIN lists l ON l.id=r.list_id LEFT JOIN lists t ON t.id=r.target_list_id "
                   "WHERE r.deleted_at IS NULL AND (r.org_id IS DISTINCT FROM l.org_id OR (t.id IS NOT NULL AND t.org_id IS DISTINCT FROM l.org_id))"),

@@ -292,7 +292,7 @@ check(r.status_code == 207 and f"{MARK} cal" in r.text, "DAV: bob sees Alpha's c
 
 # ---- a public link of an Alpha list: resolved past RLS, shows exactly that list
 TA = Bo.post(B + "/api/tasks", json={"title": f"{MARK} public task", "list_id": LA}).json()["id"]
-Bo.post(B + "/api/tasks", json={"title": "other list task", "list_id": sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]})
+Bo.post(B + "/api/tasks", json={"title": "other list task", "list_id": sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]})
 r = Bo.put(B + f"/api/lists/{LA}/public-link", json={"mode": "tick"})
 check(r.ok, "public link of an Alpha list " + r.text[:100])
 url = r.json()["link"]["url"].replace("https://kalmido.example", "")

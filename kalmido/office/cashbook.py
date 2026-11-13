@@ -169,7 +169,7 @@ def cb_default(c, oid, uid):
         return
     ts = iso(now_utc())
     bid = insert_id(c, "INSERT INTO office_cashbooks(org_id, name, opening, opening_day, is_default, archived, created_by, created_at, updated_at) "
-                       "VALUES(?,?,?,?,1,0,?,?,?)", (oid, tr("Cash box"), "0.00", _today(), uid, ts, ts))
+                       "VALUES(?,?,?,?,true,false,?,?,?)", (oid, tr("Cash box"), "0.00", _today(), uid, ts, ts))
     _log(c, oid, bid, None, "book_create", {"name": tr("Cash box"), "opening": "0.00", "opening_day": _today()}, uid)
     c.commit()
 

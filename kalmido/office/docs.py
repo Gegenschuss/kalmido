@@ -158,7 +158,7 @@ def doc_items(c, did, oid, part=None):
 
 
 def _texts(c, oid, kind=None):
-    sql = f"SELECT * FROM office_texts WHERE org_id=? AND archived=0 AND {live_sql()}"  # 2.905.0 (#5414): not the trash
+    sql = f"SELECT * FROM office_texts WHERE org_id=? AND NOT archived AND {live_sql()}"  # 2.905.0 (#5414): not the trash
     args = [oid]
     if kind:
         sql += " AND kind=?"
@@ -1496,7 +1496,7 @@ def trial_summary(c, oid):
     """2.144.10 A (#2576): trial_count (trial documents + trial documents from templates of the area), first (true = the
     area has no real quotation / invoice yet: the dialog shows the "try it first" hint) and office_id (the hint's key)."""
     n = c.execute(f"SELECT (SELECT COUNT(*) FROM office_docs WHERE org_id=? AND trial=1 AND {live_sql()}) + "  # 2.1005.0 (#5415): not the trash
-                  "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1 AND archived=0) AS n", (oid, oid)).fetchone()["n"]
+                  "(SELECT COUNT(*) FROM office_gen_docs WHERE org_id=? AND trial=1 AND NOT archived) AS n", (oid, oid)).fetchone()["n"]
     real = {r["kind"] for r in c.execute(f"SELECT DISTINCT kind FROM office_docs WHERE org_id=? AND trial=0 AND kind IN ('offer', 'invoice') AND {live_sql()}", (oid,))}  # 2.1005.0 (#5415): not the trash
     return {"trial_count": int(n or 0), "first": {"offer": "offer" not in real, "invoice": "invoice" not in real}, "office_id": oid}
 

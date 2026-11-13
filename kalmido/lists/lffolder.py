@@ -123,7 +123,7 @@ def _hidden(c, uid):
     projects tree, a folder shares it with people."""
     if not uid or acx_of(c, uid).role != "agent":
         return ""
-    return ("(SELECT l.id FROM lists l WHERE l.life IN ('health','budget') OR (l.life='travel' AND l.org_id IS NOT NULL) OR l.is_inbox=1 OR "
+    return ("(SELECT l.id FROM lists l WHERE l.life IN ('health','budget') OR (l.life='travel' AND l.org_id IS NOT NULL) OR l.is_inbox OR "
             + reading_sql("l") + ")")  # "Reading" follows the lists (#2742, decision 9): a read-later project, never an agent's
 
 
@@ -370,7 +370,7 @@ def lf_sync_owner(c, owner):
     """Every list of owner where its path says, and the empty folders of the folder order in owner's own tree. -> the ids of
     the lists whose node was made / moved."""
     n = []
-    for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0", (owner,)).fetchall():
+    for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND NOT is_inbox", (owner,)).fetchall():
         before = fs_ref_node(c, LF_KIND, r[0])
         nid = lf_place(c, r[0])
         with system_ctx(c):
@@ -421,9 +421,9 @@ def lf_want(c, lid, lr=None):
                 if u and u != lr["owner_id"]:
                     cand[u] = _rmax(cand.get(u), role)
         out = {}
-        agents = {r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent' AND disabled=0")}
+        agents = {r[0] for r in c.execute("SELECT id FROM users WHERE kind='agent' AND NOT disabled")}
         for u, role in sorted(cand.items()):
-            if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone():
+            if not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (u,)).fetchone():
                 continue
             x = fs_ref_node_role(c, u, n, chain)  # the file store's rules: organisation boundary, read-only, hidden, expiry
             if x is None:
@@ -729,7 +729,7 @@ def lf_migrate(c):
     4. grp_sync of every list (frole of the rows the folders give)."""
     out = {"nodes": 0, "shares": 0, "folder_rows": 0, "skips": 0}
     with system_ctx(c):
-        owners = [r[0] for r in c.execute("SELECT DISTINCT owner_id FROM lists WHERE is_inbox=0 ORDER BY owner_id")]
+        owners = [r[0] for r in c.execute("SELECT DISTINCT owner_id FROM lists WHERE NOT is_inbox ORDER BY owner_id")]
         owners += [r[0] for r in c.execute("SELECT DISTINCT user_id FROM user_settings WHERE key='folders' ORDER BY user_id") if r[0] not in owners]
         for o in owners:
             out["nodes"] += len(lf_sync_owner(c, o))
@@ -744,7 +744,7 @@ def lf_migrate(c):
                 c.execute(f"INSERT INTO fs_shares(node_id,{key},role,list_role,created_by,created_at) VALUES(?,?,?,?,?,?)",
                           (f["id"], fp["user_id"], "edit" if role in ("admin", "edit") else "view", role, fp["owner_id"], _old_ts(fp["created_at"])))
                 out["shares"] += 1
-        lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE is_inbox=0 ORDER BY id")]
+        lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE NOT is_inbox ORDER BY id")]
         for lid in lids:
             lr = _lrow(c, lid)
             want = lf_want(c, lid, lr)

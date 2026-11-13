@@ -579,7 +579,7 @@ def do_complete(c, tid, status=2, undo=None):
             k = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (d,)).fetchone()
             if undo is not None and k["status"] != 0:
                 undo["kids"].append([d, k["status"], k["completed_at"], k["completed_by"]])
-            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=? AND locked=0", (d,))  # 2.542.0 (#4609)
+            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=? AND NOT locked", (d,))  # 2.542.0 (#4609)
         if undo is not None:
             undo.update(copy_id=cur_id, next=nxt)
         if t["review"]:  # 2.60.0 C (#1512): the next occurrence needs its own approval
@@ -592,7 +592,7 @@ def do_complete(c, tid, status=2, undo=None):
             rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3): open again = a live task, the old round's state goes
         if status != 0:  # completing a parent completes its open subtasks (all levels)
             for d in descendants(c, tid):
-                c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0 AND locked=0",
+                c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0 AND NOT locked",
                           (status, ts, who, ts, d))  # 2.542.0 (#4609): a locked subtask stays open
     sk_after_status(c, t, status, undo, cur_id if nxt else None)  # 2.577.0 (#3354): into the project's done / rejected column
     if status != 0 and t["status"] != status:
@@ -720,7 +720,7 @@ def undo_status(c, tid, u):
             if st not in (2, -1):
                 continue
             c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=? WHERE id=? AND parent_id IS NOT NULL AND status=0 AND list_id=? "
-                      "AND locked=0",  # 2.542.0 (#4609): a subtask locked since stays as it is
+                      "AND NOT locked",  # 2.542.0 (#4609): a subtask locked since stays as it is
                       (st, cat, cby, d, t["list_id"]))
     else:
         if t["status"] == 0 or t["completed_at"] != at:
@@ -731,7 +731,7 @@ def undo_status(c, tid, u):
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (str(u["repeat"])[:500], tid))
         for d in descendants(c, tid):  # subtasks completed together with it
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND completed_at=? "
-                      "AND locked=0", (ts, d, at))  # 2.542.0 (#4609): a subtask locked since stays done
+                      "AND NOT locked", (ts, d, at))  # 2.542.0 (#4609): a subtask locked since stays done
     stars_revoke(c, tid, at=at)  # 2.19.0 (#653): a kid's stars for exactly this completion
     # the "completed" News items this completion created for others
     c.execute("DELETE FROM notifications WHERE task_id=? AND kind='complete' AND actor_id=? AND created_at>=?",

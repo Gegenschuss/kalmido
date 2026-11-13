@@ -89,7 +89,7 @@ check(state(P3) == "archived", f"deleted_at emptied by hand -> archived: {state(
 
 # ---------------------------------------------------------------- the whole table agrees with its columns
 bad = dbx("""SELECT id, state, archived, deleted_at FROM lists WHERE state IS DISTINCT FROM
-             (CASE WHEN deleted_at IS NOT NULL THEN 'trash' WHEN archived <> 0 THEN 'archived' ELSE 'live' END)""")
+             (CASE WHEN deleted_at IS NOT NULL THEN 'trash' WHEN archived THEN 'archived' ELSE 'live' END)""")
 n = dbx("SELECT COUNT(*) FROM lists")[0][0]
 check(n >= 4 and not bad, f"every project's marker agrees with archived / deleted_at ({n} rows) {bad[:3]}")
 check(bool(dbx("SELECT 1 FROM settings WHERE key='migr_liststate5537' AND value='1'")), "the start's reconcile is recorded")
@@ -122,7 +122,7 @@ check("H3 l.state IN ('live', 'archived')" in out, f"otr_live = live or archived
 check(out.count("HBAD refused") == 2 and "HBAD accepted" not in out, f"an unknown state / alias is refused {out[-400:]}")
 # P2 again in the trash, now not archived: the case the old filter archived=0 let through (an older version's row, a hand-made
 # statement; the app archives a project before it goes into the trash)
-dbx("UPDATE lists SET archived=0, deleted_at=created_at WHERE id=?", (P2,))
+dbx("UPDATE lists SET archived=false, deleted_at=created_at WHERE id=?", (P2,))
 check(state(P2) == "trash", f"setup: P2 in the trash, not archived {state(P2)}")
 dbx(f"UPDATE lists SET folder='Example Folder' WHERE id IN ({int(P1)}, {int(P2)}, {int(P3)}, {int(P4)})")
 out = in_app(f"""from kalmido.lists.folders import folder_lists

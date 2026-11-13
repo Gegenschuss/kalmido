@@ -73,7 +73,7 @@ for mod, fn in (("kalmido.calendars.polls", "tpo_page_get"), ("kalmido.team.form
 # ---- the basket in the daily summary
 assert A.patch(B + "/api/settings", json={"lang": "en"}).ok
 assert Fr.patch(B + "/api/settings", json={"lang": "en"}).ok
-LID = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (FID,))[0][0]
+LID = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (FID,))[0][0]
 dbx_set = inside(f"from kalmido.core.db import connect\nc = connect()\nc.execute(\"UPDATE lists SET name='Eingang' WHERE id={LID}\")\nc.commit()\nprint('OK')")
 check("OK" in dbx_set, "an old inbox with the German default name " + dbx_set[-200:])
 today = date.today().isoformat()

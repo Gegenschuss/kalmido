@@ -32,7 +32,7 @@ OL_LOG_MAX = 50
 def _ol_list(c, oid, lid):
     """The list lid of organisation oid (never an inbox), else 404 -- the same answer for a private list, another
     organisation's list and a list that does not exist."""
-    lr = c.execute(f"SELECT * FROM lists WHERE id=? AND org_id=? AND is_inbox=0 AND {otr_live('')}", (lid, oid)).fetchone()  # 2.102.0 A (#1988)
+    lr = c.execute(f"SELECT * FROM lists WHERE id=? AND org_id=? AND NOT is_inbox AND {otr_live('')}", (lid, oid)).fetchone()  # 2.102.0 A (#1988)
     if not lr or not ol_shared(c, lr):  # 2.148.1 A (#2480): only the lists the overview shows (shared with someone)
         raise Denied(404)
     return lr
@@ -110,11 +110,11 @@ def _ol_out(c, oid):
                                (SELECT MAX(t.updated_at) FROM tasks t WHERE t.list_id=l.id) AS changed,
                                (SELECT COUNT(*) FROM list_members m JOIN users u ON u.id=m.user_id
                                  WHERE m.list_id=l.id AND m.user_id!=l.owner_id AND COALESCE(u.kind,'user')!='agent') AS members
-                        FROM lists l WHERE l.org_id=? AND l.is_inbox=0 AND {otr_live('l')} ORDER BY {list_archived_sql('l')}, lower(l.name), l.id""", (oid,)).fetchall()
+                        FROM lists l WHERE l.org_id=? AND NOT l.is_inbox AND {otr_live('l')} ORDER BY {list_archived_sql('l')}, lower(l.name), l.id""", (oid,)).fetchall()
     rows = [r for r in rows if r["members"] > 0]
     log = c.execute("SELECT * FROM org_list_log WHERE org_id=? ORDER BY id DESC LIMIT ?", (oid, OL_LOG_MAX)).fetchall()
     people = c.execute("""SELECT u.id FROM org_members m JOIN users u ON u.id=m.user_id
-                          WHERE m.org_id=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid,)).fetchall()
+                          WHERE m.org_id=? AND NOT u.disabled AND COALESCE(u.kind,'user')!='agent'""", (oid,)).fetchall()
     ids = {r["owner_id"] for r in rows} | {x for r in log for x in (r["by_id"], r["owner_id"], r["to_id"]) if x} | {r[0] for r in people}
     names = user_names(c, list(ids))
     agents = {r[0] for r in c.execute(f"SELECT id FROM users WHERE kind='agent' AND id IN ({','.join(str(int(i)) for i in ids) or 'NULL'})")}
@@ -208,7 +208,7 @@ def oadm_owner(oid, lid):
     new = b.get("user_id")
     if not isinstance(new, int) or isinstance(new, bool):
         return err(tr("Invalid value: {0}", "user_id"))
-    u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (new,)).fetchone()
+    u = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (new,)).fetchone()
     if not u or oid not in user_orgs(c, new):
         return err(tr("unknown person"), 404)
     if (u["kind"] or "user") == "agent":
@@ -238,7 +238,7 @@ def ole_org_admin(c, lid):
     from ..agents.core import is_agent
     if is_agent(g.user):
         return False
-    r = c.execute("SELECT org_id FROM lists WHERE id=? AND is_inbox=0", (lid,)).fetchone()
+    r = c.execute("SELECT org_id FROM lists WHERE id=? AND NOT is_inbox", (lid,)).fetchone()
     return bool(r and r["org_id"] and org_role(c, me(), r["org_id"]) == "admin")
 
 

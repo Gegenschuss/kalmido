@@ -72,7 +72,7 @@ def project_status(c, lid, uid, *, frm=None, to=None, with_time=True, bounds=Non
     reached = [r for r in done_all if r["ms"]]
     opened = c.execute(f"""SELECT {cols},
                              (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers,
+                                AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE NOT is_inbox) AND {tvis(c, uid, 'b.')}) AS open_blockers,
                              (EXISTS (SELECT 1 FROM activity a WHERE a.task_id=t.id AND a.kind!='created' AND a.created_at>=? AND a.created_at<?)
                               OR EXISTS (SELECT 1 FROM obj_comments cm WHERE cm.kind='task' AND cm.ref_id=t.id AND cm.deleted_at IS NULL AND cm.created_at>=? AND cm.created_at<?)
                               OR EXISTS (SELECT 1 FROM time_entries te WHERE te.task_id=t.id AND te.start>=? AND te.start<?)

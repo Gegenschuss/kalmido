@@ -96,7 +96,7 @@ def fk_sync(c, cid):
     name = ""
     if rows:
         d = rows[0]
-        c.execute("UPDATE office_client_contacts SET is_default=CASE WHEN id=? THEN 1 ELSE 0 END WHERE client_id=? AND is_default != CASE WHEN id=? THEN 1 ELSE 0 END",
+        c.execute("UPDATE office_client_contacts SET is_default=(id=?) WHERE client_id=? AND is_default <> (id=?)",
                   (d["id"], cid, d["id"]))
         name = d["name"]
     c.execute("UPDATE clients SET contact=? WHERE id=? AND contact != ?", (name[:120], cid, name[:120]))
@@ -114,7 +114,7 @@ def fk_add(c, cid, oid, x, run_id=None, default=False):
         raise BadInput(tr("Invalid value: {0}", "contacts"))
     ts = iso(now_utc())
     if default:
-        c.execute("UPDATE office_client_contacts SET is_default=0 WHERE client_id=?", (cid,))
+        c.execute("UPDATE office_client_contacts SET is_default=false WHERE client_id=?", (cid,))
     kid = insert_id(c, "INSERT INTO office_client_contacts(org_id, client_id, name, role, email, phone, is_default, sort, import_run_id, created_at, updated_at) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (oid, cid, f["name"], f["role"], f["email"], f["phone"], 1 if default or not n[0] else 0, int(n[1]) + 1, run_id, ts, ts))
@@ -153,14 +153,14 @@ def fk_put(c, cid, oid, items, removed=None):
                       "WHERE id=? AND client_id=?", (f["name"], f["role"], f["email"], f["phone"], i + 1, link, gi, ts, kid, cid))
         else:
             kid = insert_id(c, "INSERT INTO office_client_contacts(org_id, client_id, name, role, email, phone, is_default, sort, contact_id, gets_invoices, created_at, updated_at) "
-                               "VALUES(?,?,?,?,?,?,0,?,?,?,?,?)", (oid, cid, f["name"], f["role"], f["email"], f["phone"], i + 1, link, gi or 0, ts, ts))
+                               "VALUES(?,?,?,?,?,?,false,?,?,?,?,?)", (oid, cid, f["name"], f["role"], f["email"], f["phone"], i + 1, link, gi or 0, ts, ts))
         keep.add(kid)
         if x.get("is_default") and want_default is None:
             want_default = kid
     for kid in (have & set(removed)) - keep:  # 2.269.0 C (#3017): a removed id the dialog no longer knows is no error
         c.execute("DELETE FROM office_client_contacts WHERE id=? AND client_id=?", (kid, cid))
     if want_default is not None:
-        c.execute("UPDATE office_client_contacts SET is_default=CASE WHEN id=? THEN 1 ELSE 0 END WHERE client_id=?", (want_default, cid))
+        c.execute("UPDATE office_client_contacts SET is_default=(id=?) WHERE client_id=?", (want_default, cid))
     fk_sync(c, cid)
 
 
@@ -169,10 +169,10 @@ def fk_contact_field(c, cid, oid, name):
     (the next one takes its place)."""
     name = _line(name, "name")
     if not name:
-        c.execute("DELETE FROM office_client_contacts WHERE client_id=? AND is_default=1", (cid,))
+        c.execute("DELETE FROM office_client_contacts WHERE client_id=? AND is_default", (cid,))
         fk_sync(c, cid)
         return
-    d = c.execute("SELECT id FROM office_client_contacts WHERE client_id=? AND is_default=1 LIMIT 1", (cid,)).fetchone()
+    d = c.execute("SELECT id FROM office_client_contacts WHERE client_id=? AND is_default LIMIT 1", (cid,)).fetchone()
     if d:
         c.execute("UPDATE office_client_contacts SET name=?, updated_at=? WHERE id=?", (name, iso(now_utc()), d["id"]))
     else:
@@ -191,9 +191,9 @@ def fk_migrate(c):
     whose contact field was changed by an older version (2.39.1 on the same database) has its default renamed."""
     ts = iso(now_utc())
     c.execute("INSERT INTO office_client_contacts(org_id, client_id, name, is_default, sort, created_at, updated_at) "
-              "SELECT cl.org_id, cl.id, cl.contact, 1, 1, ?, ? FROM clients cl WHERE cl.contact != '' "
+              "SELECT cl.org_id, cl.id, cl.contact, true, 1, ?, ? FROM clients cl WHERE cl.contact != '' "
               "AND NOT EXISTS (SELECT 1 FROM office_client_contacts k WHERE k.client_id=cl.id)", (ts, ts))
-    c.execute("UPDATE office_client_contacts k SET name=cl.contact, updated_at=? FROM clients cl WHERE k.client_id=cl.id AND k.is_default=1 "
+    c.execute("UPDATE office_client_contacts k SET name=cl.contact, updated_at=? FROM clients cl WHERE k.client_id=cl.id AND k.is_default "
               "AND cl.contact != '' AND k.name != cl.contact", (ts,))
 
 

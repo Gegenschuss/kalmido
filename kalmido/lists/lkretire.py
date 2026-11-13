@@ -56,7 +56,7 @@ def _grp_left_ids(c):
     group on one of the owner's folder nodes AT THAT PATH (lf_folder_nodes; was: on any folder node of the owner, so a folder
     whose nodes could not be made counted as held when another folder of the owner was shared with the same group)."""
     out = [r[0] for r in c.execute("""SELECT g.id FROM group_shares g JOIN lists l ON l.id=g.list_id
-                     WHERE l.is_inbox=0 AND NOT EXISTS (SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+                     WHERE NOT l.is_inbox AND NOT EXISTS (SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
                        WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=g.list_id AND s.group_id=g.group_id AND s.list_own=1)""",
                                    (LF_KIND,)).fetchall()]
     for g in c.execute("""SELECT id, owner_id, folder, group_id FROM group_shares WHERE list_id IS NULL AND COALESCE(folder, '') <> ''
@@ -102,7 +102,7 @@ def lk_grp_copy(c):
     out = {"own": 0, "folder": 0, "raised": 0}
     gids = set()
     with system_ctx(c):
-        for g in c.execute("""SELECT g.* FROM group_shares g JOIN lists l ON l.id=g.list_id WHERE l.is_inbox=0
+        for g in c.execute("""SELECT g.* FROM group_shares g JOIN lists l ON l.id=g.list_id WHERE NOT l.is_inbox
                               ORDER BY g.list_id, g.id""").fetchall():
             gids.add(g["group_id"])
             nid = lf_place(c, g["list_id"])

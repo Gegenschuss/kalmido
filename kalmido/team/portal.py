@@ -149,7 +149,7 @@ def pt_find(c, token):
         r = c.execute(f"""SELECT p.*, t.title, t.content, t.status, t.ttype, t.assignee_id, t.assignee_group_id, t.list_id AS t_list,
                           t.completed_at, l.owner_id AS l_owner, l.org_id AS l_org FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
                           JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
-                          WHERE p.token_hash=? AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()}""",
+                          WHERE p.token_hash=? AND t.deleted_at IS NULL AND NOT u.disabled AND {_pt_space_sql()}""",
                       (_token_hash(token),)).fetchone()
     if not r:
         return None
@@ -442,7 +442,7 @@ def pt_limit_note(c, org_id, owner_id):
     with system_ctx(c):  # who administers the space (structure); the notice names no customer
         if org_id:
             ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
-                                           "AND m.role='admin' AND u.kind!='agent' AND u.disabled=0 ORDER BY m.user_id", (int(org_id),))]
+                                           "AND m.role='admin' AND u.kind!='agent' AND NOT u.disabled ORDER BY m.user_id", (int(org_id),))]
             on = (c.execute("SELECT name FROM orgs WHERE id=?", (int(org_id),)).fetchone() or [""])[0]
         else:
             ids, on = [int(owner_id)] if owner_id else [], ""
@@ -600,7 +600,7 @@ def pt_my_tickets(c, eh, org_id, owner_id):
     return c.execute(f"""SELECT p.*, t.title, t.status, t.ttype, t.assignee_id, t.assignee_group_id FROM portal_tickets p
                          JOIN tasks t ON t.id=p.task_id JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
                          WHERE p.email_hash=? AND p.org_id IS NOT DISTINCT FROM ? AND p.owner_id IS NOT DISTINCT FROM ? AND p.claimed=1
-                         AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()} ORDER BY p.id DESC LIMIT 200""",
+                         AND t.deleted_at IS NULL AND NOT u.disabled AND {_pt_space_sql()} ORDER BY p.id DESC LIMIT 200""",
                      (eh, org_id, owner_id)).fetchall()
 
 
@@ -674,8 +674,8 @@ def pt_client_for(c, list_row, email):
     e = pt_email_norm(email)
     if not lr["org_id"] or not e:
         return None
-    r = c.execute("SELECT id FROM clients WHERE org_id=? AND archived=0 AND deleted_at IS NULL AND lower(email)=? ORDER BY id LIMIT 1", (lr["org_id"], e)).fetchone() \
-        or c.execute("""SELECT cl.id FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE cl.org_id=? AND cl.archived=0 AND cl.deleted_at IS NULL
+    r = c.execute("SELECT id FROM clients WHERE org_id=? AND NOT archived AND deleted_at IS NULL AND lower(email)=? ORDER BY id LIMIT 1", (lr["org_id"], e)).fetchone() \
+        or c.execute("""SELECT cl.id FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id WHERE cl.org_id=? AND NOT cl.archived AND cl.deleted_at IS NULL
                         AND lower(k.email)=? ORDER BY cl.id LIMIT 1""", (lr["org_id"], e)).fetchone()
     return r["id"] if r else None
 
@@ -768,7 +768,7 @@ def pt_mail_tick(c):
     with system_ctx(c):  # the reporters of every organisation (the watchdog is nobody's request)
         rows = c.execute(f"""SELECT p.*, t.title, t.status, l.owner_id AS l_owner, l.req_mail_done AS l_done FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
                              JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
-                             WHERE p.notify=1 AND p.email!='' AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()}
+                             WHERE p.notify=1 AND p.email!='' AND t.deleted_at IS NULL AND NOT u.disabled AND {_pt_space_sql()}
                              AND NOT (COALESCE(p.via, '')='mail' AND COALESCE(p.unverified, 0)=1 AND COALESCE(p.claimed, 0)=0)
                              AND (p.last_mail_at IS NULL OR p.last_mail_at<=?)
                              AND ((t.status=2 AND p.mailed_status!=2) OR (t.status!=2 AND p.mailed_status=2) OR EXISTS(

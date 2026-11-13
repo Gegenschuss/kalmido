@@ -134,7 +134,7 @@ def _client_matches(c, oid, d):
     em, co = (d.get("email") or "").strip().lower(), (d.get("company") or "").strip().lower()
     if not em and not co:
         return []
-    rows = c.execute(f"SELECT id, name, email FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL AND "
+    rows = c.execute(f"SELECT id, name, email FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL AND "
                      "((? <> '' AND lower(email)=?) OR (? <> '' AND lower(name)=?)) ORDER BY lower(name), id LIMIT 10", (em, em, co, co)).fetchall()
     return [{"id": r["id"], "name": r["name"], "email": r["email"] or "", "same_email": bool(em) and (r["email"] or "").strip().lower() == em}
             for r in rows]

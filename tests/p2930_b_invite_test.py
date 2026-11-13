@@ -79,7 +79,7 @@ def ref(oid, email):
 invite(O1, "paula@example.com")
 invite(O4, "paula@example.com")
 invite(O2, "dora@example.com")
-check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IN (?,?) AND silent=1", (PID, DID))[0][0] == 3, "setup: the invitations are kept silent (#3570)")
+check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IN (?,?) AND silent", (PID, DID))[0][0] == 3, "setup: the invitations are kept silent (#3570)")
 write("INSERT INTO org_joins(org_id, user_id, role, created_by, created_at) VALUES(?,?,?,?,?)", (O2, PID, "member", FID, "2026-11-10T00:00:00+00:00"))  # an ordinary one
 before_p, before_d, before_p4 = rows(O1, "paula@example.com"), rows(O2, "dora@example.com"), rows(O4, "paula@example.com")
 check(len(before_p) == 1 and before_p[0].get("state") == "invited" and before_p[0].get("user_id") is None, f"setup: paula's row in the list {before_p}")
@@ -96,7 +96,7 @@ check(after == before_p, f"(#4922) after her own deletion paula's silent invitat
 check([(x[0], x[1]) for x in dbx("SELECT user_id, silent FROM org_joins WHERE org_id=? AND email=?", (O1, "paula@example.com"))] == [(None, 1)],
       "(#4922) ... as a neutral row without an account")
 check(rows(O4, "paula@example.com") == before_p4, "(#4922) ... in each company that invited her")
-check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND silent=0", (O2,)), "(#4922) the ordinary invitation went with the account as before")
+check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND NOT silent", (O2,)), "(#4922) the ordinary invitation went with the account as before")
 
 # ---------------------------------------------------------------- dora's unconfirmed registration is cleaned up
 write("UPDATE users SET signup='confirm' WHERE id=?", (DID,))

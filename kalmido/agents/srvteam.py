@@ -325,7 +325,7 @@ def srv_prop_team_ids(c, jobs, uid):
     if not cand or not u or u["kind"] == "agent":
         return set()
     lids = sorted({int(j["list_id"]) for j in cand})
-    proj = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(lids))}) AND is_inbox=0", lids)}
+    proj = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(lids))}) AND NOT is_inbox", lids)}
     roles = list_roles(c, uid, sorted(proj))
     return {j["id"] for j in cand if j["list_id"] in proj and roles.get(j["list_id"]) in WRITE_ROLES}
 

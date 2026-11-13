@@ -423,7 +423,7 @@ def _apply_instance(c, b):
     if "collab_all" in b:
         _COLLAB_ALL["on"] = b["collab_all"]
         if b["collab_all"] and b.get("collab_personal_on") is True:  # "Switch on collaboration now?" (second user)
-            for (uid,) in c.execute("SELECT id FROM users WHERE disabled=0").fetchall():
+            for (uid,) in c.execute("SELECT id FROM users WHERE NOT disabled").fetchall():
                 fs = [f for f in usettings(c, uid)["features"].split(",") if f]
                 if "collab" not in fs:
                     uset(c, uid, "features", ",".join(fs + ["collab"]))

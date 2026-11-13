@@ -838,7 +838,7 @@ def _share_targets(c, n, uid=None):
     with system_ctx(c):  # which accounts are agents / members of the node's organisation (ids, structure; vis filters people)
         ag = {r[0]: (r[1], r[2]) for r in c.execute("SELECT user_id, org_id, owner_id FROM agents")}
         members = {r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (org,))} if org else None
-        rows = c.execute("SELECT id, display_name, kind FROM users WHERE disabled=0 ORDER BY display_name").fetchall()
+        rows = c.execute("SELECT id, display_name, kind FROM users WHERE NOT disabled ORDER BY display_name").fetchall()
     for r in rows:
         if r["id"] == uid:
             continue
@@ -1145,7 +1145,7 @@ def fs_agent_folder(c, aid):
             return r[0]
         owner = a["owner_id"]
         if not owner:
-            x = c.execute("SELECT id FROM users WHERE is_admin=1 AND COALESCE(kind, '')!='agent' ORDER BY id LIMIT 1").fetchone()
+            x = c.execute("SELECT id FROM users WHERE is_admin AND COALESCE(kind, '')!='agent' ORDER BY id LIMIT 1").fetchone()
             owner = x[0] if x else None
         if not owner:
             return None

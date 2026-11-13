@@ -238,7 +238,7 @@ def pgx(self, sql, args=None):
     return o_pgx(self, sql, args)
 P.notify, PG.Conn._pgx = notify, pgx
 c = connect()
-users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE disabled=0")}
+users = {r["id"]: r for r in c.execute("SELECT * FROM users WHERE NOT disabled")}
 S = P._wd_settings(c, users)
 LG = {u: "en" for u in users}
 cnt.clear()

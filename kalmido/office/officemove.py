@@ -42,7 +42,7 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_store, oc_read_file, oc_write_file
-from ..core.pg import insert_id, qi, table_columns, write_lock
+from ..core.pg import insert_id, qi, table_columns, table_names, write_lock
 from ..files.scan import sc_copy_mark
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from ..core.errors import BadInput
@@ -541,7 +541,7 @@ def ofm_move_sets(c, p, src, dst, rec, made, ts):
         ofm_copy_row(c, made, "office_sets", r, src, dst, ts, {"items": new})
         if not r["archived"]:
             rec.append({"t": "office_sets", "id": r["id"], "old": {"archived": 0}, "src": 1})
-            c.execute("UPDATE office_sets SET archived=1 WHERE id=?", (r["id"],))
+            c.execute("UPDATE office_sets SET archived=true WHERE id=?", (r["id"],))
 
 
 def ofm_set_notes(p):
@@ -630,7 +630,7 @@ def ofm_move_simple(c, uid, p, src, dst, rec, made, ts):
         made.append({"t": t, "id": nid})
         if not r["archived"]:
             rec.append({"t": t, "id": r["id"], "old": {"archived": 0}, "src": 1})
-            c.execute(f"UPDATE {t} SET archived=1 WHERE id=?", (r["id"],))
+            c.execute(f"UPDATE {qi(t, OFM_TABLE.values())} SET archived=true WHERE id=?", (r["id"],))
 
 
 def ofm_simple_notes(p):
@@ -667,7 +667,7 @@ def ofm_plan_office(c, uid, src, p):
             rows = c.execute(f"SELECT * FROM office_contracts WHERE org_id=? AND client_id IN ({','.join('?' * len(cids))}) AND {live_sql()} ORDER BY id",
                              (src, *cids)).fetchall()
         else:
-            q = "SELECT * FROM clients WHERE org_id=? AND created_by=? AND archived=0 ORDER BY id" if w == "clients" else \
+            q = "SELECT * FROM clients WHERE org_id=? AND created_by=? AND NOT archived ORDER BY id" if w == "clients" else \
                 f"SELECT * FROM {t} WHERE org_id=? AND created_by=? ORDER BY id"
             rows = c.execute(q, (src, uid)).fetchall()
         if w == "drafts":  # the drafts of a moving client came with it, its issued documents are counted there
@@ -898,7 +898,7 @@ def ofm_move_clients(c, uid, p, src, dst, to, copy, rec, made, files, ts, frm):
                 kmap[k["id"]] = insert_id(c, f"INSERT INTO office_client_contacts({','.join(kr)}) VALUES({','.join('?' * len(kr))})", list(kr.values()))
             if not r["archived"] and not p.get("keep_src"):  # 2.356.0 A (#2926): the organisation's own copy stays active
                 rec.append({"t": "clients", "id": r["id"], "old": {"archived": 0}, "src": 1})
-                c.execute("UPDATE clients SET archived=1, updated_at=? WHERE id=?", (ts, r["id"]))
+                c.execute("UPDATE clients SET archived=true, updated_at=? WHERE id=?", (ts, r["id"]))
             if copy:
                 for d in x["issued"]:
                     ofm_archive_copy(c, uid, made, files, src, dst, nid, d, frm)
@@ -1156,7 +1156,7 @@ def rmv_undo_run(c, uid, mid, files):
                 c.execute(f"UPDATE {t} SET {col}=? WHERE id=?", (old[col], rid))
             continue
         if r.get("src"):  # the source client archived by the move
-            c.execute(f"UPDATE {t} SET archived=? WHERE id=? AND archived=1", (old.get("archived", 0), rid))
+            c.execute(f"UPDATE {qi(t, table_names(c))} SET archived=? WHERE id=? AND archived", (old.get("archived", 0), rid))
             continue
         if (cur["org_id"] or None) != (r.get("org") or None):
             kept += 1  # moved on since: stays where it is now
@@ -1366,7 +1366,7 @@ def rmv_move(c, uid, p, src, dst, rec, made, files, ts):
             made.append({"t": "office_contract_files", "id": fid, "contract": nid})
         if not r["archived"]:
             rec.append({"t": "office_contracts", "id": r["id"], "old": {"archived": 0}, "src": 1})
-            c.execute("UPDATE office_contracts SET archived=1, updated_at=? WHERE id=?", (ts, r["id"]))
+            c.execute("UPDATE office_contracts SET archived=true, updated_at=? WHERE id=?", (ts, r["id"]))
 
 
 def rmv_unlink(paths):

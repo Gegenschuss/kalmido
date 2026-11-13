@@ -83,13 +83,13 @@ def h6a_kid_ids(c, uid, vl):
     """2.86.0 (N9): the kid accounts among the people uid may see (organisations, connections) and the members of uid's
     lists -- not every kid of the instance."""
     from ..accounts.orgs import visible_people
-    kids = [r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND disabled=0 ORDER BY id")]
+    kids = [r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND NOT disabled ORDER BY id")]
     seen = visible_people(c, uid)
     if seen is None or not kids:
         return kids
     seen = seen | {m["user_id"] for li in vl for m in li.get("members") or []}
     seen |= {r[0] for r in c.execute("SELECT kid_id FROM kid_parents WHERE parent_id=?", (uid,))}
-    if c.execute("SELECT 1 FROM users WHERE id=? AND is_admin=1", (uid,)).fetchone():
+    if c.execute("SELECT 1 FROM users WHERE id=? AND is_admin", (uid,)).fetchone():
         from ..family.family import H6A_ADMIN_KIDS
         with system_ctx(c):  # membership structure (ids only), as family.kids_for
             seen |= {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1 AND " + H6A_ADMIN_KIDS, (uid,))}
@@ -411,7 +411,7 @@ def state():
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? AND list_id IS NULL ORDER BY sort, id", (uid,))],
         # 2.577.0 (#3356): the shared views of the projects this person sees (in the project's head, never with the filters)
         views=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
-               for r in c.execute(f"SELECT * FROM filters WHERE shared=1 AND list_id IN {vis_sql()} ORDER BY sort, id", (uid, uid))],
+               for r in c.execute(f"SELECT * FROM filters WHERE shared AND list_id IN {vis_sql()} ORDER BY sort, id", (uid, uid))],
         sections=visible_sections(c, uid),
         fields=field_dicts(c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
                                      (uid, uid)).fetchall()),  # 2.43.0 (#1328): formula text with names; 2.640.0 (#4185): from these rows
@@ -455,7 +455,7 @@ def state():
         org_peers=org_peers(c, uid),  # 2.364.0 D (#3036): someone else in one of my organisations (the client's hasPeers)
         time_all=time_all(),
         about=about_info(c, u),
-        calendars={"enabled": CAL_ON, "subs": c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=? AND visible=1", (uid,)).fetchone()[0]},
+        calendars={"enabled": CAL_ON, "subs": c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=? AND visible", (uid,)).fetchone()[0]},
         # 2.364.0 C (#3044): mine = own API tokens / webhooks (Settings > Access is listed only then, else under Integrations)
         api={"enabled": API_ON, "mine": API_ON and c.execute("SELECT 1 FROM api_tokens WHERE user_id=? LIMIT 1", (uid,)).fetchone() is not None},
         webhooks={"enabled": WH_ON, "mine": WH_ON and c.execute("SELECT 1 FROM webhooks WHERE user_id=? AND org_id IS NULL LIMIT 1", (uid,)).fetchone() is not None},
@@ -550,11 +550,11 @@ def lz_plan(c, uid, base, bargs):
     if lim and c.execute(f"SELECT COUNT(*) FROM tasks WHERE {base}", bargs).fetchone()[0] <= lim:
         return None
     keep |= set(plists(c, uid))  # a participant's view hangs on assignments and the tree: those lists come whole
-    keep |= {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (uid,))}  # the basket (Today can show it)
+    keep |= {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (uid,))}  # the basket (Today can show it)
     t0 = local_now().date()
     kl = ",".join(str(int(x)) for x in sorted(keep))
     start = ("(status=0 OR completed_at>=?) AND ((due IS NOT NULL AND due<>'' AND due<=?) OR (deadline=2 AND due IS NOT NULL) "
-             "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned=1 OR COALESCE(waiting_at, '')<>''"
+             "OR COALESCE(plan_start, '')>=? OR assignee_id=? OR pinned OR COALESCE(waiting_at, '')<>''"
              "OR assignee_group_id IN (SELECT group_id FROM group_members WHERE user_id=?))")
     sargs = (bargs[2], (t0 + timedelta(days=LZ_DAYS)).isoformat(), (t0 - timedelta(days=1)).isoformat(), uid, uid)
     more = (f" OR list_id IN ({kl}) OR id IN (SELECT task_id FROM task_links WHERE list_id IN ({kl}))") if kl else ""

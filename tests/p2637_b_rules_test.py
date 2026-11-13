@@ -161,7 +161,7 @@ check(comments(t5, "Hand over") == [] and dbx("SELECT list_id FROM tasks WHERE i
 
 # ---------------------------------------------------------------- an old rule (act / act_val only) runs unchanged
 OLDR = dbx("""INSERT INTO list_rules(list_id,org_id,name,trig,trig_val,act,act_val,active,paused_reason,created_by,created_at,updated_at)
-              VALUES(?,?,'Old style','reopen','','comment','{"text":"Opened again"}',1,'',?,?,?) RETURNING id""",
+              VALUES(?,?,'Old style','reopen','','comment','{"text":"Opened again"}',true,'',?,?,?) RETURNING id""",
            (W, ORG, ALICE, "2026-11-01T10:00:00Z", "2026-11-01T10:00:00Z"))[0][0]
 ov = rule_of(A, W, OLDR)
 check(ov and [a["kind"] for a in ov["actions"]] == ["comment"] and ov["conditions"] == {}, f"an old rule reads as a chain of one {ov}")

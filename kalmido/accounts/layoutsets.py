@@ -114,25 +114,25 @@ def lyv_has_layout(v):
 def lyv_follow(c, uid, key, v):
     """The person's value of view key changed to v (settings PATCH, the project page PUT, a reset): the active saved
     arrangement follows. A value without an arrangement (back to the standard) ends "active" instead of overwriting it."""
-    r = c.execute("SELECT id, layout FROM view_layouts WHERE user_id=? AND view_key=? AND active=1", (uid, key)).fetchone()
+    r = c.execute("SELECT id, layout FROM view_layouts WHERE user_id=? AND view_key=? AND active", (uid, key)).fetchone()
     if not r:
         return
     if not lyv_has_layout(v):
-        c.execute("UPDATE view_layouts SET active=0 WHERE id=?", (r["id"],))
+        c.execute("UPDATE view_layouts SET active=false WHERE id=?", (r["id"],))
     elif v != r["layout"]:
         c.execute("UPDATE view_layouts SET layout=?, updated_at=? WHERE id=?", (v, iso(now_utc()), r["id"]))
 
 
 def lyv_active_id(c, uid, key):
     """The id of the active saved arrangement of view key, or None (#1066 keeps it for undo)."""
-    r = c.execute("SELECT id FROM view_layouts WHERE user_id=? AND view_key=? AND active=1", (uid, key)).fetchone()
+    r = c.execute("SELECT id FROM view_layouts WHERE user_id=? AND view_key=? AND active", (uid, key)).fetchone()
     return r[0] if r else None
 
 
 def lyv_set_active(c, uid, key, sid):
     """Mark saved arrangement sid (None = none) active for view key WITHOUT touching the person's value (the caller sets it;
     #1066 does after a 👍). No commit."""
-    c.execute("UPDATE view_layouts SET active=CASE WHEN id=? THEN 1 ELSE 0 END WHERE user_id=? AND view_key=?", (sid or 0, uid, key))
+    c.execute("UPDATE view_layouts SET active=(id=?) WHERE user_id=? AND view_key=?", (sid or 0, uid, key))
 
 
 def lyv_dict(r):
@@ -150,8 +150,8 @@ def _row(c, sid):
 
 def lyv_activate(c, uid, r):
     """Make saved arrangement r the active one of its view: its layout becomes the person's value."""
-    c.execute("UPDATE view_layouts SET active=0 WHERE user_id=? AND view_key=? AND id<>?", (uid, r["view_key"], r["id"]))
-    c.execute("UPDATE view_layouts SET active=1 WHERE id=?", (r["id"],))
+    c.execute("UPDATE view_layouts SET active=false WHERE user_id=? AND view_key=? AND id<>?", (uid, r["view_key"], r["id"]))
+    c.execute("UPDATE view_layouts SET active=true WHERE id=?", (r["id"],))
     _own_put(c, uid, r["view_key"], r["layout"] or "")
     return r["layout"] or ""
 
@@ -276,7 +276,7 @@ def lyv_standard():
     c, key = db(), b.get("key")
     lyv_need_key(c, key)
     v = lyv_clean(key, _str_arg(b, "value"))
-    c.execute("UPDATE view_layouts SET active=0 WHERE user_id=? AND view_key=?", (me(), key))
+    c.execute("UPDATE view_layouts SET active=false WHERE user_id=? AND view_key=?", (me(), key))
     _own_put(c, me(), key, v)
     bump(c)
     c.commit()

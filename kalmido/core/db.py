@@ -32,6 +32,7 @@ from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copie
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 from .moneycol import mc_migrate  # 2.755.0 (#5293): the plain money columns of the office as NUMERIC(14,2)
 from .coltype import ct_json_migrate, ct_migrate  # 2.1095.0 (#5306): the old created_at / updated_at / deleted_at as TIMESTAMPTZ
+from .colbool import cb_migrate  # 2.1118.0 (#5952): the old yes / no columns as BOOLEAN
 from .tplmove import tpl_move  # 2.905.0 (#5288): templates onto the shared core
 from .objretype import obj_retype  # 2.1101.0 (#5954): obj_history / obj_undo / obj_revoked onto real types
 
@@ -256,7 +257,7 @@ def random_topic():
 
 def default_uid(c):
     """First enabled admin (owner of the migrated single-user data, target of env defaults)."""
-    r = c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 ORDER BY id LIMIT 1").fetchone() \
+    r = c.execute("SELECT id FROM users WHERE is_admin AND NOT disabled ORDER BY id LIMIT 1").fetchone() \
         or c.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
     return r[0] if r else None
 
@@ -264,9 +265,9 @@ def default_uid(c):
 def ensure_inbox(c, uid):
     """2.15.0 (#632): a new inbox is named in its owner's language ("Inbox", "Eingang", "Boîte de réception" ...); every
     default name (inbox_default) is still shown in the viewer's language, a renamed inbox keeps its name."""
-    if not c.execute("SELECT 1 FROM lists WHERE is_inbox=1 AND owner_id=?", (uid,)).fetchone():
+    if not c.execute("SELECT 1 FROM lists WHERE is_inbox AND owner_id=?", (uid,)).fetchone():
         r = c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='lang'", (uid,)).fetchone()
-        c.execute("INSERT INTO lists(name,is_inbox,sort,created_at,owner_id) VALUES(?,1,-1,?,?)",
+        c.execute("INSERT INTO lists(name,is_inbox,sort,created_at,owner_id) VALUES(?,true,-1,?,?)",
                   (tr("Basket", lg=r[0] if r and r[0] in LANGS else "en"), iso(now_utc()), uid))
 
 
@@ -954,6 +955,8 @@ def init_db(guard=True):
         write_lock(c, "kalmido-init")
         for ext in ("unaccent", "pg_trgm"):  # message search (collab/msgsearch.py); both ship with the postgres image
             c.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
+        cb_migrate(c, iso(now_utc()))  # 2.1118.0 (#5952): BIGINT 0/1 -> BOOLEAN before the schema, whose partial indexes say `WHERE enabled`
+        clk("cb_migrate")
         c.executescript(trigger_skip_present(c, ix_skip_present(SCHEMA + FRAG_SCHEMA, ix_have(c))))  # 2.183.0 B (#2666): only the missing indexes; 2.369.0 B (#2731): and triggers; 2.475.0 (#3478): + the fragments
         clk("schema")
         flags0 = mig_flags_sync(c)  # 2.102.0 D (#1996): the one-shots done before this start (recorded if not yet)
@@ -1194,9 +1197,9 @@ def init_db(guard=True):
             n = 0
             if _ca() and table_exists(c, "folder_people"):  # 2.958.0 (#5245): gone on a new database
                 for fp in c.execute("SELECT * FROM folder_people").fetchall():
-                    for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
+                    for fl in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox AND COALESCE(folder,'')!='' AND created_at>?",
                                        (fp["owner_id"], fp["created_at"])).fetchall():
-                        if _in_folder(l["folder"], fp["folder"]) and _folder_member_add(c, l["id"], fp["user_id"], fp["role"], fp["owner_id"]):
+                        if _in_folder(fl["folder"], fp["folder"]) and _folder_member_add(c, fl["id"], fp["user_id"], fp["role"], fp["owner_id"]):
                             n += 1
             elif _ca():  # 2.997.0 (#5677): folder_people is gone since 2.958.0 (#5245) -- the folders' shares (fs_shares, read as
                 # its old rows by lf_people_rows) reach a list as a folder role (frole) once it lies under the folder: grp_sync places
@@ -1204,7 +1207,7 @@ def init_db(guard=True):
                 lids = set()
                 with pg_system_ctx(c):  # every owner's lists and folders (as lf_migrate)
                     for fp in lf_people_rows(c):
-                        for lr in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 AND COALESCE(folder,'')!='' AND created_at>?",
+                        for lr in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox AND COALESCE(folder,'')!='' AND created_at>?",
                                            (fp["owner_id"], fp["created_at"])).fetchall():
                             if _in_folder(lr["folder"], fp["folder"]) and not c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?",
                                                                                        (lr["id"], fp["user_id"])).fetchone():
@@ -1364,7 +1367,7 @@ def init_db(guard=True):
         if n:
             print("folders: took over", n, "folder agent(s)", flush=True)
         if gsetting(c, "migr_auditfix") != "1":  # security audit 2026-09-28, one-shot
-            n = c.execute("UPDATE users SET paperless_access=1 WHERE is_admin=1 AND paperless_access=0").rowcount
+            n = c.execute("UPDATE users SET paperless_access=1 WHERE is_admin AND paperless_access=0").rowcount
             counts = repair_data(c)
             gset(c, "migr_auditfix", "1")
             print("audit migration: Paperless access granted to", n, "admin(s); repaired:", counts, flush=True)
@@ -1396,7 +1399,7 @@ def init_db(guard=True):
             drt_fk_once(c)
             gset(c, "migr_drt2239", "1")
         if gsetting(c, "migr_kind2352") != "1":  # 2.352.0 B (#2752): list = project, tracked = has a status; kind stays unused
-            n = c.execute("UPDATE lists SET status='on_track' WHERE kind='project' AND is_inbox=0 AND COALESCE(status,'')=''").rowcount
+            n = c.execute("UPDATE lists SET status='on_track' WHERE kind='project' AND NOT is_inbox AND COALESCE(status,'')=''").rowcount
             gset(c, "migr_kind2352", "1")  # once: a status cleared later (= not tracked) stays cleared
             if n:
                 print("list types:", n, "projects without a status became 'on track'", flush=True)
@@ -1512,7 +1515,7 @@ def init_db(guard=True):
         # restored dump and a rollback that dropped the trigger -- review of 2.1029; touches only rows that differ)
         with pg_system_ctx(c):  # every organisation's projects (row-level security)
             c.execute("UPDATE lists SET state=state WHERE state IS DISTINCT FROM (CASE WHEN deleted_at IS NOT NULL THEN 'trash'"
-                      " WHEN archived <> 0 THEN 'archived' ELSE 'live' END)")
+                      " WHEN archived THEN 'archived' ELSE 'live' END)")
         gset(c, "migr_liststate5537", "1")
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent

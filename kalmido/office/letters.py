@@ -249,7 +249,7 @@ def lt_recipients(c, oid, uid, q="", limit=20, clients=True):
     2.237.0 A (#2861): clients=False leaves the clients out (no right to read them)."""
     words = [w for w in re.split(r"\s+", (q or "").lower().strip()) if w][:6]
     lg = lt_lang(c, oid)
-    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL" + ("" if clients else " AND false"), []
+    sql, args = f"SELECT * FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL" + ("" if clients else " AND false"), []
     for w in words:
         sql += " AND (name ILIKE ? ESCAPE '\\' OR display_name ILIKE ? ESCAPE '\\' OR city ILIKE ? ESCAPE '\\')"
         args += [lt_like(w)] * 3
@@ -689,9 +689,9 @@ def lt_public(c, oid, d, names=None, brief=False):
 def lt_meta(c, oid, uid):
     """What the editor offers: clients of the office, letter templates, the person's profile, channels, states."""
     cls = [{"id": r["id"], "name": r["name"], "display_name": r["display_name"] or ""} for r in
-           c.execute(f"SELECT id, name, display_name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LT_LIST_MAX,))]
+           c.execute(f"SELECT id, name, display_name FROM clients WHERE {pb_cl_sql(c, oid)} AND NOT archived AND deleted_at IS NULL ORDER BY lower(name) LIMIT ?", (LT_LIST_MAX,))]
     tpls = [oc_dec_fields(c, oid, "office_doc_templates", r) for r in
-            c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND kind='letter' AND archived=0 ORDER BY lower(name), id LIMIT ?", (oid, LT_LIST_MAX))]
+            c.execute("SELECT * FROM office_doc_templates WHERE org_id=? AND kind='letter' AND NOT archived ORDER BY lower(name), id LIMIT ?", (oid, LT_LIST_MAX))]
     lang = dt_lang(c, oid)
     return {"clients": cls, "templates": [{"id": t["id"], "name": t["name"], "lang": t["lang"]} for t in tpls],
             "profile": lt_profile_public(c, oid, uid, lang), "lang": lang, "me": uid,
@@ -733,7 +733,7 @@ def lt_list():
     c, uid, oid = lt_ctx()
     sql, args = "SELECT * FROM office_letters WHERE org_id=?", [oid]
     if request.args.get("archived") != "1":
-        sql += " AND archived=0"
+        sql += " AND NOT archived"
     st = request.args.get("status") or ""
     if st:
         if st not in LT_STATUS_KEYS:
@@ -891,7 +891,7 @@ def lt_delete(lid):
     """Archives a letter (a filed PDF stays in the documents space); POST .../restore takes it back (the undo)."""
     c, uid, oid = lt_ctx()
     lt_row(c, oid, lid)
-    c.execute("UPDATE office_letters SET archived=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), lid, oid))
+    c.execute("UPDATE office_letters SET archived=true, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), lid, oid))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -901,7 +901,7 @@ def lt_delete(lid):
 def lt_restore(lid):
     c, uid, oid = lt_ctx()
     lt_row(c, oid, lid)
-    c.execute("UPDATE office_letters SET archived=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), lid, oid))
+    c.execute("UPDATE office_letters SET archived=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), lid, oid))
     bump(c)
     c.commit()
     return jsonify(lt_public(c, oid, lt_row(c, oid, lid)))

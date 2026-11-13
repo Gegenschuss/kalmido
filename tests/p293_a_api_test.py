@@ -317,7 +317,7 @@ G6 = A.post(B + GD, json={"template_id": TC, "client_id": CL}).json()["id"]
 A.post(B + f"{GD}/{G6}/final")
 T6 = A.post(B + f"{GD}/{G6}/signoff", json={}).json()["url"].split("/s/q/")[1]
 FK6 = form_key(anon("/s/q/" + T6).text)
-sql("UPDATE office_gen_docs SET archived=1 WHERE id=?", (G6,), write=True)  # archived, the link row still open (the race window)
+sql("UPDATE office_gen_docs SET archived=true WHERE id=?", (G6,), write=True)  # archived, the link row still open (the race window)
 r = post(T6, f=FK6, name="Max Muster", ok="1", do="accept")
 check(r.status_code == 404 and r.text == UNKNOWN.text, f"archived before the decision: the same void answer ({r.status_code})")
 st6 = sql("SELECT d.status, s.state FROM office_gen_docs d JOIN office_signoffs s ON s.gen_doc_id=d.id WHERE d.id=?", (G6,))[0]

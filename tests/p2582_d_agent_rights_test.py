@@ -206,7 +206,7 @@ r = ask(kind="subtasks", task_id=T_L)
 check(r.status_code == 409 and "Health" not in r.text, f"F6: break down a task with the lock: 409 {r.status_code} {r.text[:160]}")
 
 # 2.582.0 (fable review F4): the owner's account disabled -> no other people's entries any more
-dbx("UPDATE users SET disabled=1 WHERE id=?", (FID,))
+dbx("UPDATE users SET disabled=true WHERE id=?", (FID,))
 r = requests.get(V + "/time/entries?scope=all", headers=FH)
 check(r.status_code == 200 and "ZQXBOB-P" not in r.text, f"F4: disabled owner: no other people's entries {r.status_code} {r.text[:200]}")
 sys.exit(done("p2582_d_agent_rights"))

@@ -755,7 +755,7 @@ def list_reorder():
                     del fm[k]
             b = {**b, "folder": fm}
     for i, lid in enumerate(b.get("ids", [])):  # 2.280.0 A (#3109): only rows whose order moves (each write is a change for others)
-        c.execute("UPDATE lists SET sort=? WHERE id=? AND is_inbox=0 AND owner_id=? AND sort!=?", (i, int(lid), uid, i))
+        c.execute("UPDATE lists SET sort=? WHERE id=? AND NOT is_inbox AND owner_id=? AND sort!=?", (i, int(lid), uid, i))
         c.execute("UPDATE list_members SET sort=? WHERE list_id=? AND user_id=? AND sort!=?", (i, int(lid), uid, i))
     fmap = b.get("folder") or {}
     if not isinstance(fmap, dict):
@@ -879,7 +879,7 @@ def lp_carry(c, lid, inbox):
                        "ORDER BY sort, id",
                        (lid,)).fetchall():
         x = c.execute("SELECT id, options FROM list_fields WHERE list_id=? AND name=? AND type=? ORDER BY id LIMIT 1", (inbox, f["name"], f["type"])).fetchone()
-        nid = x[0] if x else insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,0,?,?)",
+        nid = x[0] if x else insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,false,?,?)",
                                        (inbox, f["name"], f["type"], f["options"], f["sort"], iso(now_utc())))
         omap = lp_carry_options(c, f, x) if x and f["type"] in ("select", "multiselect") else None
         for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=?", (f["id"],)).fetchall():
@@ -1034,7 +1034,7 @@ def member_set(lid):
         uid = r[0]
     elif not may_see(c, me(), uid) and g.get("lmc_restore") != uid:  # 2.568.0 (#4739): a share put back (lmcore._on_restore)
         return err(tr("unknown person"), 404)  # reaches who it reached before (e.g. shared by e-mail address)
-    u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT id FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
         return quiet() if by_mail else err(tr("unknown person"), 404)
     if uid == c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0]:
@@ -1118,7 +1118,7 @@ def _folder_member_add(c, lid, uid, role, actor):
     from ..collab.news import news_add
     from ..family.family import is_kid
     from ..agents.core import is_agent
-    u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone()
     l = c.execute("SELECT name, life, is_inbox, owner_id, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not u or not l or l["is_inbox"] or l["owner_id"] == uid or (is_agent(u) and (l["life"] in ("health", "budget") or (l["life"] == "travel" and l["org_id"]) or reading_ids(c, [lid]))):  # 2.173.0 A (#2680): an organisation's trip neither; 2.172.1 A (#2689): read later neither
         return False
@@ -1223,7 +1223,7 @@ def fg_people_diff(c, owner, f, uid, role):
     r2 = "participant" if is_kid(c, uid) else role
     out = []
     for r in c.execute(f"""SELECT l.id, l.name, l.folder, m.own_role FROM lists l JOIN list_members m ON m.list_id=l.id AND m.user_id=?
-                          WHERE l.owner_id=? AND {list_state_sql('l')} AND l.is_inbox=0 AND m.own_role IS NOT NULL ORDER BY lower(l.name), l.id""",
+                          WHERE l.owner_id=? AND {list_state_sql('l')} AND NOT l.is_inbox AND m.own_role IS NOT NULL ORDER BY lower(l.name), l.id""",
                        (uid, owner)).fetchall():
         if _in_folder(r["folder"], f) and r["own_role"] not in (prev[0], r2):
             out.append({"list_id": r["id"], "name": r["name"], "role": r["own_role"]})
@@ -1246,7 +1246,7 @@ def folder_people_diff():
         uid = int(request.args.get("user_id") or 0)
     except (TypeError, ValueError):
         uid = 0
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() \
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone() or uid == me() \
             or personal_agent_foreign(c, uid, me()) or not may_see(c, me(), uid):
         return err(tr("unknown person"), 404)
     return jsonify(lists=fg_people_diff(c, me(), f, uid, role))
@@ -1274,7 +1274,7 @@ def folder_people_put():
         r = (r,) if r else None
         from ..lists.lffolder import lf_folder_nodes
         if not (lf_folder_nodes(c, me(), f) or any(_in_folder(x[1], f) for x in c.execute(
-                "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall())):
+                "SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox", (me(),)).fetchall())):
             return jsonify(shared=0, updated=0, by_email=True)  # 2.1071.0 (#5658, review F1): no such folder - nothing, for every address
 
         def _ads_folder_open():
@@ -1294,10 +1294,10 @@ def folder_people_put():
         from ..accounts.orgs import ws_fit_problem, ws_member_problem
         if any(ws_fit_problem(c, n["org_id"], r[0]) for n in lf_folder_nodes(c, me(), f) if n["org_id"]) or \
                 any(ws_member_problem(c, x[0], r[0]) for x in c.execute(
-                    "SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0 ORDER BY id", (me(),)).fetchall() if _in_folder(x[1], f)):
+                    "SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox ORDER BY id", (me(),)).fetchall() if _in_folder(x[1], f)):
             return _ads_folder_open()  # 2.1071.0 (#5658, review F3): the open share stays, as for an unknown address
         uid = r[0]
-    elif not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
+    elif not c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone() or uid == me() or personal_agent_foreign(c, uid, me()) \
             or not may_see(c, me(), uid):  # 2.22.0 (#752)
         return err(tr("unknown person"), 404)
     from ..agents.core import is_agent
@@ -1312,7 +1312,7 @@ def folder_people_put():
     from ..lists.lffolder import lf_people  # 2.958.0 (#5245): the folder's shares (folder_people is gone)
     prev = lf_people(c, me(), f).get(uid)
     prev = (prev,) if prev else None
-    rows = [r for r in c.execute(f"SELECT id, name, folder FROM lists WHERE owner_id=? AND {list_state_sql()} AND is_inbox=0", (me(),)).fetchall()
+    rows = [r for r in c.execute(f"SELECT id, name, folder FROM lists WHERE owner_id=? AND {list_state_sql()} AND NOT is_inbox", (me(),)).fetchall()
             if _in_folder(r["folder"], f)]
     had = {r[0]: r[1] for r in c.execute("SELECT list_id, role FROM list_members WHERE user_id=?", (uid,))}
     # 2.352.0 A (#2748): the share is one of the folder (fs_shares of its nodes, lists/lffolder.py): no copy into the lists, it
@@ -1358,7 +1358,7 @@ def folder_people_delete():
     n = 0
     if b.get("remove") is True and f and uid and uid != me():
         c.commit()
-        for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():
+        for r in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox", (me(),)).fetchall():
             if _in_folder(r["folder"], f) and c.execute("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (r["id"], uid)).fetchone():
                 try:
                     v1_call(member_remove, r["id"], uid)
@@ -1441,7 +1441,7 @@ def agent_autoshare(c, uid, lid):
         return
     auto = agent_share_get(c, uid)["auto"]
     for aid in auto:
-        if aid != uid and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone():
+        if aid != uid and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND NOT disabled", (aid,)).fetchone():
             agent_share_add(c, lid, aid, uid)
 
 
@@ -1451,7 +1451,7 @@ def agent_share_target(c, aid):
     u = c.execute("SELECT kind FROM users WHERE id=?", (me(),)).fetchone()
     if not u or u["kind"] == "agent":
         raise Denied(403)
-    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND disabled=0", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent' AND NOT disabled", (aid,)).fetchone() or personal_agent_foreign(c, aid, me()):
         raise Denied(404, tr("unknown person"))
 
 
@@ -1470,7 +1470,7 @@ def agent_share_counts(c, aid, d):
     rows = c.execute(f"""SELECT l.id, EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?) AS has,
                         EXISTS(SELECT 1 FROM list_members m JOIN users u ON u.id=m.user_id WHERE m.list_id=l.id AND u.kind='agent'
                                AND m.user_id!=?) AS other
-                        FROM lists l WHERE l.owner_id=? AND l.is_inbox=0 AND {list_archived_sql('l')}=0""", (aid, aid, me())).fetchall()
+                        FROM lists l WHERE l.owner_id=? AND NOT l.is_inbox AND {list_archived_sql('l')}=0""", (aid, aid, me())).fetchall()
     return {"own": len(rows), "shared": sum(1 for r in rows if r["has"]),
             "missing": sum(1 for r in rows if not r["has"] and not r["other"] and r["id"] not in skip),
             "skipped": sum(1 for r in rows if not r["has"] and r["id"] in skip)}
@@ -1532,7 +1532,7 @@ def agent_share_all(aid):
     skip = set(d["skip"].get(str(aid), []))
     from ..agents.safety import bridge_blocks
     n, other, bridged = 0, [], []
-    for (lid, name) in c.execute(f"SELECT id, name FROM lists WHERE owner_id=? AND is_inbox=0 AND quicknote=0 AND {list_archived_sql('')}=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
+    for (lid, name) in c.execute(f"SELECT id, name FROM lists WHERE owner_id=? AND NOT is_inbox AND quicknote=0 AND {list_archived_sql('')}=0 ORDER BY id",  # 2.477.0 (#3881): not the list Notes
                                  (me(),)).fetchall():
         if lid in skip:
             continue
@@ -1669,7 +1669,7 @@ def _ads_list_gone(c, x):
 def _ads_folder_gone(c, x):
     from ..lists.lffolder import lf_folder_nodes
     return not lf_folder_nodes(c, x["owner_id"], x["path"]) and not any(_in_folder(r[0], x["path"]) for r in c.execute(
-        "SELECT folder FROM lists WHERE owner_id=? AND is_inbox=0", (x["owner_id"],)).fetchall())
+        "SELECT folder FROM lists WHERE owner_id=? AND NOT is_inbox", (x["owner_id"],)).fetchall())
 
 
 ads_kind("list", member_set, lambda x: (int(x["ref_id"]),), _ads_list_may, _ads_list_gone)

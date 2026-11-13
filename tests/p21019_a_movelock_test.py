@@ -162,14 +162,14 @@ r = A.post(B + f"/api/lists/{SRC}/rules", json={"name": "Due: urgent and away", 
                                                  "actions": [{"kind": "priority", "priority": "urgent"}, {"kind": "move", "list_id": DST}]})
 check(r.status_code in (200, 201), f"#5633 setup rule: created {r.status_code} {r.text[:200]}")
 RID = r.json().get("id")
-sql("UPDATE list_rules SET active=0 WHERE id=?", (RID,), write=True)  # the watchdog must not run it before the race
+sql("UPDATE list_rules SET active=false WHERE id=?", (RID,), write=True)  # the watchdog must not run it before the race
 TODAY = subprocess.run(["docker", "exec", CT, "python", "-c", "import app\nfrom kalmido.core.db import local_now\nprint(local_now().date())"],
                        capture_output=True, text=True).stdout.strip().splitlines()[-1]
 check(A.patch(B + f"/api/tasks/{RP}", json={"due": TODAY}).ok, f"#5633 setup rule: the parent is due today {TODAY}")
 
 
 def rule_tick():
-    p = proc(f"c.execute('UPDATE list_rules SET active=1 WHERE id=?', ({RID},))", "c.commit()",
+    p = proc(f"c.execute('UPDATE list_rules SET active=true WHERE id=?', ({RID},))", "c.commit()",
              "from kalmido.lists.rules import rul_due_tick", "rul_due_tick(c)", hold=False)
     return p.communicate(timeout=90)
 

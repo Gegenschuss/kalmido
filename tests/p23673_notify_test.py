@@ -233,7 +233,7 @@ for s, who in ((Bo, "who set it up"), (A, "the project's owner")):
 
 # ================================================================ #2971: polled connections
 now = "2026-10-01T10:00:00Z"
-dbx("INSERT INTO hub_mailboxes(ws,owner_id,active,imap_host,imap_user,error,error_at,fails,created_at,updated_at) VALUES(?,?,1,'127.0.0.1','frida@example.test','timeout',?,4,?,?)",
+dbx("INSERT INTO hub_mailboxes(ws,owner_id,active,imap_host,imap_user,error,error_at,fails,created_at,updated_at) VALUES(?,?,true,'127.0.0.1','frida@example.test','timeout',?,4,?,?)",
     (f"u{FID}", FID, now, now, now))
 ws = dbx("SELECT ws FROM hub_mailboxes WHERE owner_id=?", (FID,))[0][0]
 check(until(lambda: news(Fi, "mailbox"), 30), "#2971: a mailbox at 5 failures in a row: its person is told")

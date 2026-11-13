@@ -90,7 +90,7 @@ for s in (A, Bo, Ca):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 AGH = {"Authorization": "Bearer " + ag["token"], **H}
-BINBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
+BINBOX = sql("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
 
 # ================================================================== #1988 an organisation list of Bob, deleted by the org admin
 LT = Bo.post(B + "/api/lists", json={"name": "Spring campaign", "org_id": ORG, "kind": "project"}).json()["id"]

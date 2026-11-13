@@ -88,7 +88,7 @@ T1 = Bo.post(B + "/api/tasks", json={"title": "Secret task one", "list_id": TEAM
 T2 = Bo.post(B + "/api/tasks", json={"title": "Secret task two", "list_id": TEAM}).json()["id"]
 dbx("UPDATE tasks SET status=2 WHERE id=?", (T2,), write=True)
 Bo.post(B + "/api/tasks", json={"title": "Private thing", "list_id": PRIV})
-BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox=1", (BOB,))[0][0]
+BINBOX = dbx("SELECT id FROM lists WHERE owner_id=? AND is_inbox", (BOB,))[0][0]
 check(dbx("SELECT org_id FROM lists WHERE id=?", (TEAM,))[0][0] == ORG and dbx("SELECT org_id FROM lists WHERE id=?", (PRIV,))[0][0] is None, "setup: workspaces of the lists")
 
 # ================================================================== #1101 the overview (mode organisation: instance admins = org admins)
@@ -111,7 +111,7 @@ check(A.get(B + "/api/orgs/9999/lists").status_code == 404, "#1101: an unknown o
 # an agent, even with admin rights, never
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})
 AG, AGH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"], **H}
-dbx("UPDATE users SET is_admin=1 WHERE id=?", (AG,), write=True)
+dbx("UPDATE users SET is_admin=true WHERE id=?", (AG,), write=True)
 dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT DO NOTHING", (ORG, AG), write=True)
 for m, u, b in (("GET", f"/api/orgs/{ORG}/lists", None), ("POST", f"/api/orgs/{ORG}/lists/{TEAM}/archive", {"archived": True}),
                 ("DELETE", f"/api/orgs/{ORG}/lists/{TEAM}", {"confirm": "Bob Team"})):

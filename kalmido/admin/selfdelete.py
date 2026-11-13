@@ -83,7 +83,7 @@ def sdl_refusal(c, u):
                          WHERE m.user_id=? AND m.role='admin' AND o.personal_of IS NULL AND o.retired_at IS NULL
                            AND NOT EXISTS (SELECT 1 FROM org_members m2 JOIN users x ON x.id=m2.user_id
                                            WHERE m2.org_id=m.org_id AND m2.role='admin' AND m2.user_id<>m.user_id
-                                             AND x.disabled=0 AND COALESCE(x.kind, 'user')<>'agent')
+                                             AND NOT x.disabled AND COALESCE(x.kind, 'user')<>'agent')
                          ORDER BY o.id LIMIT 1""", (u["id"],)).fetchone()
     if r:
         return tr(SDL_LAST_ORG, r[0])
@@ -223,12 +223,12 @@ def sdl_request():
     tok = secrets.token_urlsafe(24)
     at = iso(now_utc() + timedelta(days=SDL_DAYS))
     with system_ctx(c):  # the own agents, also those working in an organisation: their tokens are refused meanwhile
-        paused = [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=? AND enabled=1 ORDER BY user_id", (uid,)).fetchall()]
+        paused = [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=? AND enabled ORDER BY user_id", (uid,)).fetchall()]
         if paused:
-            c.execute("UPDATE agents SET enabled=0 WHERE owner_id=? AND enabled=1", (uid,))
+            c.execute("UPDATE agents SET enabled=false WHERE owner_id=? AND enabled", (uid,))
     plan = {"lists": choice, "how": how, "along": along, "agents": paused, "toks": [tkh_hash(tok)], "asked": iso(now_utc()),
             "rx": rx_counts(c, rx_subject(c, "user", uid), along)}  # review M2: the records to keep the gate saw when it was asked for
-    c.execute("UPDATE users SET disabled=1, delete_at=?, delete_plan=? WHERE id=?", (at, json.dumps(plan), uid))
+    c.execute("UPDATE users SET disabled=true, delete_at=?, delete_plan=? WHERE id=?", (at, json.dumps(plan), uid))
     ses_end(c, uid)  # every session, this one too
     bump(c)
     c.commit()
@@ -244,8 +244,8 @@ def _lift(c, u):
     p = sdl_plan(u)
     with system_ctx(c):  # the agents may work in an organisation; the cancel link comes without a session
         for aid in p.get("agents") or []:
-            c.execute("UPDATE agents SET enabled=1 WHERE user_id=? AND owner_id=?", (int(aid), u["id"]))
-        c.execute("UPDATE users SET disabled=0, delete_at=NULL, delete_plan='' WHERE id=?", (u["id"],))
+            c.execute("UPDATE agents SET enabled=true WHERE user_id=? AND owner_id=?", (int(aid), u["id"]))
+        c.execute("UPDATE users SET disabled=false, delete_at=NULL, delete_plan='' WHERE id=?", (u["id"],))
 
 
 @app.post("/api/auth/delete-cancel")  # SDL_CANCEL (a plain string: the route guards read it)
@@ -392,7 +392,7 @@ class SdlWait(Exception):
 def sdl_run(c, uid):
     """The final deletion of uid (its delete_at passed). True when it went; else the plan notes the try (SDL_RETRY)."""
     with system_ctx(c):
-        u = c.execute("SELECT * FROM users WHERE id=? AND disabled=1 AND delete_at IS NOT NULL", (uid,)).fetchone()
+        u = c.execute("SELECT * FROM users WHERE id=? AND disabled AND delete_at IS NOT NULL", (uid,)).fetchone()
     if not u:
         c.rollback()
         return False

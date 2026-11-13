@@ -51,7 +51,7 @@ def tt_list_scope(c, lid):
 
 def tt_rows(c, oid, owner, enabled=False):
     q = "org_id=?" if oid else "org_id IS NULL AND owner_id=?"
-    return c.execute(f"SELECT * FROM ticket_types WHERE {q}{' AND enabled=1' if enabled else ''} ORDER BY sort, id",
+    return c.execute(f"SELECT * FROM ticket_types WHERE {q}{' AND enabled' if enabled else ''} ORDER BY sort, id",
                      (oid or owner,)).fetchall()
 
 

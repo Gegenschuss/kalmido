@@ -140,12 +140,12 @@ def tmr_who(c, tid, sender, tu=0):
         return False, None
     if tu:
         # 2.1021.0 (#5775): only an account that proved its address (users.email_proved, like core/access.py addr_account)
-        r = c.execute("SELECT id FROM users WHERE id=? AND lower(email)=? AND email_proved=? AND disabled=0 AND COALESCE(kind,'user')<>'agent'",
+        r = c.execute("SELECT id FROM users WHERE id=? AND lower(email)=? AND email_proved=? AND NOT disabled AND COALESCE(kind,'user')<>'agent'",
                       (tu, sender, sender)).fetchone()
         if r and task_visible(c, tid, tu, full=True) and not ocm_say_refusal(c, "task", tid, tu):  # 2.607.0 (#4549): a guest /
             return True, tu  # read-only person of the list's organisation comments by mail as little as in the app
     else:
-        for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND email_proved=? AND disabled=0 AND COALESCE(kind,'user')<>'agent' ORDER BY id",
+        for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND email_proved=? AND NOT disabled AND COALESCE(kind,'user')<>'agent' ORDER BY id",
                            (sender, sender)).fetchall():  # 2.1021.0 (#5775): an address nobody proved is like an unknown one
             if task_visible(c, tid, r[0], full=True) and not ocm_say_refusal(c, "task", tid, r[0]):  # 2.607.0 (#4549)
                 return True, None

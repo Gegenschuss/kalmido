@@ -135,11 +135,11 @@ def rx_subject(c, kind, sid):
             return {"key": f"user:{int(sid)}", "kind": kind, "id": int(sid), "office": r[0] if r else None, "ws": doc_ws(None, sid),
                     # 2.239.0 C (#2874): the person's own projects only -- an organisation's project (receipts, bookings) never
                     # goes into the personal export, also not when the person owns it or left the organisation
-                    "lists": ("SELECT id FROM lists WHERE owner_id=? AND is_inbox=0 AND org_id IS NULL", (sid,))}
+                    "lists": ("SELECT id FROM lists WHERE owner_id=? AND NOT is_inbox AND org_id IS NULL", (sid,))}
         if not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL", (sid,)).fetchone():
             raise Denied(404)
     return {"key": f"org:{int(sid)}", "kind": kind, "id": int(sid), "office": int(sid), "ws": doc_ws(sid, None),
-            "lists": ("SELECT id FROM lists WHERE org_id=? AND is_inbox=0", (sid,))}
+            "lists": ("SELECT id FROM lists WHERE org_id=? AND NOT is_inbox", (sid,))}
 
 
 def rx_may_export(c, sub):

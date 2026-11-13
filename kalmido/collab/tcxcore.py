@@ -73,7 +73,7 @@ def _visible(c, uid):
     """The candidates of obj_rows (the kind has a cap hook: obj_role decides each row)."""
     u = int(uid)
     return (f"({tcx_core_rooms_sql(u)} "  # 2.924.0 (#5069): the core alone
-            f"UNION SELECT id FROM tchat_rooms WHERE kind = 'channel' AND is_open = 1 AND org_id IN "
+            f"UNION SELECT id FROM tchat_rooms WHERE kind = 'channel' AND is_open AND org_id IN "
             f"(SELECT org_id FROM org_members WHERE user_id = {u}))")
 
 

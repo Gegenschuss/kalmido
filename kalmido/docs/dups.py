@@ -7,7 +7,7 @@ twice -- otherwise both go into the DATEV batch).
  - The same invoice: after a recognition run (doc_on_done) a document with a recognised supplier / invoice number is
    compared with the older documents of its workspace: same supplier + same invoice number, or same supplier + same amount +
    same date (no supplier known: the invoice number alone, 4+ characters) -> doc_meta.dup_of = the older one. The document
-   stays; the sheet warns with a link, "No duplicate" (dup_ok = 1) keeps the decision across new recognition runs.
+   stays; the sheet warns with a link, "No duplicate" (dup_ok) keeps the decision across new recognition runs.
  - The DATEV batch leaves a possible duplicate out unless the export asks for it (office/datevin.py)."""
 import hashlib
 import re
@@ -126,7 +126,7 @@ def dup_open(c, ids):
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         q = ",".join("?" * len(part))
-        for r in c.execute(f"SELECT node_id, dup_of FROM doc_meta WHERE node_id IN ({q}) AND dup_of IS NOT NULL AND dup_ok=0", tuple(part)):
+        for r in c.execute(f"SELECT node_id, dup_of FROM doc_meta WHERE node_id IN ({q}) AND dup_of IS NOT NULL AND NOT dup_ok", tuple(part)):
             ch = fs_chain(c, r["dup_of"])
             if ch and not fs_deleted(ch):
                 out.add(r["node_id"])
@@ -143,7 +143,7 @@ def dup_seen(c, ids, uid):
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         q = ",".join("?" * len(part))
-        for r in c.execute(f"SELECT node_id, dup_of FROM doc_meta WHERE node_id IN ({q}) AND dup_of IS NOT NULL AND dup_ok=0", tuple(part)):
+        for r in c.execute(f"SELECT node_id, dup_of FROM doc_meta WHERE node_id IN ({q}) AND dup_of IS NOT NULL AND NOT dup_ok", tuple(part)):
             if r["dup_of"] not in seen:
                 seen[r["dup_of"]] = _visible(c, r["dup_of"], uid)
             if seen[r["dup_of"]]:

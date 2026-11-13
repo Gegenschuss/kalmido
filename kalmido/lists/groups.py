@@ -614,7 +614,7 @@ def fg_group_diff(c, owner, f, gid, role):
         return []
     own = {r["list_id"]: r["role"] for r in grp_own_rows(c, gid=gid)}
     return [{"list_id": r["id"], "name": r["name"], "role": own[r["id"]]} for r in c.execute(
-        f"""SELECT l.id, l.name, l.folder FROM lists l WHERE l.owner_id=? AND {list_state_sql('l')} AND l.is_inbox=0
+        f"""SELECT l.id, l.name, l.folder FROM lists l WHERE l.owner_id=? AND {list_state_sql('l')} AND NOT l.is_inbox
            ORDER BY lower(l.name), l.id""", (owner,)).fetchall()
         if r["id"] in own and _in_folder(r["folder"], f) and own[r["id"]] != role]
 
@@ -648,10 +648,10 @@ def folder_group_set(gid):
     if p:
         return jsonify(error=p, code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
-    for l in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND is_inbox=0", (me(),)).fetchall():  # 2.28.0 (#935)
-        if _in_folder(l["folder"], f):
+    for fl in c.execute("SELECT id, folder FROM lists WHERE owner_id=? AND NOT is_inbox", (me(),)).fetchall():  # 2.28.0 (#935)
+        if _in_folder(fl["folder"], f):
             for uid in grp_members(c, gid):
-                p = ws_member_problem(c, l["id"], uid)
+                p = ws_member_problem(c, fl["id"], uid)
                 if p:
                     return err(p, 409)
     before = grp_list_ids(c, owner=me())

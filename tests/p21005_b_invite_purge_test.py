@@ -94,7 +94,7 @@ for oid in (O1, O2):
     invite(oid, "paula@example.com")
     invite(oid, "dora@example.com")
 invite(O1, "gerda@example.com")
-check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IN (?,?,?) AND silent=1", (PID, DID, GID))[0][0] == 5, "setup: the invitations are kept silent")
+check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IN (?,?,?) AND silent", (PID, DID, GID))[0][0] == 5, "setup: the invitations are kept silent")
 # a new account this company makes (org_invites + org_joins, silent=0)
 invite(O1, "neu@example.com")
 NID = dbx("SELECT id FROM users WHERE email=?", ("neu@example.com",))[0][0]
@@ -113,7 +113,7 @@ r = Pa.post(B + "/api/account/delete", json={"password": kt.PASSWORD, "lists": {
 check(r.ok, f"setup: paula asks to delete her account {r.status_code} {r.text[:200]}")
 write("UPDATE users SET delete_at='2000-01-01T00:00:00+00:00' WHERE id=?", (PID,))
 check(bool(until(lambda: not dbx("SELECT 1 FROM users WHERE id=?", (PID,)), 30)), "setup: the watchdog deleted paula's account")
-check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IS NULL AND silent=1 AND email=?", ("paula@example.com",))[0][0] == 2, "setup: paula's two neutral rows")
+check(dbx("SELECT COUNT(*) FROM org_joins WHERE user_id IS NULL AND silent AND email=?", ("paula@example.com",))[0][0] == 2, "setup: paula's two neutral rows")
 
 # the ages: O1 past the period, O2 just within it (neutral and silent alike)
 write("UPDATE org_joins SET created_at=? WHERE org_id=? AND email=? AND user_id IS NULL", (OLD, O1, "paula@example.com"))
@@ -153,7 +153,7 @@ check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, IID)
 check(not dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (O1, NID)),
       "(#5786) the row of the new account this company made goes on the same day as the others")
 # open and accepted
-check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=? AND silent=1", (O1, GID))) and "gerda@example.com" in after1,
+check(bool(dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=? AND silent", (O1, GID))) and "gerda@example.com" in after1,
       "(#5118) an open (fresh) silent invitation stays")
 check(bool(dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (O1, KID))), "(#5118) an accepted invitation keeps its membership")
 check(bool(dbx("SELECT 1 FROM users WHERE id IN (?,?,?)", (DID, HID, IID))) and dbx("SELECT COUNT(*) FROM users WHERE id IN (?,?,?)", (DID, HID, IID))[0][0] == 3,

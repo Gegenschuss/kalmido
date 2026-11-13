@@ -28,7 +28,7 @@ def owner_orphaned(c, uid):
 def owner_candidates(c, lid, owner):
     """Active people (never agents) who can become the owner of lid: members first (with their role), then everyone else."""
     roles = {r[0]: r[1] for r in c.execute("SELECT user_id, role FROM list_members WHERE list_id=?", (lid,))}
-    rows = c.execute("SELECT id, username, display_name FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' AND id!=? "
+    rows = c.execute("SELECT id, username, display_name FROM users WHERE NOT disabled AND COALESCE(kind,'user')!='agent' AND id!=? "
                      "ORDER BY id", (owner,)).fetchall()
     from ..accounts.orgs import list_org, visible_people
     from ..accounts.orgroles import user_orgs_full  # 2.143.0 A (#2151, review): owners of an organisation's list: member / admin
@@ -156,7 +156,7 @@ def owner_transfer(c, lr, new, force=False):
         news_add(c, new, "owner", list_id=lid, data={"name": lr["name"], "from": names.get(old, ""), "reset": reset, "self": True}, actor=old)
     who = names.get(me(), "?")
     list_push(c, new, "share", lid, lambda lg: tr("{0} made you the owner of a project", who, lg=lg), lambda lg: lr["name"])
-    if old and old != me() and c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (old,)).fetchone():  # 2.367.5 (#2980): someone else moved my project
+    if old and old != me() and c.execute("SELECT 1 FROM users WHERE id=? AND NOT disabled", (old,)).fetchone():  # 2.367.5 (#2980): someone else moved my project
         news_add(c, old, "owner", list_id=lid, data={"name": lr["name"], "given": names.get(new, "")})
         list_push(c, old, "share", lid, lambda lg: tr("{0} handed your project to {1}", who, names.get(new, ""), lg=lg), lambda lg: lr["name"])
     return old, names.get(new, "")
@@ -223,10 +223,10 @@ def admin_lists_orphaned():
                                (SELECT COUNT(*) FROM list_members m WHERE m.list_id=l.id) AS members,
                                (SELECT COUNT(*) FROM tasks t WHERE t.list_id=l.id AND t.deleted_at IS NULL) AS tasks
                         FROM lists l JOIN users u ON u.id=l.owner_id
-                        WHERE l.is_inbox=0 AND l.deleted_at IS NULL AND (u.kind='agent' OR u.disabled=1) ORDER BY l.id""").fetchall()
+                        WHERE NOT l.is_inbox AND l.deleted_at IS NULL AND (u.kind='agent' OR u.disabled) ORDER BY l.id""").fetchall()
     rows = [r for r in rows if not op_takeover_apart(c, r)]  # 2.399.0 (#2687): hosted: only projects of the operator's own organisations
     return jsonify(lists=[{"id": r["id"], "name": r["name"], "archived": bool(r["archived"]), "owner_id": r["owner_id"],
                            "owner_name": r["display_name"] or r["username"], "reason": "agent" if r["kind"] == "agent" else "disabled",
                            "members": r["members"], "tasks": r["tasks"]} for r in rows],
                    candidates=[{"id": r["id"], "name": r["display_name"] or r["username"]} for r in c.execute(
-                       "SELECT id, username, display_name FROM users WHERE disabled=0 AND COALESCE(kind,'user')!='agent' ORDER BY id")])
+                       "SELECT id, username, display_name FROM users WHERE NOT disabled AND COALESCE(kind,'user')!='agent' ORDER BY id")])

@@ -92,9 +92,9 @@ def brief_blocked(c, uid, ql, vis):
                AND t.id NOT IN (SELECT item_id FROM sample_items WHERE kind='task') AND {vis}"""
     rows = c.execute(f"""SELECT {cols}, t.waiting_at, t.wait_note, t.wait_until,
                            (SELECT COUNT(*) FROM task_deps d JOIN tasks b ON b.id=d.blocker_id WHERE d.task_id=t.id AND b.status=0
-                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}) AS open_blockers
+                              AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE NOT is_inbox) AND {tvis(c, uid, 'b.')}) AS open_blockers
                          {base} AND {mine} AND (t.waiting_at IS NOT NULL OR EXISTS (SELECT 1 FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
-                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE is_inbox=0) AND {tvis(c, uid, 'b.')}))
+                              WHERE d.task_id=t.id AND b.status=0 AND b.deleted_at IS NULL AND b.list_id IN (SELECT id FROM lists WHERE NOT is_inbox) AND {tvis(c, uid, 'b.')}))
                          ORDER BY t.due IS NULL, t.due, t.id""", (uid, uid, uid)).fetchall()
     return [r for r in rows if r["waiting_at"] or r["open_blockers"]]
 
@@ -289,7 +289,7 @@ def v1_briefing():
         if not raw or not str(raw).isdigit():
             raise BadInput(tr("Invalid value: {0}", "user_id"))
         pid = int(raw)
-        u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (pid,)).fetchone()
+        u = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (pid,)).fetchone()
         if not u or is_agent(u) or not agent_shares(c, uid, pid):
             raise Denied(404)
         return jsonify(briefing_data(c, pid, agent_id=uid, since=since))

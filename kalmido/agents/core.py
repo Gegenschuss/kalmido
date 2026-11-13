@@ -395,7 +395,7 @@ def agent_emit(c, aid, event, data, actor="auto", via=None):
     env = {"id": ev, "seq": seq, "event": event, "created_at": ts, "agent_id": aid, "actor": actor, "via": via, "data": data}
     c.execute("UPDATE agent_events SET payload=? WHERE id=?", (json.dumps(env, ensure_ascii=False), seq))
     if a["webhook_id"] and WH_ON:
-        w = c.execute("SELECT * FROM webhooks WHERE id=? AND enabled=1", (a["webhook_id"],)).fetchone()
+        w = c.execute("SELECT * FROM webhooks WHERE id=? AND enabled", (a["webhook_id"],)).fetchone()
         if w:
             wh_queue_raw(c, w, env)
     if (a["provider"] or "") == "kalmido-server":  # 2.557.0 B (#4670): Kalmido runs the model itself (agents/srvagent.py)
@@ -1067,7 +1067,7 @@ def perm_user_ok(c, a, uid):
     agent: an active person the agent reaches in the chat (agent_shares, where its host posts the question)."""
     if a["owner_id"]:
         return uid == a["owner_id"]
-    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT id FROM users WHERE id=? AND kind<>'agent' AND NOT disabled", (uid,)).fetchone()
     return bool(u) and agent_shares(c, a["user_id"], uid)
 
 
@@ -1659,7 +1659,7 @@ def agent_projects_counts(c, aids):
         return {}
     with system_ctx(c):  # a count over the agents' memberships (structure; no project is named)
         n = {r[0]: r[1] for r in c.execute(f"""SELECT m.user_id, COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id
-                                               WHERE m.user_id = ANY(CAST(? AS BIGINT[])) AND l.is_inbox=0 AND {otr_live("l")}
+                                               WHERE m.user_id = ANY(CAST(? AS BIGINT[])) AND NOT l.is_inbox AND {otr_live("l")}
                                                AND l.owner_id<>m.user_id GROUP BY m.user_id""", (st_ids(ids),))}
     return {a: n.get(a, 0) for a in ids}
 
@@ -1712,7 +1712,7 @@ def agent_shared_by(c, aid, uid):
     if o is not None:
         return o == uid
     with system_ctx(c):  # the agent's memberships and uid's role in them (structure, nothing is read out)
-        return bool(c.execute(f"""SELECT 1 FROM lists l WHERE {otr_live("l")} AND l.is_inbox=0
+        return bool(c.execute(f"""SELECT 1 FROM lists l WHERE {otr_live("l")} AND NOT l.is_inbox
                                  AND l.id IN (SELECT list_id FROM list_members WHERE user_id=?)
                                  AND (l.owner_id=? OR EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?
                                                              AND m.role IN ('owner','admin'))) LIMIT 1""", (aid, uid, uid)).fetchone())

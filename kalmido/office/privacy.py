@@ -163,7 +163,7 @@ def dsb_sync(c, oid, uid, rows):
 def dsb_rows(c, oid, uid, client_id=None, archived=False):
     sql, args = "SELECT * FROM office_privacy_sheets WHERE org_id=?", [oid]
     if not archived:
-        sql += " AND archived=0"
+        sql += " AND NOT archived"
     if client_id is not None:
         sql += " AND client_id=?"
         args.append(client_id)
@@ -195,7 +195,7 @@ def dsb_list():
     out = {"sheets": [dsb_public(c, oid, r, gds.get(r["gen_doc_id"]), reps.get(r["id"])) for r in rows]}
     if request.args.get("brief") != "1":
         smtp, rin = dsb_mail_on()
-        tpls = c.execute("SELECT id, name, lang, sign FROM office_doc_templates WHERE org_id=? AND archived=0 ORDER BY lower(name), id LIMIT 500",
+        tpls = c.execute("SELECT id, name, lang, sign FROM office_doc_templates WHERE org_id=? AND NOT archived ORDER BY lower(name), id LIMIT 500",
                          (oid,)).fetchall()
         out.update(kinds=[{"key": k, "label": tr(v[0]), "sign": int(v[2]), "hint": tr(DSB_HINT_DPA) if k == "dpa" else ""} for k, v in DSB_KINDS.items()],
                    templates=[{"id": t["id"], "name": t["name"], "lang": t["lang"]} for t in tpls],
@@ -303,7 +303,7 @@ def dsb_delete(sid):
     """Archives a sheet (its documents and files stay); POST .../restore takes it back (the client's undo)."""
     c, uid, oid = _ctx()
     dsb_sheet(c, oid, sid)
-    c.execute("UPDATE office_privacy_sheets SET archived=1, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+    c.execute("UPDATE office_privacy_sheets SET archived=true, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -313,7 +313,7 @@ def dsb_delete(sid):
 def dsb_restore(sid):
     c, uid, oid = _ctx()
     dsb_sheet(c, oid, sid)
-    c.execute("UPDATE office_privacy_sheets SET archived=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+    c.execute("UPDATE office_privacy_sheets SET archived=false, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
     bump(c)
     c.commit()
     return jsonify(dsb_public(c, oid, dsb_sheet(c, oid, sid)))

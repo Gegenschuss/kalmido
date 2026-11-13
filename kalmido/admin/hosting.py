@@ -363,7 +363,7 @@ def announce_set(c, b, by=None):
     gset(c, "announce", json.dumps(a, ensure_ascii=False) if a else "")
     if a and b.get("push") is True and g.get("pushes") is not None:
         author = g.user["id"] if g.get("user") else None
-        for r in c.execute("SELECT id FROM users WHERE disabled=0 AND kind!='agent'").fetchall():
+        for r in c.execute("SELECT id FROM users WHERE NOT disabled AND kind!='agent'").fetchall():
             s = usettings(c, r[0])
             if r[0] != author and notif_ok(c, r[0], s, "notice", "push") and push_reachable(c, r[0], s):  # 2.367.4 (#2974): switchable, not to its author
                 g.pushes.append((r[0], tr("{0}: notice", APP_NAME, lg=lang_of(s)), a["text"], f"{PUBLIC_URL}/", push_prio(s)))
@@ -553,7 +553,7 @@ def org_activity(c):
             uids = [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=?", (o["id"],))]
             in_org.update(uids)
             out.append({"id": o["id"], "name": o["name"], **row(uids, o["id"])})
-        free = [r[0] for r in c.execute("SELECT id FROM users WHERE disabled=0") if r[0] not in in_org]
+        free = [r[0] for r in c.execute("SELECT id FROM users WHERE NOT disabled") if r[0] not in in_org]
         private = {"members": 0, **row(free, 0)}
     return {"orgs": out, "private": private}
 
@@ -606,7 +606,7 @@ def agent_joined_notice(c, lid, aid, actor):
     if not a or not l:
         return
     people = {l["owner_id"]} | {r[0] for r in c.execute("""SELECT m.user_id FROM list_members m JOIN users u ON u.id=m.user_id
-                                                          WHERE m.list_id=? AND u.kind!='agent' AND u.disabled=0""", (lid,))}
+                                                          WHERE m.list_id=? AND u.kind!='agent' AND NOT u.disabled""", (lid,))}
     for uid in people:
         if uid and uid != actor:
             news_add(c, uid, "agentjoin", list_id=lid, data={"name": l["name"], "agent": a["display_name"] or a["username"],

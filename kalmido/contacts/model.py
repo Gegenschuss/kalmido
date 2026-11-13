@@ -314,7 +314,7 @@ def book_member_set(c, bid, uid, role):
     if role not in BOOK_ROLES:
         raise BadInput(tr("Invalid value: {0}", "role"))
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()
-    u = c.execute("SELECT * FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
+    u = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (uid,)).fetchone()
     if not u or (uid == b["owner_id"] and not obk_org(b)) or personal_agent_foreign(c, uid, me()):  # 2.52.0 C (#1438): an org book's manager may be shared with
         raise Denied(404, tr("unknown person"))
     if is_agent(u) and not has_request_context():
