@@ -98,6 +98,7 @@ check([x["id"] for x in it] == [m4["id"]] and it[0]["kind"] == "dm" and it[0]["r
 # ---- agent chat
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})
 CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+A.put(B + f"/api/lists/{L['id']}/members", json={"user_id": CL, "role": "edit"})  # an agent talks to the people it works with
 
 
 def agent_say(body, **kw):
@@ -137,6 +138,8 @@ say(Bo, DM, "Only for Alice")
 check(all(x["src"] != "team" for x in pop(F, 0, 0)["items"]), "freelancer: no message of the organisation's people")
 ag = F.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida's bot", "scopes": ["read", "comments"]})
 check(ag.status_code in (200, 201), f"freelancer: an own agent ({ag.status_code} {ag.text[:200]})")
+FL = F.post(B + "/api/lists", json={"name": "Frida's work"}).json()
+F.put(B + f"/api/lists/{FL['id']}/members", json={"user_id": ag.json()["id"], "role": "edit"})
 FT = {"Authorization": "Bearer " + F.post(B + f"/api/my/agents/{ag.json()['id']}/token").json().get("token", "")}
 r = requests.post(V + f"/agent/chats/{FID}", headers=FT, json={"body": "Invoice draft is ready."})
 check(r.status_code == 201, f"freelancer: her agent answers ({r.status_code} {r.text[:200]})")
