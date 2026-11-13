@@ -38,6 +38,11 @@ the history, undo and the version check (`expect_updated_at`, `ccf_check` compar
 `TEXT` and `TIMESTAMPTZ` tables; an older area moves its columns over in its stage. Never compare such a column with `''`
 (`deleted_at IS NULL` / `IS NOT NULL`), and a trigger never takes one as `to_jsonb(row)->>'..._at'` (that text carries the
 session's zone, not the canonical form): use `to_char(x AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')`.
+Since 2.1095.0 (#5306) `created_at` / `updated_at` / `deleted_at` are `TIMESTAMPTZ` in every table (`kalmido/core/coltype.py`
+turns an older database at the start); the other old time, yes / no and JSON columns follow area by area (the rest of
+`tools/coltypes_baseline.txt`). SQL that must work for both types: `CAST(x AS text) = ''` instead of `x = ''`, `ct_day(x)` for
+the day instead of `substr(x, 1, 10)`, `ct_iso(x)` for a key or mark that Python compares with a value it read, and a TEXT time
+compared with a `TIMESTAMPTZ` one is cast on its own side (`NULLIF(t.completed_at, '')::timestamptz`).
 
 Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and say where its rows go in the exports:
 `obj_register(..., export={...})` (stage Q11, below "Export register"), not a hand entry in the export lists (`tools/check_export_tables.py`
