@@ -52,11 +52,11 @@ NULLABLE_ORG_WHY = {
     "the row follows its parent (list, calendar, address book, chat room, agent of a person); NULL = a private parent, "
     "core/orgrows.py and the app fill it from there": (
         "lists", "agents", "books", "ev_cals", "tasks", "events", "contacts", "task_vectors", "task_links", "list_rules",
-        "templates", "rss_feeds", "webhooks", "tchat_rooms", "tchat_files", "hub_mail_links"),
+        "templates", "rss_feeds", "webhooks", "tchat_rooms", "tchat_files"),
     "the shared core (#4709): history, undo, versions, comments, tags, follows, shares of a private object; the core checks the "
     "object's rights (obj_need) or the own user_id": (
         "obj_history", "obj_undo", "obj_revoked", "obj_addr_shares", "obj_versions", "obj_comments", "obj_follow", "obj_tags",
-        "undo_groups", "module_cards", "doc_views", "merge_runs"),
+        "undo_groups", "module_cards", "doc_views", "merge_runs", "obj_links"),  # obj_links: 2.1076.0 (#5271), replaced hub_mail_links
     "the private space of a person without organisation (files, documents, receipts, Paperless, wiki, tables, videos, "
     "bookmarks; Selbstständige P4); the app checks the owner / the workspace": (
         "fs_nodes", "fs_area_roots", "fs_ext_links", "fs_locks", "fs_upload_requests", "file_text", "upload_scan",
