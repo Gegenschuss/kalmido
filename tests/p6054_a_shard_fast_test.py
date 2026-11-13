@@ -105,13 +105,45 @@ check(os.path.exists(os.path.join(tmp, "junit", "s_after1.xml")) and "skipped=\"
 check(sorted(os.path.basename(x) for x in glob.glob(os.path.join(tmp, "junit", "s_r*.xml"))) == ["s_r1.xml", "s_r2.xml", "s_r3.xml"],
       "streak: the reports of the suites that ran stay")
 rc, out, did, nstart, took = run_all(streak, KALMIDO_RED_STREAK="3", GITHUB_ACTIONS="true")
-check(any(x.startswith("::error title=shard stopped after 3 red suites in a row::") for x in out), "streak: an annotation on GitHub")
+gh_out = out
+check(any(x.startswith("::warning title=shard stopped after 3 red suites in a row::") for x in out), "streak: an annotation on GitHub")
 broken = ["fresh; " + suite("s_r1", "exit 1"), suite("s_r2", "exit 1"), suite("s_ok", "echo 1 ok, 0 failed"),
           suite("s_r3", "exit 1"), suite("s_r4", "exit 1"), suite("s_end", "echo 1 ok, 0 failed")]
 rc, out, did, nstart, took = run_all(broken, KALMIDO_RED_STREAK="3")
 check(did[-1] == "s_end" and not any(x.startswith("NOT RUN") for x in out), f"streak: a green suite starts the row anew {did}")
 rc, out, did, nstart, took = run_all(streak)
 check(did[-1] == "s_after2" and out[-1] == "FAILED suites: s_r1 s_r2 s_r3", f"no stop without KALMIDO_RED_STREAK (Mac, local) {did}")
+
+# ---- 3. tools/ci_gate.py: a shard stopped after a red streak has untested suites - the merge queue gate holds (unknown = hard),
+#         the release / live gate counts it like a shard cut before its end (its suites are soft: soft shards hold soft groups only)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))
+import ci_gate as gate  # noqa: E402
+stop_title = "shard stopped after 10 red suites in a row"
+titles = ["suite p1_ui failed", "suite p2_ui failed", stop_title]
+check(gate.suites_from_titles(titles) == ["p1_ui", "p2_ui", gate.STOPPED], f"the stop annotation is read: {gate.suites_from_titles(titles)}")
+check(gate.suites_from_titles(titles[:2]) == ["p1_ui", "p2_ui"], "without it only the red suites")
+check(gate.suites_from_titles(["suite ??? broke"]) is None, "a suite title that does not parse stays unknown (None)")
+ann = [x for x in gh_out if x.startswith("::warning title=shard")]  # the title run_all.sh writes is the one the gate reads
+check(any(gate.STOP_ANN_RE.match(x.split("::")[1][len("warning title="):]) for x in ann), f"run_all.sh and ci_gate.py agree on the title {ann}")
+OK = {"result": "success"}
+NEEDS = {"plan": OK, "checks": OK, "pr-lint": OK, "semgrep": OK, "einvoice": OK, "zap": OK, "tests": {"result": "failure"}}
+
+
+def job(i, name, concl="success"):
+    return {"id": i, "name": name, "conclusion": concl, "status": "completed", "steps": []}
+
+
+qjobs = [job(100, "Lint, i18n, scanners"), job(1, "Test suites 1/2 queue hart (API, UI, security)"),
+         job(2, "Test suites 2/2 queue (API, UI, security)", "failure")]
+ok, txt, _ = gate.judge_queue("merge_group", NEEDS, qjobs, lambda j: {2: ["p1_ui", gate.STOPPED]}.get(j["id"], []), ["*invoice*"], {"p1_ui": "p1_ui"})
+check(not ok and "stopped after a red streak" in txt, f"queue gate: a stopped shard holds the entry: {ok} {txt}")
+ok, txt, _ = gate.judge_queue("merge_group", NEEDS, qjobs, lambda j: {2: ["p1_ui"]}.get(j["id"], []), ["*invoice*"], {"p1_ui": "p1_ui"})
+check(ok, f"queue gate: the same soft red without a stop still passes as soft: {ok} {txt}")
+fjobs = [job(1, "Test suites 1/2 full hart (API, UI, security)"), job(2, "Test suites 2/2 full (API, UI, security)", "failure"),
+         job(6, "Lint, i18n, scanners")]
+ok, txt, info = gate.judge_soft(fjobs, lambda j: {2: ["p1_ui", gate.STOPPED]}.get(j["id"], []), ["*invoice*"], {"p1_ui": "p1_ui"})
+check(ok and info["suites"] == ["p1_ui"] and any("stopped after a red streak" in c for c in info["cut"]),
+      f"release gate: a stopped soft shard = soft red + cut before the end: {ok} {txt}")
 
 shutil.rmtree(tmp, ignore_errors=True)
 print(f"p6054_a_shard_fast: {OKS[0]} ok, {len(FAILS)} failed")
