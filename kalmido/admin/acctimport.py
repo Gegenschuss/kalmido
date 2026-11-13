@@ -47,7 +47,7 @@ from ..lists.tplextra import tx_import, tx_keys
 from ..tasks.attachments import safe_name
 from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, ts_canon  # 2.1095.0 (#5306): ts_canon
 from ..core.moneycol import MC_COLS, MC_FITS  # 2.765.0 (#5315): the money columns NUMERIC(14,2) and their rule
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
@@ -2886,7 +2886,7 @@ def _umz_undo_rows(c, uid, r):
         if not (isinstance(x, list) and len(x) == 4 and isinstance(x[0], str) and isinstance(x[1], int)):
             continue
         j = c.execute("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? AND day=?", (uid, x[0])).fetchone()
-        if not j or j["updated_at"] != x[3]:
+        if not j or ts_canon(j["updated_at"]) != ts_canon(x[3]):  # 2.1095.0 (#5306): TIMESTAMPTZ reads canonically, x[3] was written as iso_ms
             kept_rows += bool(j)
             continue
         cur = jr_open(c, uid, j)

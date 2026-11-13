@@ -5,7 +5,7 @@ from flask import jsonify, request, Response
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
 from ..core.srchreg import srch_q, srch_register  # 2.1026.0 (#5280)
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, write_lock
+from ..core.pg import IntegrityError, insert_id, ts_canon, write_lock  # 2.1095.0 (#5306): ts_canon
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -234,7 +234,7 @@ def note_update(nid):
     from .liste2e import le2a_note_write
     le2a_note_write(c, r, f)  # 2.64.1 (#1817): texts of a list with the lock; a move into / out of one only with both texts
     exp = b.get("expect_updated_at")
-    if exp and exp != r["updated_at"] and any(k in f for k in ("body", "title", "tags", "pinned")):  # 2.270.0 D (#3028): + tags, pinned
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]) and any(k in f for k in ("body", "title", "tags", "pinned")):  # 2.270.0 D (#3028): + tags, pinned
         cur = note_dict(r, names=user_names(c, [r["updated_by"]] if r["updated_by"] else []))
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), note=cur), 409
     if f:

@@ -684,7 +684,7 @@ def wkh_restore(pid, vid):
     v = _version(c, pid, vid, r)
     uid = me()
     exp = body().get("expect_updated_at")
-    if exp and exp != r["updated_at"]:
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
         cur["path"] = wkf_shown_path(c, uid, r)  # 2.200.0 (#2747, review): nothing above a share
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409

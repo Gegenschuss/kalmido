@@ -69,7 +69,7 @@ lid = A.post(B + "/api/lists", json={"name": "L"}).json()["id"]
 check(A.get(B + "/api/state").json()["public_links"] is False, "env off: state")
 check(A.put(B + f"/api/lists/{lid}/public-link", json={"mode": "view"}).status_code == 409, "env off: creating refused")
 check(A.get(B + "/api/about").json()["public_links_env"] is False, "env off: shown to admins")
-dbx("INSERT INTO public_links(list_id,token_hash,token,mode,created_at) VALUES(?,?,'x','view','2026')",
+dbx("INSERT INTO public_links(list_id,token_hash,token,mode,created_at) VALUES(?,?,'x','view','2026-01-01T00:00:00+00:00')",  # 2.1095.0 (#5306): TIMESTAMPTZ takes a whole moment
     (lid, hashlib.sha256(b"A" * 32).hexdigest()))
 check(page("/s/" + "A" * 32).status_code == 404, "env off: stored links do not open")
 

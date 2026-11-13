@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape, qi, table_columns, write_lock
+from ..core.pg import insert_id, like_escape, qi, table_columns, ts_canon, write_lock  # 2.1095.0 (#5306): ts_canon
 from ..core.orgcrypt import oc_dec_fields, oc_item_store, oc_json_store
 from ..core.i18n import N_, lang, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
@@ -1141,7 +1141,7 @@ def ofd_need_current(c, oid, r, b, admin):
     409 {error, doc} with the current document (head, positions, parts). Absent: as before (agents, older clients).
     The caller holds write_lock office_doc_<id> and read r after it, and calls this before writing anything."""
     exp = b.get("expect_updated_at") if isinstance(b, dict) else None
-    if exp and exp != r["updated_at"]:
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):
         raise OfdConflict(doc_public(c, oid, r, admin))
 
 

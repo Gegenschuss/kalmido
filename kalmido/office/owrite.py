@@ -41,7 +41,7 @@ from ..core.db import bump, iso_ms, now_utc
 from ..core.errors import Denied
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.pg import table_columns, write_lock
+from ..core.pg import table_columns, ts_canon, write_lock  # 2.1095.0 (#5306): ts_canon
 from ..core.writes import (NEED_VERSION, OBJ_TRACK, _same, _val, obj_history_add, obj_is_agent, obj_track, obj_undo_post,
                            obj_undo_pre)
 
@@ -61,7 +61,7 @@ def ow_conflict_answer(e):
 def ow_check(b, have, cur):
     """The version check (core/conflict.py ccf_check, answered with OwConflict): expect_updated_at set and not the row's -> 409."""
     exp = b.get("expect_updated_at") if isinstance(b, dict) else None
-    if exp and str(exp) != str(have or ""):
+    if exp and ts_canon(str(exp)) != ts_canon(have):  # 2.1095.0 (#5306): one moment, whichever text form (TIMESTAMPTZ reads with microseconds)
         raise OwConflict(cur())
 
 

@@ -27,7 +27,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.i18n import N_, tr
 from ..core.access import Denied, list_role, live_sql
-from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.pg import insert_id, system_ctx, ts_canon, write_lock  # 2.1095.0 (#5306): ts_canon
 from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
@@ -739,7 +739,7 @@ def v1_office_offer_patch(did):
         raise Denied(409, tr("Only a draft can be changed"))
     take_version(b)  # 2.564.0 (#4702): expect_updated_at (or If-Match) required for agents: 400 version_required
     exp = b.get("expect_updated_at")
-    if exp and exp != r["updated_at"]:  # 2.269.0 A (#3012) / 2.270.0 D (#3028): a person (or another run) saved since the agent read it
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):  # 2.269.0 A (#3012) / 2.270.0 D (#3028): a person (or another run) saved since the agent read it
         cur = _doc_v1(c, oid, r)
         out = jsonify(error={"code": "conflict", "message": tr("Changed in the meantime"), "doc": cur}, current=cur)  # both answers' keys
         out.status_code = 409

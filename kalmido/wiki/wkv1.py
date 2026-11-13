@@ -24,7 +24,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR
 from ..core.access import Denied, acx_of
 from ..core.db import bump, db, insert_id, iso_ms, now_utc
-from ..core.pg import write_lock  # 2.1048.0 (#5861)
+from ..core.pg import ts_canon, write_lock  # 2.1048.0 (#5861); 2.1095.0 (#5306): ts_canon
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.conflict import need_version  # 2.564.0 (#4702)
@@ -279,7 +279,7 @@ def wkv_update(pid):
         wiki_body(b)  # the size check before anything else
     need_version(b, "expect_updated_at")  # 2.564.0 (#4702): an agent says which version it read (or If-Match)
     exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
-    if exp and exp != r["updated_at"]:
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):
         return _conflict(c, uid, r, role, path)
     try:
         v1_call(wiki_update, pid, body={**b, **({"expect_updated_at": exp} if exp else {})})  # 2.564.0 (#4702): + If-Match
@@ -371,7 +371,7 @@ def wkv_append(pid):
     write_lock(c, f"wiki-{int(pid)}")  # the same lock as wiki_update (re-entrant there): read + save see no other save
     r, role, path = wkv_need(c, uid, pid, write=True)
     exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
-    if exp and exp != r["updated_at"]:
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):
         return _conflict(c, uid, r, role, path)
     cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
     new = wkv_append_text(cur, text, under)

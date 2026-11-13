@@ -19,7 +19,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.srchreg import srch_register  # 2.1026.0 (#5280)
-from ..core.pg import IntegrityError, insert_id, st_ids, write_lock
+from ..core.pg import IntegrityError, insert_id, st_ids, ts_canon, write_lock  # 2.1095.0 (#5306): ts_canon
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc, parse_iso
 from ..core.retention import ret_on  # 2.272.0 A (#3026)
@@ -576,7 +576,7 @@ def wiki_update(pid):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
         cur["path"] = wkf_shown_path(c, uid, r)  # 2.200.0 F (#2747, review B3)
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
-    if exp and exp != r["updated_at"] and ("body" in b or "path" in b):
+    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]) and ("body" in b or "path" in b):
         return conflict(r)
     f, ts, n = {}, iso_ms(now_utc()), 0
     from .wkhist import wkh_body, wkh_note, wkh_prev, wkh_rename, wkh_seal  # 2.123.0 A (#2105, #2102, #2106); 2.571.0 (#4766): wkh_rename

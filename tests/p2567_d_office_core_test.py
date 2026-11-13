@@ -17,7 +17,7 @@ import json
 import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
 
 import requests
 
@@ -67,6 +67,14 @@ AID = A.get(B + "/api/state").json()["me"]["id"]
 FID, Fr = freelancer(B, A)
 
 
+def same_ts(a, b):
+    """2.1095.0 (#5306): two ISO texts of the same moment - the API reads TIMESTAMPTZ canonically (.563000), psql its own way (.563)."""
+    try:
+        return datetime.fromisoformat(str(a).replace("Z", "+00:00")) == datetime.fromisoformat(str(b).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+
+
 def two(S, who, uid, what, kind, table, rid, url, first, second, ver, method="PATCH", same=None):
     """Writer 1 and writer 2 opened the object at its stored version v0 (module docstring)."""
     p = f"{who} {what}: "
@@ -82,7 +90,7 @@ def two(S, who, uid, what, kind, table, rid, url, first, second, ver, method="PA
     check(moved and moved <= set(first), p + f"only the field sent changes in the row: {sorted(moved)} (sent {sorted(first)})")
     v1 = after["updated_at"]
     check(v1 and v1 != v0, p + f"a new updated_at {v0} -> {v1}")
-    check(ver(r.json()) == v1, p + f"the answer carries the new updated_at {ver(r.json())!r} == {v1!r}")
+    check(same_ts(ver(r.json()), v1), p + f"the answer carries the new updated_at {ver(r.json())!r} == {v1!r}")
     if "updated_by" in after:
         check(after["updated_by"] == uid, p + f"updated_by = the person {after['updated_by']} == {uid}")
     # writer 2, opened at v0: 409 with the current state under "current" (writer 1's change), nothing written
@@ -90,7 +98,7 @@ def two(S, who, uid, what, kind, table, rid, url, first, second, ver, method="PA
     cur = r.json().get("current") if r.status_code == 409 else None
     check(r.status_code == 409 and isinstance(cur, dict), p + f"writer 2 with the old version: 409 with 'current' {r.status_code} {r.text[:200]}")
     if isinstance(cur, dict):
-        check(ver(cur) == v1, p + f"'current' is the stored version {ver(cur)!r} == {v1!r}")
+        check(same_ts(ver(cur), v1), p + f"'current' is the stored version {ver(cur)!r} == {v1!r}")
         if same:
             check(same(cur), p + f"'current' shows writer 1's change {cur}")
         check("row" not in r.json(), p + "2.576.0 (#4794): the older key 'row' went (the dialogs read current)")
