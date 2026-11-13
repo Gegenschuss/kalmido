@@ -423,6 +423,47 @@ def tchat_dm_unread(c, uid):
     return sum(x["unread"] for x in tchat_rooms(c, uid, full=False) if x["kind"] in ("dm", "group") and not x["muted"])  # 2.113.1 (#2059): groups like DMs
 
 
+def tchat_new_for(c, uid, after, limit=20):
+    """2.1130.0 (#6057): the newest unread messages of other people in my conversations with an id above `after` (the in-app
+    pop-up, agents/msgpop.py), newest first: the main conversation of every room I am in (a muted one only when the message
+    @mentions me) and the threads I take part in; my own messages, deleted ones and those below my read marks never. Returns
+    (messages as {id, room_id, thread, user_id, text, enc, file, mention}, the highest message id of my rooms = the next `after`);
+    after None = the first call: no messages, only that id.
+    Reads like _tchat_room_counts (the core's obj_seen / obj_follow rows), nothing is written. The caller hides ciphertexts."""
+    if not tchat_on(c, uid):
+        return [], after or 0
+    rooms = tchat_rooms(c, uid, full=False)
+    ids = sorted({r["id"] for r in rooms})
+    if not ids:
+        return [], after or 0
+    muted = {r["id"] for r in rooms if r["muted"]}
+    top = c.execute("SELECT COALESCE(MAX(id),0) FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[]))", (ids,)).fetchone()[0]
+    if after is None:  # the first call of a window: only where it starts, nothing that was there before is new
+        return [], top
+    pat = f"%<@{uid}>%"
+    rows = c.execute(
+        f"""SELECT m.* FROM tchat_msgs m
+           LEFT JOIN obj_seen d ON d.kind='tchat' AND d.ref_id=m.room_id AND d.user_id=?
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>? AND m.id>COALESCE(d.seen_id,0) AND {live_sql("m")}
+           AND m.thread_of IS NULL AND COALESCE(m.user_id,0)!=?
+           UNION ALL
+           SELECT m.* FROM tchat_msgs m
+           JOIN obj_follow w ON w.kind='tchat_thread' AND w.ref_id=m.thread_of AND w.user_id=? AND w.mode='watch'
+           LEFT JOIN obj_seen t ON t.kind='tchat_thread' AND t.ref_id=m.thread_of AND t.user_id=w.user_id
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>? AND m.id>COALESCE(t.seen_id,0) AND {live_sql("m")}
+           AND COALESCE(m.user_id,0)!=?
+           ORDER BY id DESC LIMIT ?""", (uid, ids, after, uid, uid, ids, after, uid, limit * 2)).fetchall()
+    out = []
+    for m in rows:
+        mention = pat.strip("%") in (m["body"] or "")
+        if m["room_id"] in muted and not mention:
+            continue
+        b = tchat_msg_brief(c, m)
+        out.append({"id": m["id"], "room_id": m["room_id"], "thread": m["thread_of"], "user_id": m["user_id"],
+                    "text": b["text"], "enc": bool(b.get("enc")), "file": bool(b.get("file")), "mention": mention})
+    return out[:limit], max([top, after] + [m["id"] for m in rows])  # a message after the MAX above counts too
+
+
 def md_brief(text):
     """2.18.0 (review): the Markdown markers out of a one-line preview (team chat list): code fences ("```js"), `code`,
     **bold**, ~~strike~~, *italic*, headings, quotes, list / checkbox markers, links -> their text. Keep in sync with

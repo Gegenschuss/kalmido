@@ -935,6 +935,9 @@ function settingsModal(focus) {
       ${hint(tr('No extra app needed. Switch it on below on every device that should ring.'))}
       <h4>${tr('This device')}</h4>
       <div id="s-wp"><div class="muted">${tr('Loading…')}</div></div>` : ''}
+      <h4>${tr('In the app')}</h4>
+      <div class="row">${chk('s-msgpop', LS.get('msgPop', '1') !== '0', tr('Pop-up for new messages'))}</div>
+      ${hint(tr('A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.'))}
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code>${S.webpush?.enabled ? '' : `<button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button>`}</div>${''/* 2.555.0 C (#4664): with Web Push "Test all channels" above covers ntfy */}
       ${S.webpush?.enabled ? '' : prio}
@@ -1288,6 +1291,7 @@ function settingsModal(focus) {
     if (e.target.id !== 's-split') return;
     setLocal(tr('Split view'), () => LS.get('split', false) === true, v => spl_setOn(v), e.target.checked);  // 2.1037.0 (#5803): miniwin.js spl_setOn (the button in the bar follows)
   });
+  md.addEventListener('change', e => { if (e.target.id === 's-msgpop') { LS.set('msgPop', e.target.checked ? '1' : '0'); mp_check(); } });  // 2.1130.0 (#6057): this device
   md.addEventListener('change', e => { if (e.target.id === 's-mdpen') { LS.set('mdPenOnly', e.target.checked); if (S.sel) renderDetail(); } });  // 2.40.0 (#1203): this device
   md.addEventListener('change', async e => {
     if (e.target.id !== 's-wpdev') return;

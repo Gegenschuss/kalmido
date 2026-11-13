@@ -231,6 +231,7 @@ ROUTES = {
     "GET /api/office/agreements/{}/history": "office", "GET /api/office/doc-templates/{}/history": "office", "GET /api/office/gen-docs/{}/history": "office", "GET /api/office/deals/{}/history": "office",
     "GET /api/office/letter-blocks/{}/history": "office", "GET /api/office/vehicles/{}/history": "office", "GET /api/office/drives/{}/history": "office", "GET /api/clients/{}/history": "client",
     "GET /api/whatsnew": "own", "POST /api/whatsnew/seen": "own",  # 2.556.0 (#4685): the own seen version of "New for you"
+    "GET /api/msgpop": "own",  # 2.1130.0 (#6057): the pop-up asks for the own new chat messages (only the person's rooms and own agent chats; p21130_a_msgpop_api_test.py)
     # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
     "GET /api/files/lock/{}": "file", "POST /api/files/lock/{}/start": "file", "GET /api/files/lock/{}/todo": "file", "GET /api/files/lock/{}/raw/{}": "file", "POST /api/files/lock/{}/convert/{}": "file", "POST /api/files/lock/{}/finish": "file", "POST /api/files/lock/{}/stop": "file", "POST /api/files/lock/{}/keys": "file", "POST /api/files/lock/upload": "file", "POST /api/files/lock/folder": "file", "POST /api/files/lock/rename/{}": "file", "POST /api/files/lock/version/{}": "file", "POST /api/files/lock/move/{}": "file",
     "POST /api/files/lock/{}/rotate": "file", "GET /api/files/lock/movecheck/{}": "file",  # p2953_lockrest_test.py

@@ -18545,5 +18545,8 @@
   "The heading {0} is there more than once: rename one or change the whole text": "De kop {0} staat er meer dan eens: hernoem er een of wijzig de hele tekst",
   "The notes are encrypted: only the app can change them": "De notities zijn versleuteld: alleen de app kan ze wijzigen",
   "The description is encrypted: only the app can change it": "De beschrijving is versleuteld: alleen de app kan die wijzigen",
-  "Check the connection in the settings, or remove it.": "Controleer de verbinding in de instellingen of verwijder haar."
+  "Check the connection in the settings, or remove it.": "Controleer de verbinding in de instellingen of verwijder haar.",
+  "{0} new message from {1}": ["{0} nieuw bericht van {1}", "{0} nieuwe berichten van {1}"],
+  "Pop-up for new messages": "Pop-up bij nieuwe berichten",
+  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Een nieuw bericht van een persoon of een afgerond antwoord van een agent verschijnt kort bovenaan, waar je ook bent in Kalmido. Alleen op dit apparaat; zolang de app open is, krijgt dit apparaat hiervoor geen extra push."
 }
