@@ -220,11 +220,16 @@ function lzTake(j) {
 // 2.575.0 B (#3966): an answer asked with td=1 leaves out the keys a task holds at their default; its table (tdef, the server's
 // serializers.TD_DEFAULTS) puts them back before anything reads the tasks (applyState, lzLoad, the delta), so a task is the one
 // the whole state has (t.x === null, 'x' in t). content stays out where the note is long (content_n). The one fill function.
-S.tdef = null;
-function tdFill(ts, def = S.tdef) {
+// 2.1117.0 (#6023): asked with td=2 the points in time of S.tutc (serializers.TD_UTC, always UTC) come without their zone
+// +00:00; it goes back on here too (a text that has it already stays, so a whole task of the delta passes unchanged).
+S.tdef = null; S.tutc = null;
+function tdFill(ts, def = S.tdef, utc = S.tutc) {
   if (!def || !ts) return ts;
-  const ks = Object.keys(def);
-  for (const t of ts) for (const k of ks) if (!(k in t) && !(k === 'content' && 'content_n' in t)) { const v = def[k]; t[k] = v !== null && typeof v === 'object' ? (Array.isArray(v) ? [] : {}) : v; }
+  const ks = Object.keys(def), us = utc || [];
+  for (const t of ts) {
+    for (const k of ks) if (!(k in t) && !(k === 'content' && 'content_n' in t)) { const v = def[k]; t[k] = v !== null && typeof v === 'object' ? (Array.isArray(v) ? [] : {}) : v; }
+    for (const k of us) { const v = t[k]; if (typeof v === 'string' && v && !v.endsWith('+00:00')) t[k] = v + '+00:00'; }
+  }
   return ts;
 }
 // the query of the next /api/state: the lists this window has whole (all = every one, nothing is pending)
@@ -266,7 +271,7 @@ async function lzLoad(want) {
   if (key) lzBusy.add(key);
   ids.forEach(id => lzBusy.add(id));
   let j;
-  try { j = await api('GET', '/api/state/lists?td=1&ids=' + (key || ids.join(','))); tdFill(j.tasks, j.tdef || S.tdef); }  // 2.575.0 B (#3966): + td
+  try { j = await api('GET', '/api/state/lists?td=2&ids=' + (key || ids.join(','))); tdFill(j.tasks, j.tdef || S.tdef, j.tutc || S.tutc); }  // 2.575.0 B (#3966): + td; 2.1117.0 (#6023): td=2 + tutc
   catch { return false; }  // offline: the view shows what it has
   finally { if (key) lzBusy.delete(key); ids.forEach(id => lzBusy.delete(id)); }
   if (!S.lz) return true;  // a whole state came meanwhile
