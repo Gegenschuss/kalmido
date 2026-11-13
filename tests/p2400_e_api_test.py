@@ -167,7 +167,7 @@ check(j.get("raw_mode") == "none" and [x["kind"] for x in j["totals"]["lines"]] 
 # the start migration: once per database, for organisations that use producing / raw data
 A.put(B + O + "/settings", json={"producing_on": 0, "raw_on": 0})
 sql("DELETE FROM kalmido_meta WHERE key='fe_office_rules'")
-sql("UPDATE office_settings SET data=(data::jsonb - 'producing_on' - 'raw_on')::text WHERE org_id=?", (ORG,))
+sql("UPDATE office_settings SET data=data - 'producing_on' - 'raw_on' WHERE org_id=?", (ORG,))  # 2.1121.0 (#6041): JSONB since #5953
 r = A.post(B + "/api/admin/orgs", json={"name": "Gamma", "admin_id": ALICE})
 ORG3 = r.json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG3}"})
