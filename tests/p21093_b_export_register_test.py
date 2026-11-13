@@ -104,6 +104,11 @@ try:
     out["late"] = "accepted"
 except ValueError as e:
     out["late"] = "refused" if "after the account import" in str(e) else str(e)
+try:  # 2.1093.0 (#5289, review): a clause that names no organisation would export every organisation's rows
+    obj_export("obj_zz_open", org=(("zz/open.json", "kind='task'"),), by="kind zz2")
+    out["open"] = "accepted"
+except ValueError as e:
+    out["open"] = "refused" if "names its organisation" in str(e) else str(e)
 print(json.dumps(out, sort_keys=True))
 '''
 r = in_app(SNAP)
@@ -119,6 +124,7 @@ check(snap.get("rx") is True and snap.get("rx_hand") is True, "the retention exp
 check(snap.get("umz_left") is True and snap.get("later") is True, "the account export: the same reasons and names, none by hand")
 check(snap.get("map") is True and snap.get("read") is True, "the imports: the same files and parts, none by hand")
 check(snap.get("late") == "refused", f"a part registered after the import read the register is refused, not lost {snap.get('late')}")
+check(snap.get("open") == "refused", f"a where clause without its organisation is refused {snap.get('open')}")
 check(snap.get("all_core") == [], f"only the core's tables in the register {snap.get('all_core')}")
 
 # ================================================================== the organisation boundary (two organisations)

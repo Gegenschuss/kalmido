@@ -45,6 +45,10 @@ def obj_export(table, *, org=(), org_left=None, acct_left=None, acct_later=None,
     if any(len(e) not in (2, 3) or not all(isinstance(x, str) and x for x in e) for e in org) \
             or any(len(e) != 2 or not all(isinstance(x, str) and x for x in e) for e in rx):
         raise ValueError(f"obj_export {table}: org = ((archive, where[, part]), ...), rx = ((archive, where), ...)")
+    # 2.1093.0 (#5289, review): a clause without a parameter and without the organisation's lists / tasks / rooms would
+    # export the rows of every organisation
+    if any("?" not in e[1] and not any(k in e[1] for k in ("{LSQ}", "{TSQ}", "{RSQ}")) for e in (*org, *rx)):
+        raise ValueError(f"obj_export {table}: every where clause names its organisation (org_id=? or {{LSQ}} / {{TSQ}} / {{RSQ}})")
     if acct_later and acct_left not in (None, OEX_LATER):
         raise ValueError(f"obj_export {table}: a table not yet in the account export has no other reason")
     OEX[table] = {"org": org, "org_left": org_left, "acct_left": OEX_LATER if acct_later else acct_left,

@@ -202,8 +202,9 @@ def _tab_trash(added):
         # the undo), with the step's time -- the way back compares it
         if out:
             n = 0 if t["deleted_at"] else 1
-            if n:
-                shk_trash(c, uid, t["id"], checked=True, ts=when)
+            if n:  # 2.1093.0 (#5472, review): put there by someone else meanwhile (another time) = not this step's
+                got = shk_trash(c, uid, t["id"], checked=True, ts=when)
+                n = 1 if got is not None and ts_canon(got["deleted_at"]) == ts_canon(when) else 0
             if n and not added:
                 c.execute("UPDATE sheet_changes SET new_raw=? WHERE id=?", (ts, ch["id"]))
         else:

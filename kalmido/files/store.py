@@ -902,9 +902,14 @@ def fs_purge_lock(c, ids):
 
 
 def fs_purge_files(ids, paths):
-    """The stored files of an fs_purge, after the commit."""
+    """The stored files of an fs_purge, after the commit. 2.1093.0 (#5472, review): only files under ATT_DIR (as
+    core/serializers.py unlink_files) -- the part kinds of pages' and tables' files run here now."""
+    root = os.path.realpath(ATT_DIR)
     for p in paths:
         try:
+            if not os.path.realpath(os.path.join(ATT_DIR, p)).startswith(root + os.sep):
+                print("fs purge: path outside the files kept", flush=True)
+                continue
             os.remove(os.path.join(ATT_DIR, p))
         except FileNotFoundError:
             pass
