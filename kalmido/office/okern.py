@@ -312,6 +312,12 @@ def _dangling(c, table, row):
 # then the table goes.
 def _copy_insert(c, table, names, row, tc=table_columns):
     cols = tc(c, table)  # 2.1055.0 (#5791): tc = the run's cache of table_columns
+    if any(isinstance(v, (dict, list)) for v in row.values()):
+        # 2.1111.0 (#5953): a JSONB column of the copy (row_to_json nests it as an object / array) goes back as its JSON text;
+        # an array column (BIGINT[] ...) keeps its list
+        js = {r[0] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() "
+                                      "AND table_name=? AND data_type IN ('json', 'jsonb')", (table,))}
+        row = {k: json.dumps(v) if k in js and isinstance(v, (dict, list)) else v for k, v in row.items()}
     c.execute(f"INSERT INTO {qi(table, names)}({','.join(qi(k, cols) for k in row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
