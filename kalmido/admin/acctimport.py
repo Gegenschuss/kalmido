@@ -887,6 +887,8 @@ def _coerce(v, typ):
         return v[:UMZ_TEXT_MAX].replace("\x00", "")
     if typ == "timestamp with time zone":  # 2.760.0 (#5311): the core template's columns -- a valid ISO time stamp as text
         return v if _iso_ts(v) else _BAD
+    if typ == "date":  # 2.1115.0 (#5951): a day column (DATE) - its day; '' / no day stays out (NULL)
+        return v[:10] if isinstance(v, str) and _iso_ts(v) else _BAD
     return _BAD  # json, binary, other time stamps: not taken over
 
 

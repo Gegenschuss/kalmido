@@ -18,6 +18,7 @@ from ..core.config import OFFICE_DIR
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT, _txt  # noqa: F401
 from .orgimport import _oid  # 2.654.0 (#4585)
+from .orgimport import _BAD, _coerce  # 2.1115.0 (#5951)
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..core.orgcrypt import OrgCryptError  # 2.516.0 (#4364)
@@ -827,7 +828,8 @@ def _f_bank(c, run, uid, data, who):
             continue
         mid = run.m({"invoice": "office_docs", "card": "office_cc_statements"}.get(kind, "fs_nodes"), src.get("match_id"))
         if mid:
-            c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, matched_at=? WHERE id=?", (kind, mid, src.get("matched_at"), nid))
+            at = _coerce(src.get("matched_at"), "timestamp with time zone")  # 2.1115.0 (#5951): TIMESTAMPTZ - '' / no time -> NULL
+            c.execute("UPDATE office_bank_tx SET match_kind=?, match_id=?, matched_at=? WHERE id=?", (kind, mid, None if at is _BAD else at, nid))
         else:
             c.execute("UPDATE office_bank_tx SET payment_id=NULL, matched_by=NULL WHERE id=?", (nid,))
 

@@ -56,6 +56,7 @@ ORDER = (
     "core.orgrows",  # 2.662.0 (#4602): the organisation of tasks / comments / events / contacts (triggers, set up by init_db)
     "core.retention",  # 2.152.0 (#2165): deletion periods + the switch of the retention runs
     "core.fkeys",  # 2.152.0 C (#2174): foreign keys of references that had none (orphans cleaned first)
+    "core.coltime",  # 2.1115.0 (#5951): the other old time columns per area (CT_MORE, no imports)
     "core.colbool",  # 2.1118.0 (#5952): the old yes / no columns as BOOLEAN (cb_migrate in init_db, core/pg.py reads them as 0 / 1)
     "core.coltype",  # 2.1095.0 (#5306): the old created_at / updated_at / deleted_at as TIMESTAMPTZ (ct_migrate in init_db)
     "core.moneycol",  # 2.755.0 (#5293): the plain money columns as NUMERIC(14,2) (mc_migrate in init_db, mc_text for the readers)

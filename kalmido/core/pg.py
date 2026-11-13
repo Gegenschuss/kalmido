@@ -265,9 +265,17 @@ class _TsLoader(TimestamptzLoader):
         return ts_canon(super().load(data))
 
 
+class _DateLoader(adapt.Loader):
+    """2.1115.0 (#5951): DATE reads as 'YYYY-MM-DD' text, as the TEXT day columns did (core/coltime.py moves them to DATE)."""
+
+    def load(self, data):
+        return bytes(data).decode()
+
+
 def _adapters():
     am = adapt.AdaptersMap(psycopg.adapters)
     am.register_loader("timestamptz", _TsLoader)  # 2.760.0 (#5311)
+    am.register_loader("date", _DateLoader)  # 2.1115.0 (#5951)
     am.register_dumper(bool, _IntUnknown)
     am.register_dumper(int, _IntUnknown)
     am.register_loader("numeric", _NumLoader)

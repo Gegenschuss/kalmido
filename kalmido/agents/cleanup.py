@@ -22,7 +22,7 @@ import secrets
 
 from flask import jsonify
 
-from ..core.pg import insert_id
+from ..core.pg import insert_id, ts_canon  # 2.1115.0 (#5951): + ts_canon
 from ..core.objtags import obj_tags_of  # 2.947.0 (#5275)
 from ..core.i18n import N_, tr
 from ..core.db import bump, err, iso, now_utc
@@ -372,7 +372,7 @@ def cln_undo(c, rec, back=True):
             skipped += prop_titles(c, [tid])
             continue
         if back:
-            if not t or t["deleted_at"] or t["status"] != -1 or t["completed_at"] != x["at"]:
+            if not t or t["deleted_at"] or t["status"] != -1 or ts_canon(t["completed_at"]) != ts_canon(x["at"]):  # 2.1115.0 (#5951)
                 skipped += prop_titles(c, [tid])
                 continue
             for d in [tid, *x["kids"]]:

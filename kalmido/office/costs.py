@@ -63,7 +63,7 @@ def ek_purchases_write(c, oid, did):
     accepted_at = the day of acceptance (kept when an accepted quotation is written again). Amounts in the organisation's
     currency (purchases are entered in it), encrypted at rest. Returns the number of rows."""
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
-    old = c.execute("SELECT accepted_at FROM office_purchases WHERE doc_id=? AND org_id=? AND accepted_at<>'' ORDER BY id LIMIT 1", (did, oid)).fetchone()
+    old = c.execute("SELECT accepted_at FROM office_purchases WHERE doc_id=? AND org_id=? AND accepted_at IS NOT NULL ORDER BY id LIMIT 1", (did, oid)).fetchone()  # 2.1115.0 (#5951): DATE
     c.execute("DELETE FROM office_purchases WHERE doc_id=? AND org_id=?", (did, oid))
     if not r or r["kind"] != "offer" or r["status"] != "accepted":
         return 0

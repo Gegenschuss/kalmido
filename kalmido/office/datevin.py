@@ -241,7 +241,8 @@ def _no_amount(c, oid, d_from, d_to):
     from .books import _uid_filter, bk_ws
     ws = bk_ws(c, oid)
     uid = _uid_filter(None)
-    day = "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''), substr(r.set_at, 1, 10))"
+    # 2.1115.0 (#5951): paid_at DATE, set_at TIMESTAMPTZ -> their day as text (core/coltype.py ct_day)
+    day = "COALESCE(NULLIF(d.doc_date, ''), substr(CAST(r.paid_at AS text), 1, 10), substr(CAST(r.set_at AS text), 1, 10))"
     n = 0
     for r in c.execute(f"SELECT r.node_id, d.amount, d.ws FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                        f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL "

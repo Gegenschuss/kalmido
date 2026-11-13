@@ -322,7 +322,7 @@ def _bgj_kk(uid):
 
 def _wd_reading(c, users, S, LG, now):
     """Watchdog: the oldest due connection (one per tick, so a slow server never holds the watchdog up long)."""
-    for r in c.execute("SELECT * FROM kk_conns ORDER BY COALESCE(synced_at, '') LIMIT 5").fetchall():
+    for r in c.execute("SELECT * FROM kk_conns ORDER BY synced_at NULLS FIRST LIMIT 5").fetchall():  # 2.1115.0 (#5951): TIMESTAMPTZ, never synced first
         uid = r["user_id"]
         if uid not in users or "reading" not in (S[uid].get("features") or "").split(","):
             continue

@@ -9,7 +9,7 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB, TZ
 from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
 from ..core.objfollow import ofl_bell_put, ofl_bell_rest  # 2.981.0 (#5287): a project's bell is a row of the core's obj_follow
-from ..core.pg import insert_id
+from ..core.pg import insert_id, ts_canon  # 2.1115.0 (#5951)
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import me
@@ -364,7 +364,8 @@ def overview_patch(lid):
         le2a_locked_text(c, lid, d)  # 2.538.0 (#4372): not encrypted -- none in a project with the lock (emptying it stays possible)
         r0 = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR NO KEY UPDATE", (lid,)).fetchone()  # 2.1111.0 (#5830, Fable review F2): check and save under the row lock
         exp = b.get("expect_updated_at")
-        if exp is not None and (exp or None) != (r0["description_at"] or None) and d != (r0["description"] or ""):  # 2.270.0 A (#3019)
+        # 2.1115.0 (#5951): description_at is TIMESTAMPTZ - the stamp sent back (an older form: iso_ms 'Z') compared canonically
+        if exp is not None and ts_canon(exp) != ts_canon(r0["description_at"]) and d != (r0["description"] or ""):  # 2.270.0 A (#3019)
             last = c.execute("SELECT user_id FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT 1", (lid,)).fetchone()
             by = user_names(c, [last["user_id"]]).get(last["user_id"], "") if last and last["user_id"] else ""
             return jsonify(error=tr("Changed in the meantime by {0}", by or "?"), current=overview_build(c, lid, me())), 409

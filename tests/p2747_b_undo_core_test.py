@@ -224,12 +224,12 @@ O7 = new(Bo, "Rekeyed", ORG, note="r1")["id"]
 patch(Bo, O7, note="r2")
 GK = groups(BOB)[-1]["id"]
 dbx("INSERT INTO org_keys(org_id, wrapped, kek_check, created_at, rotated_at) VALUES(?, 'x', 'x', '2026-01-01T00:00:00+00:00', "
-    "to_char(now() + interval '1 hour', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')) ON CONFLICT (org_id) DO UPDATE SET rotated_at=EXCLUDED.rotated_at", (ORG,))
+    "now() + interval '1 hour') ON CONFLICT (org_id) DO UPDATE SET rotated_at=EXCLUDED.rotated_at", (ORG,))  # 2.1115.0 (#5951): rotated_at TIMESTAMPTZ
 r = Bo.post(B + f"/api/undo/to/{GK}")
 x = r.json() if r.ok else {}
 check(r.ok and get(Bo, O7)["note"] == "r2" and [s["id"] for s in x.get("stayed", [])] == [O7] and "schlüssel" in (x["stayed"][0]["reason"] or "").lower(),  # bob reads German
       f"rotated after the step: the copy stays unused, the answer names the key change {x} {r.status_code}")
-dbx("UPDATE org_keys SET rotated_at='2026-01-01T00:00:00+00:00', rot_started_at=to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00') WHERE org_id=?", (ORG,))
+dbx("UPDATE org_keys SET rotated_at='2026-01-01T00:00:00+00:00', rot_started_at=now() WHERE org_id=?", (ORG,))  # 2.1115.0 (#5951): TIMESTAMPTZ
 patch(Bo, O7, note="r3")
 GK2 = groups(BOB)[-1]["id"]
 r = Bo.post(B + f"/api/undo/to/{GK2}")

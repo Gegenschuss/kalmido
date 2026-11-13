@@ -213,7 +213,8 @@ def otr_delete(lid):
 def otr_keep(a):
     """2.936.0 (#5364): obj_register trash_keep of the kind list -- a project with receipts kept by law (lists.retain_until today
     or later, useradmin.ua8_receipts_keep; 2.186.0 A, #2566) waits for its end (counted as list_kept)."""
-    return f"COALESCE({a}.retain_until, '')>=?", (now_utc().date().isoformat(),)
+    # 2.1115.0 (#5951): retain_until is DATE (no '' any more); never NULL as a whole - the core uses it under NOT (...)
+    return f"({a}.retain_until IS NOT NULL AND {a}.retain_until>=?)", (now_utc().date().isoformat(),)
 
 
 _OTR_EARLY = ContextVar("otr_early", default=False)  # 2.1002.0 (#5491): otr_delete's early delete for its obj_purge

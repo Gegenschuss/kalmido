@@ -215,7 +215,7 @@ CHECKS = {
                        "AND CASE WHEN EXISTS (SELECT 1 FROM fs_nodes bn WHERE bn.kind='ref' AND bn.ref_kind='address_book' AND bn.ref_id=b.id) "
                        "THEN NOT EXISTS (SELECT 1 FROM fs_shares bs JOIN fs_nodes bn ON bn.id=bs.node_id WHERE bn.kind='ref' "
                        "AND bn.ref_kind='address_book' AND bn.ref_id=b.id AND bs.user_id=cl.created_by AND bs.role IN ('view', 'edit') "
-                       "AND (bs.expires_at IS NULL OR bs.expires_at > to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'))) "
+                       "AND (bs.expires_at IS NULL OR bs.expires_at > now())) "  # 2.1115.0 (#5951): fs_shares.expires_at is TIMESTAMPTZ
                        "ELSE TRUE END) END"),
     # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
     # 2.972.0 (#5285): rows of obj_follow (mode watch)

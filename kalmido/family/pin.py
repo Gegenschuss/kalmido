@@ -121,7 +121,7 @@ def pin_unlock():
     now = now_utc()
     if good:
         until = iso(now + timedelta(seconds=PIN_OPEN))
-        c.execute("UPDATE kid_pins SET fails=0, lock_until='' WHERE kid_id=?", (uid,))
+        c.execute("UPDATE kid_pins SET fails=0, lock_until=NULL WHERE kid_id=?", (uid,))  # 2.1115.0 (#5951): TIMESTAMPTZ, no lock = NULL
         c.execute("DELETE FROM kid_pin_open WHERE token_hash=?", (sh,))
         c.execute("INSERT INTO kid_pin_open(token_hash,kid_id,until) VALUES(?,?,?)", (sh, uid, until))
         c.commit()
@@ -166,7 +166,7 @@ def pin_set(kid):
         return err(tr("The PIN has 4 to 6 digits"))
     ts = iso(now_utc())
     c.execute("DELETE FROM kid_pins WHERE kid_id=?", (kid,))
-    c.execute("INSERT INTO kid_pins(kid_id,pin_hash,fails,lock_until,set_by,set_at) VALUES(?,?,0,'',?,?)",
+    c.execute("INSERT INTO kid_pins(kid_id,pin_hash,fails,lock_until,set_by,set_at) VALUES(?,?,0,NULL,?,?)",  # 2.1115.0 (#5951)
               (kid, generate_password_hash(pin), me(), ts))
     c.execute("DELETE FROM kid_pin_open WHERE kid_id=?", (kid,))  # a new PIN closes every open session of the kid
     bump(c)
