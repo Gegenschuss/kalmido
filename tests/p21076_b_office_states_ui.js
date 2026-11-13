@@ -9,6 +9,8 @@
 // - the start page keeps the place of "bookings without a receipt" while its counter loads (no jump when it comes)
 // - the figures without any payment: one empty state, no empty axis
 // - the role Bookkeeping: no "Correspondence" in the office menu; the page itself says "No access" in the one form
+// - 2.1094.0 (#5902): the side paths (import runs, terms, travel purposes, entertainment choices, suggested payments) say a
+//   failure with the reason and "Try again"; the role Bookkeeping without an office group sees Bookkeeping and Bank
 // Every wait is on a real state of the page.
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -51,6 +53,8 @@ async function receipt(ck, ws, name, amount, day) {
   return id;
 }
 const txt = (d, sel) => d.querySelector(sel)?.textContent || '';
+// 2.1094.0 (#5902): the bookkeeping page is there (its content, no loading or no-access block)
+const S_ok = w => { const d = w.document, b = d.querySelector('#view .office[data-ofctab="books"] .ofcbody'); return !!b && b.textContent.trim().length > 0 && !b.querySelector('.enoacc, .eerr, .eload.es-big'); };
 
 (async () => {
   await sleep(600);
@@ -152,9 +156,74 @@ const txt = (d, sel) => d.querySelector(sel)?.textContent || '';
     w.close();
   }
   // Alice (admin) keeps the point
-  const w = await boot({user: 'alice', hash: 'office/start'});
+  let w = await boot({user: 'alice', hash: 'office/start'}), d = w.document;
   check(await until(() => w.eval('typeof OFC === "object" && !!OFC.info')), 'Alice: the office is loaded');
   check(w.eval("ofm_items().some(i => i.key === 'letters')"), 'Alice, admin: Correspondence stays in the menu');
+
+  // ================= 2.1094.0 (#5902): the side paths say a failed load with the reason + "Try again", never quietly empty
+  // the import page: the runs fail -> the reason, no "No imports yet"; "Try again" loads the page (its real empty state)
+  hold(w, /^GET \/api\/office\/legacy\/runs/);
+  w.location.hash = '#office/import';
+  check(await until(() => w.__held.length >= 1), '#5902 import: the runs are requested (held)');
+  w.__held.forEach(h => h.fail('The import runs are resting for the test'));
+  check(await until(() => d.querySelector('#view .oim .eerr [data-esretry]')), '#5902 import: the failed runs show "Try again"');
+  check(/The import runs are resting for the test/.test(txt(d, '#view .oim .eerr')), '#5902 import: with the reason');
+  check(!/No imports yet/.test(txt(d, '#view .oim')), '#5902 import: a failure is no "No imports yet"');
+  unhold(w);
+  d.querySelector('#view .oim .eerr [data-esretry]').click();
+  check(await until(() => d.querySelector('#view .oim .oim-none') && !d.querySelector('#view .oim .eerr')), '#5902 import: "Try again" loads the runs (none yet, said in the one block)');
+  check(/No imports yet/.test(txt(d, '#view .oim .oim-none')), '#5902 import: the empty state says so');
+
+  // the terms (AGB) in the office settings: a failure is never "No terms and conditions yet"; "Try again" brings the rows
+  w.eval('AGB.data = null');
+  hold(w, /^GET \/api\/office\/terms$/);
+  w.location.hash = '#office/settings';
+  check(await until(() => w.__held.length >= 1), '#5902 terms: requested (held)');
+  check(await until(() => d.querySelector('#agb-box .eload')), '#5902 terms: while it loads the one loading block');
+  w.__held.forEach(h => h.fail('The terms are resting for the test'));
+  check(await until(() => d.querySelector('#agb-box .eerr [data-esretry]')), '#5902 terms: the failure shows "Try again"');
+  check(/The terms are resting for the test/.test(txt(d, '#agb-box')) && !/No terms and conditions yet/.test(txt(d, '#agb-box')) && !d.querySelector('#agb-box .agbrow'), '#5902 terms: the reason, no "No terms yet"');
+  unhold(w);
+  d.querySelector('#agb-box .eerr [data-esretry]').click();
+  check(await until(() => d.querySelectorAll('#agb-box .agbrow').length > 1 && !d.querySelector('#agb-box .eerr')), '#5902 terms: "Try again" lists the languages');
+  check(/No terms and conditions yet/.test(txt(d, '#agb-box .agbrow')), '#5902 terms: now the real "none yet"');
+
+  // the own travel purposes and the entertainment choices of the settings: a failure in their section, "Try again" reads again
+  hold(w, /^GET \/api\/office\/(trips\/purposes|meals\/choices)$/);
+  w.eval('rk_purposesLoad(); bw_choicesLoad(); 1');
+  check(await until(() => w.__held.length >= 2), '#5902 settings: purposes and choices requested (held)');
+  w.__held.forEach(h => h.fail('Resting for the test'));
+  check(await until(() => /eerr/.test(w.eval('rk_settingsHtml()')) && /eerr/.test(w.eval('bw_settingsHtml()'))), '#5902 settings: both sections show the failure');
+  check(/Resting for the test/.test(w.eval('rk_settingsHtml()')) && !/data-rkp="name"/.test(w.eval('rk_settingsHtml()')), '#5902 travel purposes: the reason, not an empty list');
+  check(/Resting for the test/.test(w.eval('bw_settingsHtml()')) && !/data-bwc-new/.test(w.eval('bw_settingsHtml()')), '#5902 entertainment choices: the reason, not empty lists');
+  unhold(w);
+  w.eval('rk_purposesLoad(); bw_choicesLoad(); 1');
+  check(await until(() => !/eerr/.test(w.eval('rk_settingsHtml() + bw_settingsHtml()')) && /data-bwc-new/.test(w.eval('bw_settingsHtml()'))), '#5902 settings: loaded again, the failure is gone');
+
+  // the suggested payments of agents above the invoices: a failure is said (a 403 stays quiet)
+  hold(w, /\/api\/office\/pay-props/);
+  w.eval('OA.pp = null; oa_ppLoad(); 1');
+  check(await until(() => w.__held.length >= 1), '#5902 payments: requested (held)');
+  w.__held.forEach(h => h.fail('The suggestions are resting for the test'));
+  check(await until(() => /The suggestions are resting for the test/.test(w.eval('oa_ppBox()')) && /data-esretry/.test(w.eval('oa_ppBox()'))), '#5902 payments: the reason with "Try again" instead of nothing');
+  w.eval('OA.pp = null; oa_ppLoad(); 1');
+  check(await until(() => w.__held.length >= 2), '#5902 payments: requested again (held)');
+  w.__held[1].fail('Not for you', 403);
+  check(await until(() => w.eval('!!OA.pp && !OA.ppLoading') && w.eval('oa_ppBox()') === ''), '#5902 payments: a 403 stays quiet');
+  unhold(w);
+  w.close();
+
+  // ================= 2.1094.0 (#5902): the role Bookkeeping in "Previous access" (no office group) reads every area: its menu
+  // shows Bookkeeping and Bank (it was empty of them); Correspondence stays away; the page opens
+  check((await call(CA, 'PUT', `/api/office/rights/people/${carlId}`, {groups: ['tpl:legacy']})).http < 300, 'carl back to previous access');
+  w = await boot({user: 'carl', hash: 'office/start'}); d = w.document;
+  check(await until(() => w.eval('typeof OFC === "object" && !!OFC.info') && d.querySelector('#view .ofmstart')), '#5902 Carl, previous access: the office start');
+  check(w.eval("OFC.info.role === 'accounting' && !!OFC.info.rights?.legacy && !ofm_lv()"), '#5902 Carl: not ruled by groups');
+  check(w.eval("ofm_items().some(i => i.key === 'books') && ofm_items().some(i => i.key === 'bank')"), '#5902 Carl: Bookkeeping and Bank are in his menu');
+  check(w.eval("!ofm_items().some(i => i.key === 'letters')"), '#5902 Carl: still no Correspondence');
+  check(!!d.querySelector('#view [data-ofm="books"], #view [href="#office/books"]'), '#5902 Carl: the start page offers Bookkeeping');
+  w.location.hash = '#office/books';
+  check(await until(() => S_ok(w)), '#5902 Carl: the bookkeeping page opens without "No access"');
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);
