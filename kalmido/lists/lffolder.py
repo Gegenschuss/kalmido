@@ -46,6 +46,7 @@ Interface:
 """
 import json
 import threading
+from datetime import datetime
 
 from flask import has_app_context, jsonify
 
@@ -530,6 +531,18 @@ def lf_folder_share(c, owner, path, uid, role, group=False):
     grp_dl_full(c, lids, [owner] if nodes else [])  # Fable review F4: the folder marks also without a member row changed
 
 
+def _old_ts(v):
+    """#5916: an old TEXT point in time for a TIMESTAMPTZ column (fs_shares.created_at since #5306): ISO as it is, else
+    (NULL / '' / any other text) now -- a broken old value never breaks the start."""
+    if isinstance(v, str):
+        try:
+            datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+            return v
+        except ValueError:
+            return _now()
+    return v or _now()
+
+
 def lf_people_rows(c, owner=None, uid=None):
     """2.958.0 (#5245, stage 7d of the shared core): the person / agent shares of the projects folders as the rows of the old
     table folder_people (gone) -- [{owner_id, folder, user_id, role, created_at}]: per folder (its owner and path, lf_node_folder)
@@ -729,7 +742,7 @@ def lf_migrate(c):
                 if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (f["id"], fp["user_id"])).fetchone():
                     continue
                 c.execute(f"INSERT INTO fs_shares(node_id,{key},role,list_role,created_by,created_at) VALUES(?,?,?,?,?,?)",
-                          (f["id"], fp["user_id"], "edit" if role in ("admin", "edit") else "view", role, fp["owner_id"], fp["created_at"] or _now()))
+                          (f["id"], fp["user_id"], "edit" if role in ("admin", "edit") else "view", role, fp["owner_id"], _old_ts(fp["created_at"])))
                 out["shares"] += 1
         lids = [r[0] for r in c.execute("SELECT id FROM lists WHERE is_inbox=0 ORDER BY id")]
         for lid in lids:

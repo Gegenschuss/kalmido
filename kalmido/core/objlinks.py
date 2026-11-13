@@ -477,12 +477,15 @@ undo_need_reg(OLNK_KIND, _olnk_undo_need)
 
 
 # ---------------------------------------------------------------- the move of the old tables (start, once per table)
-def _ts(cols, col, alias="o"):
-    """An old TEXT point in time as TIMESTAMPTZ (NULL / '' / not ISO -> now for created_at, else NULL)."""
+def _ts(cols, col, alias="o", now=False):
+    """An old TEXT point in time as TIMESTAMPTZ (NULL / '' / not ISO / column missing -> now when it lands in a NOT NULL
+    target (now=True: obj_links.created_at, whatever the old column's name), else NULL). #5916: the fallback follows the
+    target column, not the source name -- contact_tasks.added_at '' gave NULL in created_at and the start broke off."""
+    fb = "CURRENT_TIMESTAMP" if now else "NULL"
     if col not in cols:
-        return "CURRENT_TIMESTAMP" if col == "created_at" else "NULL"
+        return fb
     return (f"CASE WHEN CAST({alias}.{col} AS TEXT) ~ '{OLNK_ISO}' THEN CAST(CAST({alias}.{col} AS TEXT) AS TIMESTAMPTZ) "
-            f"ELSE {'CURRENT_TIMESTAMP' if col == 'created_at' else 'NULL'} END")
+            f"ELSE {fb} END")
 
 
 def olnk_move(c):
@@ -495,7 +498,7 @@ def olnk_move(c):
     if c.execute(f"SELECT to_regclass('{t}')").fetchone()[0]:
         cols = table_columns(c, t)
         out[t] = c.execute(f"""INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by, created_at)
-                               SELECT o.org_id, 'hub_mail', o.mail_id, o.kind, o.ref_id, 'made', o.created_by, {_ts(cols, 'created_at')}
+                               SELECT o.org_id, 'hub_mail', o.mail_id, o.kind, o.ref_id, 'made', o.created_by, {_ts(cols, 'created_at', now=True)}
                                FROM {qi(t, {t})} o WHERE o.kind IN ('task', 'event') ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "life_device_links"
@@ -505,7 +508,7 @@ def olnk_move(c):
                                                     updated_at)
                                SELECT o.user_id, 'task', o.task_id, 'omd_equipment', o.equipment_id, 'device',
                                       jsonb_build_object('origin', COALESCE(o.origin, 'device'), 'office_id', o.office_id),
-                                      o.user_id, {_ts(cols, 'created_at')}, {_ts(cols, 'updated_at')}
+                                      o.user_id, {_ts(cols, 'created_at', now=True)}, {_ts(cols, 'updated_at')}
                                FROM {qi(t, {t})} o WHERE o.task_id IS NOT NULL AND o.equipment_id IS NOT NULL ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "contact_tasks"
@@ -513,7 +516,7 @@ def olnk_move(c):
         cols = table_columns(c, t)
         out[t] = c.execute(f"""INSERT INTO obj_links(src_kind, src_id, dst_kind, dst_id, rel, extra, created_by, created_at)
                                SELECT 'contact', o.contact_id, 'task', o.task_id, 'contact',
-                                      jsonb_build_object('kind', COALESCE(o.kind, 'about')), o.added_by, {_ts(cols, 'added_at')}
+                                      jsonb_build_object('kind', COALESCE(o.kind, 'about')), o.added_by, {_ts(cols, 'added_at', now=True)}
                                FROM {qi(t, {t})} o ORDER BY o.added_at, o.contact_id, o.task_id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
     t = "office_letter_links"
@@ -523,7 +526,7 @@ def olnk_move(c):
         out[t] = c.execute(f"""INSERT INTO obj_links(org_id, src_kind, src_id, dst_kind, dst_id, rel, created_by, agent_id, created_at,
                                                     deleted_at, deleted_by, updated_at, updated_by)
                                SELECT o.org_id, 'office_letter', o.letter_id, 'fs_entry', o.node_id, o.kind, o.created_by,
-                                      {'o.agent_id' if 'agent_id' in cols else 'NULL'}, {_ts(cols, 'created_at')}, {', '.join(trash)}
+                                      {'o.agent_id' if 'agent_id' in cols else 'NULL'}, {_ts(cols, 'created_at', now=True)}, {', '.join(trash)}
                                FROM {qi(t, {t})} o WHERE o.kind IN ('answers', 'reply') ORDER BY o.id
                                ON CONFLICT (src_kind, src_id, dst_kind, dst_id, rel) DO NOTHING""").rowcount
         from .undogroups import ug_gc

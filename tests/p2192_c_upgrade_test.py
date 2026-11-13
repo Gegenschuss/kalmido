@@ -110,6 +110,8 @@ def fill_old_tables():
             return str(r[0][0]) if r else None
         if "int" in typ or typ in ("numeric", "double precision", "real"):
             return "0"
+        if name.endswith("_at") and "timestamp" not in typ:  # #5916: an old TEXT time column (created_at, added_at ...) held ISO
+            return "2026-01-01T00:00:00Z"  # (now_iso) - the filler text broke later moves into TIMESTAMPTZ columns (#5306)
         return {"bytea": "\\x00", "jsonb": "{}", "json": "{}", "boolean": "false", "date": "2026-01-01"}.get(typ, "p2192-fill-" + t if "timestamp" not in typ else "2026-01-01")
 
     def insert(t, more=()):

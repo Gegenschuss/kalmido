@@ -255,7 +255,8 @@ for stmt in (
     f"INSERT INTO life_device_links VALUES (1, {BOB}, 900010, {ORG}, 900011, 'equipment', '2026-10-02T08:00:00Z', '2026-10-03T08:00:00Z'), "
     f"(2, {BOB}, NULL, {ORG}, 900012, 'device', '2026-10-02T08:00:00Z', '2026-10-02T08:00:00Z')",
     "CREATE TABLE contact_tasks (contact_id BIGINT, task_id BIGINT, kind TEXT, added_by BIGINT, added_at TEXT)",
-    f"INSERT INTO contact_tasks VALUES (900020, {T3}, 'responsible', {ALICE}, '2026-10-04T08:00:00Z')",
+    f"INSERT INTO contact_tasks VALUES (900020, {T3}, 'responsible', {ALICE}, '2026-10-04T08:00:00Z'), "
+    f"(900021, {T3}, 'about', {ALICE}, ''), (900022, {T3}, 'about', NULL, NULL)",  # #5916: an empty / missing added_at
     "CREATE TABLE office_letter_links (id BIGINT PRIMARY KEY, org_id BIGINT, letter_id BIGINT, node_id BIGINT, kind TEXT, created_by BIGINT, "
     "agent_id BIGINT, created_at TEXT, deleted_at TIMESTAMPTZ, deleted_by BIGINT, rev BIGINT, updated_at TIMESTAMPTZ, updated_by BIGINT)",
     f"INSERT INTO office_letter_links VALUES (1, {ORG}, 900030, 900031, 'answers', {ALICE}, NULL, '2026-10-05T08:00:00Z', NULL, NULL, 1, NULL, NULL), "
@@ -263,7 +264,7 @@ for stmt in (
 ):
     sql(stmt, write=True)
 out = in_app("pass")
-check("obj_links: moved hub_mail_links 2, life_device_links 1, contact_tasks 1, office_letter_links 2" in out,
+check("obj_links: moved hub_mail_links 2, life_device_links 1, contact_tasks 3, office_letter_links 2" in out,
       f"the start moves each table's rows (a doubled mail link once, a device link without its device stays out) {out[-600:]}")
 m = sql("SELECT org_id, dst_kind, dst_id, rel, created_by, created_at IS NOT NULL FROM obj_links WHERE src_kind='hub_mail' AND src_id IN (900001, 900002) ORDER BY src_id")
 check([tuple(x) for x in m] == [(ORG, "task", T1, "made", ALICE, True), (ORG, "event", 900003, "made", None, True)],
@@ -273,6 +274,9 @@ check([tuple(x) for x in d] == [(BOB, None, "task", 900010, "omd_equipment", 900
       f"device link: the person's own row, origin and office in extra {d}")
 k = sql("SELECT src_id, dst_id, extra->>'kind', created_by FROM obj_links WHERE src_kind='contact' AND src_id=900020")
 check([tuple(x) for x in k] == [(900020, T3, "responsible", ALICE)], f"contact link: rel contact, its kind in extra {k}")
+k = sql("SELECT src_id, created_at IS NOT NULL FROM obj_links WHERE src_kind='contact' AND src_id IN (900021, 900022) ORDER BY src_id")
+check([tuple(x) for x in k] == [(900021, True), (900022, True)],
+      f"#5916: a contact link with an empty / missing added_at moves with created_at = now (the start of 2.1067 data broke off) {k}")
 lt = sql("SELECT dst_id, rel, agent_id, deleted_at IS NOT NULL, org_id FROM obj_links WHERE src_kind='office_letter' AND src_id=900030 ORDER BY dst_id")
 check([tuple(x) for x in lt] == [(900031, "answers", None, False, ORG), (900032, "reply", 7, True, ORG)],
       f"letter links: office_letter -> fs_entry, the kind as relation, the agent and the trash kept {lt}")
