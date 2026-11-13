@@ -58,6 +58,7 @@ from flask import has_request_context, jsonify
 from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx, write_lock
+from ..core.errors import Denied  # 2.1124.0 (#6047)
 from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from .moneycol import mc_fields  # 2.755.0 (#5293): the NUMERIC money columns back as the text the office code reads
 
@@ -1710,7 +1711,12 @@ def oc_route_status(oid):
     recovery key asks: password | totp | passkey | fresh | proxy); oid 0 = the own personal office."""
     from flask import g
     c = db()
-    oid = _org_admin(c, oid)
+    try:
+        oid = _org_admin(c, oid)
+    except Denied as e:  # 2.1124.0 (#6047): no personal office yet = nothing encrypted, a plain answer instead of a 404 in
+        if oid != 0 or e.code != 404:  # the console / the log (the box stays hidden); agents still 403, the recovery 404
+            raise
+        return jsonify(enabled=bool(SECRET_KEY), active=False, has_key=False, office=False)
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     step = rck_step(c, u)
     extra = {"stepup": rck_stepup_via(c, u), "fresh": _rck_fresh(c, f"{oid}:show"),  # 2.144.5 A (#2387)
