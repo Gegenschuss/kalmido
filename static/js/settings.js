@@ -936,8 +936,8 @@ function settingsModal(focus) {
       <h4>${tr('This device')}</h4>
       <div id="s-wp"><div class="muted">${tr('Loading…')}</div></div>` : ''}
       <h4>${tr('In the app')}</h4>
-      <div class="row">${chk('s-msgpop', LS.get('msgPop', '1') !== '0', tr('Pop-up for new messages'))}</div>
-      ${hint(tr('A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.'))}
+      <div class="row">${/*html-ok*/ chk('s-msgpop', LS.get('msgPop', '1') !== '0', tr('Pop-up for new messages'))}</div>
+      ${/*html-ok*/ hint(tr('A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.'))}
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code>${S.webpush?.enabled ? '' : `<button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button>`}</div>${''/* 2.555.0 C (#4664): with Web Push "Test all channels" above covers ntfy */}
       ${S.webpush?.enabled ? '' : prio}
