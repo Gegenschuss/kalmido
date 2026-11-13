@@ -17,7 +17,6 @@ Every read, write and creation by an agent is noted in the history of the page's
 """
 import json
 import os
-import re
 
 from flask import g, jsonify, request
 
@@ -28,6 +27,7 @@ from ..core.pg import ts_canon, write_lock  # 2.1048.0 (#5861); 2.1095.0 (#5306)
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
 from ..core.conflict import need_version  # 2.564.0 (#4702)
+from ..core.mdedit import MdHeadingError, md_edit, md_edit_input, md_heading_answer, md_spec_body, md_version  # 2.1111.0 (#5830)
 from ..core.dlock import dl_chain_cut  # 2.1045.0 (#5823)
 from ..accounts.session import me
 from ..api.common import V1Error, v1_args, v1_call, v1_err, v1_json, v1_out, v1_view
@@ -295,56 +295,8 @@ def wkv_update(pid):
     return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True))
 
 
-WKV_APPEND_MAX = 20000  # 2.1048.0 (#5861): one appended piece (a link, a paragraph); the whole page stays bound by wiki_body
-WKV_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")  # review F8: "# C#" is "C#"  # 2.1068.0 (#5829): an ATX heading (as wkembed.js wem_pgPart)
-WKV_FENCE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
-
-
-def wkv_headings(lines):
-    """2.1068.0 (#5829): [(line index, level, text)] of the Markdown headings, code fences skipped."""
-    out, fence = [], ""
-    skip = 0
-    if lines and lines[0].strip() == "---":  # review F8: the frontmatter block on top is no section (a "# comment" there)
-        skip = next((k + 1 for k in range(1, len(lines)) if lines[k].strip() in ("---", "...")), 0)
-    for i, x in enumerate(lines):
-        if i < skip:
-            continue
-        f = WKV_FENCE_RX.match(x)
-        if f:  # review F8: a fence closes only with its own character, at least as long
-            if not fence:
-                fence = f.group(1)
-            elif f.group(1)[0] == fence[0] and len(f.group(1)) >= len(fence) and not x.strip()[len(f.group(1)):].strip():
-                fence = ""
-            continue
-        m = None if fence else WKV_HEAD_RX.match(x)
-        if m:
-            out.append((i, len(m.group(1)), (m.group(2) or "").strip()))
-    return out
-
-
-def wkv_append_text(cur, text, under=None):
-    """2.1068.0 (#5829): the page's text with text added -> the new text, or None when the heading under is not there.
-    Exactly one empty line between the page's text and the new text (none on an empty page); without under at the end of
-    the page, with under at the end of that heading's section (up to the next heading of the same or a higher level; the
-    first heading of that name, case ignored), an empty line before the next heading. The page's trailing line break stays."""
-    piece = text.strip("\r\n")
-    if under is None:
-        body = cur.rstrip("\r\n")
-        return (body + "\n\n" + piece if body else piece) + ("\n" if cur.endswith("\n") else "")
-    lines = cur.split("\n")
-    hs = wkv_headings(lines)
-    want = under.strip().casefold()
-    hit = next((k for k, h in enumerate(hs) if h[2].casefold() == want), None)
-    if hit is None:
-        return None
-    at, lvl = hs[hit][0], hs[hit][1]
-    end = next((h[0] for h in hs[hit + 1:] if h[1] <= lvl), len(lines))
-    last = end - 1
-    while last > at and not lines[last].strip():
-        last -= 1
-    rest = lines[end:]
-    tail = ([""] + rest) if rest else ([""] if end == len(lines) and cur.endswith("\n") else [])
-    return "\n".join(lines[:last + 1] + ["", *piece.split("\n")] + tail)
+# 2.1111.0 (#5830): the Markdown work (headings, appending, replacing a section) is the shared building block
+# core/mdedit.py -- tasks' notes and projects' descriptions use the same functions
 
 
 @app.post("/api/v1/wiki/pages/<int:pid>/append")
@@ -354,30 +306,42 @@ def wkv_append(pid):
     page. The same save as PATCH (wiki_update: the size, the frontmatter, the history, the word index, the links); the page's
     lock holds between reading the text and saving it, so nothing saved in between is lost. expect_updated_at is optional
     here (appending overwrites nothing): when given and the page changed since, 409 with the current page like PATCH.
-    2.1068.0 (#5829): exactly one empty line before the new text (wkv_append_text); under = a heading of the page: the text
+    2.1068.0 (#5829): exactly one empty line before the new text (core/mdedit.py md_append); under = a heading of the page: the text
     goes to the end of that section; no such heading = 404 heading_not_found with the page's headings, nothing written."""
+    return _wkv_edit(pid, "append")
+
+
+@app.post("/api/v1/wiki/pages/<int:pid>/replace-section")
+@v1_view
+def wkv_replace_section(pid):
+    """2.1111.0 (#5830): {heading, text, expect_updated_at} -- replaces the text below one heading of the page (up to the
+    next heading of the same or a higher level; core/mdedit.py md_replace_section) without sending the whole page (role
+    edit). expect_updated_at (or If-Match) is required: 400 version_required without, 409 with the current page when the
+    page changed since. The heading not there = 404 heading_not_found, there more than once = 409 heading_ambiguous (both
+    with the page's headings), nothing written. The same save as PATCH (history, word index, links)."""
+    return _wkv_edit(pid, "replace")
+
+
+def _wkv_edit(pid, mode):
+    """2.1111.0 (#5830): the targeted change of page pid (append | replace) -- read under the page's lock, the new text from
+    core/mdedit.py, saved through wiki_update like PATCH."""
     b = v1_json()
     c = db()
     uid = me()
-    reject_unknown(b, ("text", "under", "expect_updated_at"))
-    text = b.get("text")
-    if not isinstance(text, str) or not text.strip():
-        raise BadInput(tr("Invalid value: {0}", "text"))
-    if len(text) > WKV_APPEND_MAX:
-        raise BadInput(tr("Too long: {0} (at most {1} characters)", "text", WKV_APPEND_MAX))
-    under = b.get("under")
-    if under is not None and (not isinstance(under, str) or not under.strip() or len(under) > 300):
-        raise BadInput(tr("Invalid value: {0}", "under"))
+    reject_unknown(b, ("text", "under", "expect_updated_at") if mode == "append" else ("heading", "text", "expect_updated_at"))
+    text, head = md_edit_input(b, mode)
+    exp = md_version(b, mode == "replace")  # review F3: one normalised value, a string or None
     write_lock(c, f"wiki-{int(pid)}")  # the same lock as wiki_update (re-entrant there): read + save see no other save
     r, role, path = wkv_need(c, uid, pid, write=True)
-    exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
-    if exp and ts_canon(str(exp)) != ts_canon(r["updated_at"]):
+    if exp is not None and ts_canon(str(exp)) != ts_canon(r["updated_at"]):  # 2.1095.0 (#5306): one moment
         return _conflict(c, uid, r, role, path)
     cur = wkh_body(c, r) or ""  # the plain text (a sealed private page opens with its key, like a read)
-    new = wkv_append_text(cur, text, under)
-    if new is None:
-        heads = [h[2] for h in wkv_headings(cur.split("\n"))][:100] if _reads() else []  # review F5: a write-only token reads no text
-        return v1_err(404, tr("No heading {0} on this page", under.strip()), name="heading_not_found", headings=heads)
+    try:
+        new = md_edit(cur, mode, text, head)
+    except MdHeadingError as e:
+        return md_heading_answer(e, show=_reads())  # review F5 (2.1068.0): a write-only token reads no text
+    if new == cur:  # review F4 / F7: nothing changes -- no save, no "write" in the node's history
+        return jsonify(_page(c, r, role, path, user_names(c, [r["updated_by"]]), full=True))
     v1_call(wiki_update, pid, body={"body": new, "expect_updated_at": r["updated_at"]})
     r, role, path = wkv_need(c, uid, pid)
     _log(c, uid, r, "write")
@@ -592,15 +556,16 @@ def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
                         "path": {"type": "string", "description": "People's tokens only: rename / move (the full path)"},
                         "relink": {"type": "boolean", "description": "People's tokens only, with path (default true)"}}},
                     scope="wiki:write", desc="Needs the role edit (403 otherwise). Every save is one entry of the page's history in the app.")}
-    paths["/wiki/pages/{id}/append"] = {  # 2.1048.0 (#5861)
-        "post": op("Add text at the end of a knowledge page (2.1048.0)", T, ok(ref("WikiPage")) | errs("400", "403", "404", "409"), [wid],
-                   body={"type": "object", "required": ["text"], "properties": {
-                       "text": {"type": "string", "maxLength": WKV_APPEND_MAX, "description": "Markdown added after the page's text "
-                                "(a line break first when the page does not end with one; start it with an empty line for a new paragraph)"},
-                       "expect_updated_at": {"type": "string", "description": "Optional: the updated_at you read; 409 with the current "
-                                                                              "page (error.page) when someone saved in between"}}},
+    paths["/wiki/pages/{id}/append"] = {  # 2.1048.0 (#5861); 2.1111.0 (#5830): the body of core/mdedit.py (+ under, 2.1068.0)
+        "post": op("Add text at the end of a knowledge page or of a section (2.1048.0)", T, ok(ref("WikiPage")) | errs("400", "403", "404", "409"), [wid],
+                   body=md_spec_body("append", "the page's updated_at"),
                    scope="wiki:write", desc="Needs the role edit (403 otherwise). For a link or a paragraph: you need not read and send "
                                             "the whole page. One entry of the page's history, like PATCH.")}
+    paths["/wiki/pages/{id}/replace-section"] = {  # 2.1111.0 (#5830)
+        "post": op("Replace the text below one heading of a knowledge page (2.1111.0)", T, ok(ref("WikiPage")) | errs("400", "403", "404", "409"), [wid],
+                   body=md_spec_body("replace", "the page's updated_at"),
+                   scope="wiki:write", desc="Needs the role edit (403 otherwise). Only the section is sent, not the whole page. One entry "
+                                            "of the page's history, like PATCH.")}
     # 2.488.0 B (#2209): the files of a page (PDFs and pictures), read only
     schemas["WikiFile"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "page_id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},

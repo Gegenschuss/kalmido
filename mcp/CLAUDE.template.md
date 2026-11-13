@@ -128,7 +128,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
   it again (the answer's `current`), decide anew, never just resend. 2.564.0: a version is required for content
   changes (`400 version_required` without): `update_task` / `batch_tasks` (`expect_updated_at` or `_prev`), `wiki_write`
-  (`expect_updated_at`), `sheet_set_cells` (`expect_rev` or `prev` per cell), `sheet_set_rules` (`expect_rev`), `write_file` with `file_id` (`expect_version`).
+  (`expect_updated_at`), the `..._replace_section` tools (`expect_updated_at`, 2.1111.0), `sheet_set_cells` (`expect_rev` or `prev` per cell), `sheet_set_rules` (`expect_rev`), `write_file` with `file_id` (`expect_version`).
   A change of a locked task shows as `locked_bypass` in its history. `create_task` gets a `client_ref` of your own, so a
   retry after a timeout does not make a second task (2.370.2: `add_comment` and `suggest_payment` too); `update_note` and `update_offer_draft` take `expect_updated_at` too,
   and positions you keep in `update_offer_draft` go with their `id`.
@@ -430,6 +430,11 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - 2.1068.0: a card that changes a text (knowledge page, task notes, project description, comment) shows the person the
   lines it removes and adds, reckoned by the server - so keep a step to what you mean to change: for an addition to a
   knowledge page use `wiki_append` (the card then shows only the new lines), not `wiki_write` with the whole page.
+- 2.1111.0: send only the change of a long text. To add to a knowledge page, a task's notes or a project's description use
+  `wiki_append` / `task_notes_append` / `project_overview_append` (at the end or `under` a heading); to rework one part
+  use `wiki_replace_section` / `task_notes_replace_section` / `project_overview_replace_section` (the text below one
+  heading, with `expect_updated_at`). The whole text (`wiki_write`, `update_task` `notes`, `set_project_overview`) only
+  when you really rewrite all of it.
 - One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
   a card first, on every level, also when they happen outside Kalmido.
 - A decision that does not run through the Kalmido API (a job card you answer yourself, a change of a tool on your
@@ -752,6 +757,12 @@ project), and the message search finds no team chat channel or group messages (o
 and sending the whole text (2.1068.0: exactly one empty line comes before it; `under` = a heading of the page puts it at the
 end of that section, an unknown heading = `404` with the page's headings); `expect_updated_at` is optional there. For
 additions always prefer `wiki_append`; anything else in the page still goes through `wiki_write`.
+2.1111.0: `wiki_replace_section` (`page_id`, `heading`, `text`, `expect_updated_at`) replaces the text below one heading
+(up to the next heading of the same or a higher level; the heading line stays) - the heading not there = `404`
+`heading_not_found`, there twice = `409` `heading_ambiguous`, both with the headings, nothing written. The same two kinds
+exist for a task's notes (`task_notes_append`, `task_notes_replace_section`, scope `tasks:write`, the task's lock holds)
+and a project's description (`project_overview_append`, `project_overview_replace_section`, scope `structure`;
+`expect_updated_at` = `description_at`). Each is one normal save with the history and undo of a whole write.
 
 ### Video sign-offs (2.99.1)
 A video sign-off holds links only (Vimeo, YouTube, a video file; each new link = a version v1, v2 ...) and comments at a
@@ -923,7 +934,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search`,
 `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_set_rules`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
-`set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_section_kind`, `set_status`, `set_task_state`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
+`set_office_deal_stage`, `project_overview_append`, `project_overview_replace_section`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_section_kind`, `set_status`, `set_task_state`, `task_notes_append`, `task_notes_replace_section`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_objects`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
@@ -931,7 +942,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
 `update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_object`, `update_notepad`,
 `update_offer_draft`, `update_office_lead`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
-`upload_attachment`, `upload_project_file`, `wait_for_events`, `watch_task`, `wiki_append`, `wiki_create`, `wiki_files`, `wiki_list`, `wiki_read`, `wiki_read_file`, `wiki_write`,
+`upload_attachment`, `upload_project_file`, `wait_for_events`, `watch_task`, `wiki_append`, `wiki_create`, `wiki_files`, `wiki_list`, `wiki_read`, `wiki_read_file`, `wiki_replace_section`, `wiki_write`,
 `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->
 

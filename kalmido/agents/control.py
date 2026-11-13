@@ -705,6 +705,8 @@ def ctl_info(path, b):
     """2.653.0 (#5079): what a task change touched, for a history line in words: {fields: [the body's keys], count?: tasks of a
     batch} -- only the names of the fields, never their values. {} for any other route."""
     skip = CTL_PLAN_EXTRA | {"If-Match"}
+    if request.method == "POST" and path in ("/tasks/{}/notes/append", "/tasks/{}/notes/replace-section"):
+        return {"fields": ["notes"]}  # 2.1111.0 (#5830, review F6): a targeted change of the notes
     if request.method == "PATCH" and path == "/tasks/{}":
         return {"fields": sorted(k for k in b if isinstance(k, str) and k not in skip)[:CTL_FIELDS_MAX]}
     if path == "/tasks/batch":
@@ -730,8 +732,8 @@ def ctl_kind(note, method, resp_j):
     plan = p == "/tasks/batch" or set(info.get("fields") or ()) & CTL_PLAN_KEYS  # 2.653.0 (#5079): unlocking only = a change
     if p in ("/tasks/{}", "/tasks/batch") and bf.get("tasks") and note["step"] == "routine" and plan:
         return "task_planned", int(next(iter(bf["tasks"]))), bf.get("title") or "", {"tasks": bf["tasks"]}
-    if method == "PATCH" and p == "/tasks/{}":
-        tid = (request.view_args or {}).get("tid")
+    if (method == "PATCH" and p == "/tasks/{}") or (method == "POST" and p in ("/tasks/{}/notes/append", "/tasks/{}/notes/replace-section")):
+        tid = (request.view_args or {}).get("tid")  # 2.1111.0 (#5830, review F6): + the targeted changes of the notes
         return "task_changed", tid if isinstance(tid, int) else None, str(j.get("title") or bf.get("title") or ""), None
     if p == "/tasks/batch":
         ids = [x for x in ((bf.get("ids") or list((bf.get("tasks") or {}).keys())) or []) if str(x).isdigit()]

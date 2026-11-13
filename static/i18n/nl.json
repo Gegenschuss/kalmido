@@ -18471,7 +18471,6 @@
   "Scan inboxes file only into folders of the documents": "Scan-inboxen leggen alleen af in mappen van de documenten",
   "Scan inbox: {0}": "Scan-inbox: {0}",
   "waits for your answer": "wacht op je antwoord",
-  "No heading {0} on this page": "Geen kop {0} op deze pagina",
   "Knowledge page {0}": "Kennispagina {0}",
   "Notes of task {0}": "Notities van taak {0}",
   "Description of project {0}": "Beschrijving van project {0}",
@@ -18541,5 +18540,9 @@
   "Your control level needs an approval for this upload: ask with an approval card in your chat (approval.step = method, path and body exactly as in this answer), then after the Yes send this request again with the files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "Je controleniveau heeft voor deze upload een goedkeuring nodig: vraag het met een goedkeuringskaart in je chat (approval.step = method, path en body precies zoals in dit antwoord) en stuur na het Ja dit verzoek opnieuw met de bestanden en de header X-Kalmido-Approval: ID van de kaart (MCP: use_approval) - de uitvoering vanaf de kaart kan geen bestanden sturen.",
   "One-way step.": "Stap zonder weg terug.",
   "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "De bestanden wijken af van de kaart (namen of inhoud): de kaart keurt precies de bestanden van de geweigerde upload goed. Stuur precies deze bestanden of vraag het met een nieuwe kaart.",
-  "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "De kaart keurt een upload goed: stuur de upload opnieuw met dezelfde bestanden en de header X-Kalmido-Approval: ID van de kaart (MCP: use_approval) - de uitvoering vanaf de kaart kan geen bestanden sturen."
+  "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "De kaart keurt een upload goed: stuur de upload opnieuw met dezelfde bestanden en de header X-Kalmido-Approval: ID van de kaart (MCP: use_approval) - de uitvoering vanaf de kaart kan geen bestanden sturen.",
+  "No heading {0} in this text": "Geen kop {0} in deze tekst",
+  "The heading {0} is there more than once: rename one or change the whole text": "De kop {0} staat er meer dan eens: hernoem er een of wijzig de hele tekst",
+  "The notes are encrypted: only the app can change them": "De notities zijn versleuteld: alleen de app kan ze wijzigen",
+  "The description is encrypted: only the app can change it": "De beschrijving is versleuteld: alleen de app kan die wijzigen"
 }

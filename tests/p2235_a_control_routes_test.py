@@ -90,6 +90,9 @@ ROUTES = {
     "PATCH /api/v1/templates/{}": "change", "PATCH /api/v1/time/entries/{}": "change",
     "PATCH /api/v1/videos/{}/comments/{}": "change", "PATCH /api/v1/wiki/pages/{}": "change",
     "POST /api/v1/wiki/pages/{}/append": "change",  # 2.1048.0 (#5861)
+    "POST /api/v1/wiki/pages/{}/replace-section": "change", "POST /api/v1/tasks/{}/notes/append": "change",  # 2.1111.0 (#5830): like the whole write
+    "POST /api/v1/tasks/{}/notes/replace-section": "change", "POST /api/v1/lists/{}/overview/append": "change",
+    "POST /api/v1/lists/{}/overview/replace-section": "change",
     "POST /api/v1/address-books": "change", "POST /api/v1/address-books/{}/import": "change", "POST /api/v1/clients": "change",
     "POST /api/v1/clients/bulk": "change", "POST /api/v1/contacts": "change", "POST /api/v1/contacts/bulk": "change",
     "POST /api/v1/documents": "change", "POST /api/v1/event-calendars": "change",

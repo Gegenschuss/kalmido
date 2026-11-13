@@ -3378,7 +3378,8 @@ run it from the card after the Yes:
 
 **What the person sees (2.1068.0, #5831).** A card whose step replaces or adds to a text - a knowledge page
 (`PATCH /wiki/pages/{id}` `body`, `POST /wiki/pages/{id}/append`), a task's notes (`PATCH /tasks/{id}` `notes`), a project's
-description (`PATCH /lists/{id}/overview`) or a comment (`PATCH /comments/{id}`) - shows the person the change itself: folded
+description (`PATCH /lists/{id}/overview`; 2.1111.0: also the targeted changes `POST .../append` and `POST .../replace-section`
+of all three) or a comment (`PATCH /comments/{id}`) - shows the person the change itself: folded
 one line in words ("Knowledge page Wiki/2D: 1 line added, nothing removed"), unfolded the removed and added lines with two
 lines around each change. The server reckons it from the card's bound body against the target's text at the moment the
 person looks, with that person's rights (never from anything you write on the card); when the target changed since the card
@@ -4242,7 +4243,7 @@ with the scope it needs). The tools:
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
   filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
   `q` and `sort`, see *Task filters* in docs/API.md; 2.577.0: `filter_id` applies a saved filter or a shared view),
-  `search` (2.1026.0, see *One search* below; `kind: tasks` 2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet; `kind: messages` 2.33.0: comments, team chat, your chats), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
+  `search` (2.1026.0, see *One search* below; `kind: tasks` 2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet; `kind: messages` 2.33.0: comments, team chat, your chats), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `get_task`, `create_task`, `update_task`, `task_notes_append` / `task_notes_replace_section` (2.1111.0, see *Changing part of a long text* below), `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
@@ -4271,7 +4272,7 @@ with the scope it needs). The tools:
 - delivery state (2.392.2): `set_delivery` (in progress, parked with a reason, waiting for a task), `list_tasks` with `delivery`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
   `restore_attachment` (2.610.0), `delete_chat_attachment`
-- projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
+- projects: `get_project_overview`, `set_project_overview`, `project_overview_append` / `project_overview_replace_section` (2.1111.0), `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `restore_project_file` (2.610.0), `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
   (2.270.0: pass `expect_updated_at` = `description_at` from `get_project_overview` to `set_project_overview`; when someone saved
@@ -4340,8 +4341,8 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `log_decision`, `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
 `request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search`,
-`send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,
-`set_status`,
+`send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `project_overview_append`, `project_overview_replace_section`, `set_project_overview`, `set_project_status`,
+`set_status`, `task_notes_append`, `task_notes_replace_section`, `wiki_replace_section`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `partial_task`, `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,
 `sync_read_later`, `take_task`, `tidy_task`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`,
@@ -4986,7 +4987,8 @@ send again. Every save is one entry of the page's history (the people restore an
 approval card then binds only the added text and shows the person the lines it adds. 2.1068.0: `under` (a heading of the
 page, case ignored) puts the text at the end of that heading's section instead; no such heading = `404`
 `heading_not_found` with the page's headings in `error.headings`, nothing is written. For additions use `wiki_append`,
-`wiki_write` only to change or remove text. A new page
+`wiki_write` only to change or remove text. 2.1111.0: `wiki_replace_section` replaces the text below one heading (see
+*Changing part of a long text* below). A new page
 (`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
 `409` when a page of that name is already there. Renaming, moving, the trash, uploading / removing files of pages, shares,
 export / import and the encryption stay with people in the app.
@@ -5006,6 +5008,33 @@ not `path` / `relink` (`403`).
 | One page with its Markdown text | `GET /api/v1/wiki/pages/{id}` | `wiki_read` | wiki:read |
 | Change a page's text | `PATCH /api/v1/wiki/pages/{id}` | `wiki_write` | wiki:write |
 | Add text at the end of a page or of a section (2.1048.0, `under` 2.1068.0) | `POST /api/v1/wiki/pages/{id}/append` | `wiki_append` | wiki:write |
+| Replace the text below one heading (2.1111.0) | `POST /api/v1/wiki/pages/{id}/replace-section` | `wiki_replace_section` | wiki:write |
+
+### Changing part of a long text (2.1111.0)
+
+Knowledge pages, a task's notes and a project's description take two targeted changes, so an agent sends only the change and
+never reads and resends the whole text (one shared building block on the server for all three):
+
+- **Append** `{text, under?, expect_updated_at?}`: `text` (Markdown, at most 20,000 characters) at the end with exactly one
+  empty line before it; `under` = a heading (case ignored, a leading `## ` is ignored too): at the end of that heading's
+  section instead. No such heading = `404` `heading_not_found` with the headings in `error.headings`, nothing written.
+  `expect_updated_at` is optional (appending overwrites nothing; given and outdated = `409` with the current state).
+- **Replace a section** `{heading, text, expect_updated_at}`: everything below the heading up to the next heading of the
+  same or a higher level becomes `text` (the heading line stays; an empty `text` empties the section). `expect_updated_at`
+  (or the header `If-Match`) is required (`400` `version_required` without, `409` with the current state when outdated). The
+  heading not there = `404` `heading_not_found`, there more than once = `409` `heading_ambiguous` (rename one or write the
+  whole text), both with `error.headings`, nothing written.
+
+Headings inside code fences or in a frontmatter block on top do not count. The rights, the task's lock, a password-locked
+note, encryption (`409` `encrypted`: only the app can change an encrypted text), the history and undo are those of the whole
+write of the same target; an approval card shows only the lines the change adds or removes, and the control level treats
+it like the whole write (a change).
+
+| Target | Append | Replace a section | Version | MCP | Scope |
+|---|---|---|---|---|---|
+| Knowledge page | `POST /api/v1/wiki/pages/{id}/append` | `POST /api/v1/wiki/pages/{id}/replace-section` | `updated_at` | `wiki_append`, `wiki_replace_section` | wiki:write |
+| A task's notes | `POST /api/v1/tasks/{id}/notes/append` | `POST /api/v1/tasks/{id}/notes/replace-section` | the task's `updated_at` | `task_notes_append`, `task_notes_replace_section` | tasks:write |
+| A project's description | `POST /api/v1/lists/{id}/overview/append` | `POST /api/v1/lists/{id}/overview/replace-section` | `description_at` (`""` when null) | `project_overview_append`, `project_overview_replace_section` | structure |
 | A new page in a shared folder | `POST /api/v1/wiki/pages` | `wiki_create` | wiki:write |
 | The files of a page (2.488.0) | `GET /api/v1/wiki/pages/{id}/files` | `wiki_files` | wiki:read |
 | One file's bytes / text (2.488.0) | `GET /api/v1/wiki/files/{id}`, `GET /api/v1/wiki/files/{id}/text` | `wiki_read_file` | wiki:read |
