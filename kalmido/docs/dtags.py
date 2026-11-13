@@ -3,11 +3,13 @@ core (obj_tags scope ws, obj_tag_links kind fs_entry; core/objtags.py otg_move_w
 tag's id, for a tag whose id was taken in obj_tags already (by a project tag, a label or a personal tag):
   doc_models (feature tags)   the learned yes / no model per tag id (sealed): its keys
   doc_meta.suggest            a suggested tag (sealed): {"tags": {"value": [ids]}}
+  doc_meta.trained            what a document taught the models (sealed): {"tags": ["<id>"]} (review F3)
   doc_meta.redo_prev          "Recognise again" kept for 24 h: {"tags": [ids]}
   doc_meta.learn_prev         "Apply what was learned" kept for 24 h: {"after": {"tags": [ids]}}
   doc_flow_runs.data          a flow's run (sealed, its undo): {"b": {"tags": [ids]}, "a": {"tags": [ids]}}
   doc_views                   a saved view: its query string (tag= / not_tag= "1,7") and its rules (f tag, v ["1,7"])
-The ids of doc_tags were unique over every workspace, so one map {old: new} serves every row. A sealed value that cannot be
+Each row is rewritten with the map of its own workspace (an old id is unique on the first move; after a rollback an older
+version's table starts at 1 again, review F4). A sealed value that cannot be
 opened any more (another server key, a lost organisation key) is left as it is -- nobody can read it either (an old id in it
 is no tag of its workspace any more: the readers check every id against the workspace, store.py label_ok).
 
@@ -47,27 +49,55 @@ def _open(c, ws, ctx, value):
         return {}
 
 
-def dtg_rekey(c, m):
-    """Rewrites the places that keep a tag id (module docstring) with m {old id: new id}. {place: rows changed}."""
-    n = {"models": 0, "suggest": 0, "prev": 0, "runs": 0, "views": 0}
-    if not m:
+def _view_map(maps, ws, owner):
+    """The map of a saved view: its workspace's ('org:<id>' / 'private'); 'all' searches the owner's own and the organisations'."""
+    if ws == "private":
+        return maps.get(f"u{owner}", {})
+    if str(ws).startswith("org:"):
+        return maps.get("o" + str(ws)[4:], {})
+    out = {}
+    for k, v in maps.items():
+        if k == f"u{owner}" or k.startswith("o"):
+            out.update(v)
+    return out
+
+
+def dtg_rekey(c, maps):
+    """Rewrites the places that keep a tag id (module docstring) with maps {workspace: {old id: new id}} -- each row with the
+    map of its own workspace (review F4: after a rollback an old id may stand for different tags in two workspaces).
+    {place: rows changed}."""
+    n = {"models": 0, "suggest": 0, "prev": 0, "runs": 0, "views": 0, "trained": 0}
+    maps = {k: v for k, v in (maps or {}).items() if v}
+    if not maps:
         return n
-    for r in c.execute("SELECT ws, data FROM doc_models WHERE feature='tags'").fetchall():
+    wss = sorted(maps)
+    for r in c.execute("SELECT ws, data FROM doc_models WHERE feature='tags' AND ws = ANY(CAST(? AS TEXT[]))", (wss,)).fetchall():
+        m = maps[r["ws"]]
         d = _open(c, r["ws"], "doc_models.data", r["data"])
         new = {(str(m[int(k)]) if str(k).isdigit() and int(k) in m else k): v for k, v in d.items()}
         if new != d:
             S.model_put(c, r["ws"], "tags", new)
             n["models"] += 1
-    for r in c.execute("SELECT node_id, ws, suggest FROM doc_meta WHERE suggest<>''").fetchall():
+    # review F3: what a document taught the models (doc_meta.trained, sealed: {"tags": ["<id>"]}) -- the next train takes it out again
+    for r in c.execute("SELECT node_id, ws, trained FROM doc_meta WHERE trained<>'' AND ws = ANY(CAST(? AS TEXT[]))", (wss,)).fetchall():
+        m = maps[r["ws"]]
+        d = _open(c, r["ws"], "doc_meta.trained", r["trained"])
+        if isinstance(d.get("tags"), list) and _ids(d["tags"], m) != d["tags"]:
+            d["tags"] = _ids(d["tags"], m)
+            c.execute("UPDATE doc_meta SET trained=? WHERE node_id=?", (S._jseal(c, r["ws"], "doc_meta.trained", d), r["node_id"]))
+            n["trained"] += 1
+    for r in c.execute("SELECT node_id, ws, suggest FROM doc_meta WHERE suggest<>'' AND ws = ANY(CAST(? AS TEXT[]))", (wss,)).fetchall():
+        m = maps[r["ws"]]
         d = _open(c, r["ws"], "doc_meta.suggest", r["suggest"])
         t = d.get("tags") if isinstance(d, dict) else None
         if isinstance(t, dict) and isinstance(t.get("value"), list) and _ids(t["value"], m) != t["value"]:
             t["value"] = _ids(t["value"], m)
             c.execute("UPDATE doc_meta SET suggest=? WHERE node_id=?", (S._jseal(c, r["ws"], "doc_meta.suggest", d), r["node_id"]))
             n["suggest"] += 1
-    for col, q in (("redo_prev", "SELECT node_id, redo_prev AS v FROM doc_meta WHERE redo_prev LIKE '%tags%'"),
-                   ("learn_prev", "SELECT node_id, learn_prev AS v FROM doc_meta WHERE learn_prev LIKE '%tags%'")):
-        for r in c.execute(q).fetchall():
+    for col, q in (("redo_prev", "SELECT node_id, ws, redo_prev AS v FROM doc_meta WHERE redo_prev LIKE '%tags%' AND ws = ANY(CAST(? AS TEXT[]))"),
+                   ("learn_prev", "SELECT node_id, ws, learn_prev AS v FROM doc_meta WHERE learn_prev LIKE '%tags%' AND ws = ANY(CAST(? AS TEXT[]))")):
+        for r in c.execute(q, (wss,)).fetchall():
+            m = maps[r["ws"]]
             try:
                 d = json.loads(r["v"])
             except ValueError:
@@ -80,7 +110,8 @@ def dtg_rekey(c, m):
                 c.execute("UPDATE doc_meta SET redo_prev=? WHERE node_id=?" if col == "redo_prev" else
                           "UPDATE doc_meta SET learn_prev=? WHERE node_id=?", (json.dumps(d, separators=(",", ":")), r["node_id"]))
                 n["prev"] += 1
-    for r in c.execute("SELECT id, ws, data FROM doc_flow_runs WHERE data<>''").fetchall():
+    for r in c.execute("SELECT id, ws, data FROM doc_flow_runs WHERE data<>'' AND ws = ANY(CAST(? AS TEXT[]))", (wss,)).fetchall():
+        m = maps[r["ws"]]
         d = _open(c, r["ws"], "doc_flow_runs.data", r["data"])
         if not isinstance(d, dict):
             continue
@@ -92,7 +123,10 @@ def dtg_rekey(c, m):
         if hit:
             c.execute("UPDATE doc_flow_runs SET data=? WHERE id=?", (S._jseal(c, r["ws"], "doc_flow_runs.data", d), r["id"]))
             n["runs"] += 1
-    for r in c.execute("SELECT id, query, rules FROM doc_views WHERE query LIKE '%tag%' OR rules LIKE '%tag%'").fetchall():
+    for r in c.execute("SELECT id, ws, owner_id, query, rules FROM doc_views WHERE query LIKE '%tag%' OR rules LIKE '%tag%'").fetchall():
+        m = _view_map(maps, r["ws"], r["owner_id"])
+        if not m:
+            continue
         pairs = parse_qsl(r["query"] or "", keep_blank_values=True)
         new = [(k, _group(v, m) if k in ("tag", "not_tag") else v) for k, v in pairs]
         q = urlencode(new) if new != pairs else (r["query"] or "")
@@ -102,10 +136,11 @@ def dtg_rekey(c, m):
         except ValueError:
             d = None
         if isinstance(d, dict) and isinstance(d.get("conds"), list):
+            hit = False
             for x in d["conds"]:
-                if isinstance(x, dict) and x.get("f") == "tag" and isinstance(x.get("v"), list):
-                    x["v"] = [_group(v, m) for v in x["v"]]
-            rules = json.dumps(d, ensure_ascii=False, separators=(",", ":"))
+                if isinstance(x, dict) and x.get("f") == "tag" and isinstance(x.get("v"), list) and [_group(v, m) for v in x["v"]] != x["v"]:
+                    x["v"], hit = [_group(v, m) for v in x["v"]], True
+            rules = json.dumps(d, ensure_ascii=False, separators=(",", ":")) if hit else rules
         if q != (r["query"] or "") or rules != (r["rules"] or ""):
             c.execute("UPDATE doc_views SET query=?, rules=? WHERE id=?", (q, rules, r["id"]))
             n["views"] += 1
@@ -114,11 +149,12 @@ def dtg_rekey(c, m):
 
 def dtg_move(c):
     """2.1119.0 (#5277): doc_tags / doc_node_tags into the core and the ids of the tags that got a new one rewritten (module
-    docstring). Runs as "system" in the start transaction (core/objhooks.MOVE). The map {old: new}."""
-    remap = otg_move_ws(c)
-    m = {o: x for (_ws, o), x in remap.items()}
-    dtg_rekey(c, m)
-    return m
+    docstring). Runs as "system" in the start transaction (core/objhooks.MOVE). The maps {workspace: {old: new}}."""
+    maps = {}
+    for (ws, o), x in otg_move_ws(c).items():
+        maps.setdefault(ws, {})[o] = x
+    dtg_rekey(c, maps)
+    return maps
 
 
 MOVE.append(dtg_move)  # core/db.py init_db, before the fragments' AFTER (core/objhooks.py)

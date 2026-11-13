@@ -20,7 +20,7 @@ from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from ..docs import store as S
 from ..accounts.orgroles import org_role_key  # 2.1119.0 (#5277): dt_ws_member
-from ..core.objtags import OTG_FS_IN, otg_ws_of, otg_ws_tag_of  # 2.1119.0 (#5277): the tags are the core's
+from ..core.objtags import OTG_FS_IN, otg_ws_name, otg_ws_of  # 2.1119.0 (#5277): the tags are the core's
 from .store import fs_chain, fs_link_target, fs_log_add, fs_visible_sql, need_node
 from .fslock import fsl_need_unlocked  # 2.353.0 F (#2758)
 from .web import _items  # 2.369.5 (#2517): pulled up from functions
@@ -80,13 +80,13 @@ def dt_set(c, n, raw, uid):
     return None
 
 
-def dt_merge(c, have, old, mine):
+def dt_merge(c, have, old, mine, ws=None):
     """2.564.0 (#4701): the stored tag names have with what one client changed (old = the list it saw, mine = its new list;
-    names or ids, compared by name in any case): removed ones go, added ones come, the rest stays as stored."""
+    names or ids, compared by name in any case): removed ones go, added ones come, the rest stays as stored.
+    2.1119.0 (#5277, review F1): an id is read only as a tag of workspace ws (another workspace's id is no name)."""
     def nm(t):
         if isinstance(t, int) and not isinstance(t, bool):
-            r = otg_ws_tag_of(c, t)  # 2.1119.0 (#5277)
-            return r["name"] if r else None
+            return otg_ws_name(c, ws, t) if ws else None
         return t.strip() if isinstance(t, str) and t.strip() else None
     key = lambda x: x.casefold()  # noqa: E731
     old_k = {key(x) for x in map(nm, old) if x}
@@ -194,8 +194,13 @@ def files_node_tags_put(nid):
         return err(tr("Invalid value: {0}", "tags"))
     write_lock(c, f"fs-tags-{nid}")
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if not dt_ws_member(c, dt_ws(n), me()):  # 2.1119.0 (#5277, question 11, review F2): someone a node is shared with names a tag,
+        on = {t["id"] for t in S.node_tags(c, nid)}  # an id only of a tag the node carries (probing ids would read the workspace's names)
+        raw = [t for t in raw if not (isinstance(t, int) and not isinstance(t, bool)) or t in on]
+        if prev and isinstance(prev.get("tags"), list):
+            prev = {**prev, "tags": [t for t in prev["tags"] if not (isinstance(t, int) and not isinstance(t, bool)) or t in on]}
     if prev and isinstance(prev.get("tags"), list):
-        raw = dt_merge(c, [t["name"] for t in S.node_tags(c, nid)], prev["tags"], raw)
+        raw = dt_merge(c, [t["name"] for t in S.node_tags(c, nid)], prev["tags"], raw, dt_ws(n))
     if raw:
         fsl_need_unlocked(c, nid)  # 2.353.0 F (#2758, review N10): tags are plain -- none in a locked folder (taking them off stays possible)
     e = dt_set(c, n, raw, me())

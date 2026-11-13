@@ -10,6 +10,8 @@ the core (obj_tags scope ws, obj_tag_links kind fs_entry; core/objtags.py, docs/
    a tag to a name the workspace has is refused (409, no second row); delete + undo; the filter finds the nodes
  - question 11 (decided 08.11.2026): a person a node is shared with (edit, a guest of the organisation) sees the tags on
    it, not the workspace's other names; a member of the workspace sees them
+ - review: an id of another workspace reads no name (F1), a share recipient cannot probe the workspace's ids (F2), what a
+   document taught the models follows a new id (F3)
  - a node deleted for good takes its links along (trigger kalmido_otg_gone_fs)
  - a person without an organisation tags her own files and filters by them
 freelancer-matrix: files
@@ -105,7 +107,8 @@ Z = Y + 1
 # the places that keep a tag's id, written first (every box() is a start of the app: it would move the old tables at once)
 box(f"""S.model_put(c, {OWS!r}, "tags", {{"{X}": {{"v": 1, "docs": 1, "classes": {{}}}}, "{Y}": {{"v": 1, "docs": 2, "classes": {{}}}}}})
 c.execute("UPDATE doc_meta SET suggest=?, learn_prev=? WHERE node_id=?", (S._jseal(c, {OWS!r}, "doc_meta.suggest", {{"tags": {{"value": [{X}], "by": "learn"}}}}),
-          json.dumps({{"run": "r1", "after": {{"tags": [{X}]}}}}), {D2}))""")
+          json.dumps({{"run": "r1", "after": {{"tags": [{X}]}}}}), {D2}))
+S.meta_set_json(c, {D2}, {OWS!r}, "trained", {{"tags": ["{X}", "{Y}"]}})""")  # review F3: what the document taught the models
 VIEW = dbx("""INSERT INTO doc_views(owner_id, title, query, rules, ws, created_at, updated_at) VALUES(?,?,?,?,?,?,?) RETURNING id""",
            (ALICE, "Steuer", f"tag={X}%2C{Y}&not_tag={Z}&q=rechnung", json.dumps({"op": "and", "conds": [{"f": "tag", "op": "in", "v": [f"{X},{Y}"]}]}),
             f"org:{ORG}", TS, TS))[0][0]
@@ -130,9 +133,10 @@ check(dbx("SELECT org_id FROM obj_tags WHERE id=?", (N,)) == [(ORG,)], "the orga
 out = box(f"""m = S.model_get(c, {OWS!r}, "tags")
 d = S._jopen(c, {OWS!r}, "doc_meta.suggest", c.execute("SELECT suggest FROM doc_meta WHERE node_id=?", ({D2},)).fetchone()[0], {{}})
 lp = json.loads(c.execute("SELECT learn_prev FROM doc_meta WHERE node_id=?", ({D2},)).fetchone()[0])
-print("GOT" + json.dumps([sorted(m), d["tags"]["value"], lp["after"]["tags"]]))""")
-check(f'GOT{json.dumps([sorted([str(N), str(Y)]), [N], [N]])}' in out,
-      f"the tag model, the suggestion and 'apply what was learned' name the new id {out[-300:]} N={N}")
+tr = S.meta_json(c, c.execute("SELECT * FROM doc_meta WHERE node_id=?", ({D2},)).fetchone(), "trained", {{}})
+print("GOT" + json.dumps([sorted(m), d["tags"]["value"], lp["after"]["tags"], tr["tags"]]))""")
+check(f'GOT{json.dumps([sorted([str(N), str(Y)]), [N], [N], [str(N), str(Y)]])}' in out,
+      f"the tag model, the suggestion, 'apply what was learned' and what the document taught name the new id {out[-300:]} N={N}")
 v = dbx("SELECT query, rules FROM doc_views WHERE id=?", (VIEW,))[0]
 check(v[0] == f"tag={N}%2C{Y}&not_tag={N}&q=rechnung" and json.loads(v[1])["conds"][0]["v"] == [f"{N},{Y}"],
       f"the saved view's query and rules name the new id {v}")
@@ -178,6 +182,11 @@ check(A.post(B + f"/api/files/nodes/{G1}/shares", json={"user_id": BOB, "role": 
 check(sorted(t["name"] for t in node_tags(Bo, G1)["all"]) == ["Steuer", "Vertrag", "Von Gina"],
       "bob, a member of the organisation, sees all its workspace's names")
 check(sorted(t["name"] for t in node_tags(A, F3)["all"]) == ["Alt", "Neu2"], "alice sees all names of her own workspace")
+# review F2: gina cannot probe the workspace's names by id -- an id of a tag the node does not carry is dropped, a name works
+r = Gi.put(B + f"/api/files/nodes/{G1}/tags", json={"tags": ["Steuer", "Von Gina", Y]})
+check(r.ok and sorted(t["name"] for t in r.json()["tags"]) == ["Steuer", "Von Gina"], f"gina's id of 'Vertrag' (not on the node) is dropped {r.text[:200]}")
+r = Gi.put(B + f"/api/files/nodes/{G1}/tags", json={"tags": [Y], "_prev": {"tags": []}})
+check(r.ok and "Vertrag" not in [t["name"] for t in r.json()["tags"]], f"... also through _prev / the merge {r.text[:200]}")
 
 # ================================================================== a node deleted for good takes its links along
 check(links(F2), "F2 carries a tag")
@@ -193,5 +202,9 @@ tid = dict(wstags(f"u{CARL}")).get("Privat")
 r = Ca.get(B + "/api/files/tagged", params={"space": "private", "tag": str(tid)})
 check(r.ok and [x["id"] for x in r.json()["items"]] == [CF], f"... and filters by it {r.text[:200]}")
 check(Ca.get(B + "/api/files/tags", params={"space": "private"}).json()["tags"] == [{"name": "Privat", "ids": [tid]}], "the used tags of his space")
+# review F1: an id of another workspace's tag reads no name (the merge with _prev resolved any id before)
+r = Ca.put(B + f"/api/files/nodes/{CF}/tags", json={"tags": ["Privat", NEU], "_prev": {"tags": ["Privat"]}})
+check(r.ok and [t["name"] for t in r.json()["tags"]] == ["Privat"] and "Neu2" not in dict(wstags(f"u{CARL}")),
+      f"alice's tag id on carl's own file: no name of hers comes over {r.text[:200]} {wstags(f'u{CARL}')}")
 
 sys.exit(kt.done("p21119_a_tags_ws"))
