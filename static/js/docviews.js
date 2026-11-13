@@ -100,6 +100,18 @@ async function dcv_load(force) {
   return DCV.loading;
 }
 const dcv_stale = () => { DCV.at = 0; DCV.hits = {}; };
+// 2.1106.0 (#4976): after an undo / redo the server took back by its group (core.js histReloader, #5667) the step's own undo
+// no longer runs: the views are fetched again (sidebar, Today, the bar's name and version - else the next rename sent the old
+// version -> 409 and a view brought back stayed out of the sidebar); the open view's list follows only when its filter came
+// back different (a search typed on top stays otherwise)
+histReloader('docviews', async () => {
+  if (!DCV.items) return;
+  const dv = () => typeof DC !== 'undefined' ? DC.dv : null;  // lazy-ok: docviews.js also loads without docs.js (Today)
+  const id = dv(), was = id ? JSON.stringify(dcv_get(id)?.rules || null) : '';
+  dcv_stale(); await dcv_load(true);
+  const v = id && dv() === id ? dcv_get(id) : null;
+  if (v && JSON.stringify(v.rules || null) !== was) { dcv_apply(v); dc_load(); }
+});
 
 // ---- the sidebar (ablage.js: the group "Saved filters" under Files)
 function dcv_sideHtml() {
@@ -185,10 +197,12 @@ async function dcv_shareAll(v, on) {
   dcv_stale(); await dcv_load(true);
   toast(on ? tr('Everyone of the organisation sees this view now (with their own rights)') : tr('Only you see this view now'));
 }
+// quiet = a part of deleting the view: 2.1106.0 (#4976) no undo step of its own (_auto) - as the newest server group it was what
+// Undo took back right after the delete (undo.js histNext), the deleted view stayed away
 function dcv_todaySet(id, on, quiet) {
   const ids = dcv_todayIds().filter(x => x !== +id);
   if (on) ids.push(+id);
-  favSetting('dv_today', ids.join(','));
+  favSetting('dv_today', ids.join(','), !!quiet);
   if (!quiet) toast(on ? tr('Shown on Today') : tr('No longer shown on Today'));
 }
 function dcv_menuItems(v) {

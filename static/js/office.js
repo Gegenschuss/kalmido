@@ -758,6 +758,7 @@ const ofcPvId = id => id === 'os-scheme' ? 'os-preview' : id + '-pv';  // (the q
 function ofcSchemePv(inp, now) {
   const kind = inp.dataset.scheme, v = inp.value;
   OFC.pv[kind] = {...(OFC.pv[kind] || {}), busy: true};
+  const n = OFC['pvN' + kind] = (OFC['pvN' + kind] || 0) + 1;  // 2.1106.0 (#5608): an older answer arriving late does not overwrite a newer preview
   clearTimeout(OFC['pvT' + kind]);
   OFC['pvT' + kind] = setTimeout(async () => {
     let text;
@@ -765,6 +766,7 @@ function ofcSchemePv(inp, now) {
     try { const j = await api('GET', `/api/office/number-preview?kind=${kind}&scheme=${encodeURIComponent(v)}${cnt}`);
       text = j.valid ? tr('next: {0}', j.preview) + ' · ' + (j.yearly ? tr('starts again every year') : tr('counts on without a restart')) : (j.error || tr('Invalid value: {0}', tr('Number scheme'))); }
     catch { text = ''; }
+    if (n !== OFC['pvN' + kind]) return;  // 2.1106.0 (#5608): a newer call is on its way
     OFC.pv[kind] = {scheme: v, text};
     const el = $('#' + ofcPvId(inp.id)); if (el) { el.textContent = text; const er = !!text && !text.startsWith(tr('next: {0}', '').trim()); el.classList.toggle('err', er); const rs = $('#' + inp.id + '-rs'); if (rs) rs.hidden = !er; }  // 2.114.2 (#2264)
   }, now ? 0 : 250);
