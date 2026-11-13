@@ -74,10 +74,10 @@ check("#5954" in fl.get("back_floor_how", ""), f"new database: the back limit na
 
 # ================================================================== a database of before
 o = new(Bo, "Call sheet draft", ORG, note="first")
-O = o["id"]
-r = Bo.patch(B + f"/api/obj/{K}/{O}", json={"note": "second"}, headers=U)
+O1 = o["id"]
+r = Bo.patch(B + f"/api/obj/{K}/{O1}", json={"note": "second"}, headers=U)
 check(r.ok, f"setup: a change with an undo step {r.status_code} {r.text[:200]}")
-check(len([x for x in hist(Bo, O) if x["action"] == "update"]) == 1, "setup: one history entry of the change")
+check(len([x for x in hist(Bo, O1) if x["action"] == "update"]) == 1, "setup: one history entry of the change")
 canon = "to_char({0} AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"+00:00\"')"
 for (tb, col), ty in COLS.items():
     if ty == "jsonb":
@@ -89,11 +89,11 @@ check(set(types().values()) == {"text"}, f"setup: the columns as before 2.1101 {
 OLD = "2026-10-01T08:00:00+00:00"
 HB = dbx("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, vals_before, vals_after, created_at, updated_at) "
          "VALUES(?, ?, ?, ?, 'update', ?, 'not json', ?, 'last tuesday') RETURNING id",
-         (K, O, ORG, BOB, json.dumps({"note": "Müller's note"}), OLD))[0][0]
+         (K, O1, ORG, BOB, json.dumps({"note": "Müller's note"}), OLD))[0][0]
 UB = dbx("INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, created_at) "
-         "VALUES(?, ?, 'feedfeedfeedfeed', ?, ?, 1, 'done', '{broken', '2026-02-30T10:00:00+00:00') RETURNING id", (ORG, BOB, K, O))[0][0]
+         "VALUES(?, ?, 'feedfeedfeedfeed', ?, ?, 1, 'done', '{broken', '2026-02-30T10:00:00+00:00') RETURNING id", (ORG, BOB, K, O1))[0][0]
 RA = dbx("INSERT INTO obj_revoked(src, org_id, user_id, kind, ref_id, row_json, reason, created_at) "
-         "VALUES('fs_shares', ?, ?, ?, ?, '[1, 2]', 'unshare', '') RETURNING id", (ORG, BOB, K, O))[0][0]
+         "VALUES('fs_shares', ?, ?, ?, ?, '[1, 2]', 'unshare', '') RETURNING id", (ORG, BOB, K, O1))[0][0]
 restart()
 A, Bo = sess("alice"), sess("bob")
 t = types()
