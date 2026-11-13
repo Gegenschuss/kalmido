@@ -126,6 +126,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   await w.eval(`dcv_delete(dcv_get(${VID}))`);
   check(await until(() => !d.querySelector(`#side [data-dcvid="${VID}"]`) && w.location.hash === '#ablage/docs'), 'deleted: gone from the sidebar, back to Documents');
   check((await call('GET', '/api/state')).settings.dv_today === '', 'deleted: off Today too');
+  // 2.1106.0 (#4976): the delete's own "off Today" (a setting) is no step of its own: Undo takes the delete back, not that setting
   await w.eval(`histStep('undo')`);
   check(await until(() => d.querySelector(`#side [data-dcvid="${VID}"]`)), 'undo: the view is back');
   // an organisation's view: the admin may share it, a member's own view has no such entry

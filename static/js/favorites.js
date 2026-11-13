@@ -34,10 +34,11 @@ function favSet(id, on) {
   FAV_Q = p;
   return p;
 }
-async function favSetting(key, val) {
+// 2.1106.0 (#4976): auto = a save the app makes by itself as a part of another step (no undo step, accounts/settings.py _auto)
+async function favSetting(key, val, auto = false) {
   S.settings[key] = val;
   render();
-  try { await api('PATCH', '/api/settings', {[key]: val}); } catch { try { await load(); } catch { /* offline */ } render(); }
+  try { await api('PATCH', '/api/settings', {[key]: val, ...(auto ? {_auto: 1} : {})}); } catch { try { await load(); } catch { /* offline */ } render(); }
 }
 // the list menu entry (dialogs.js listMenuItems): the header's "…" and the sidebar's context menu (long press on a phone)
 const favMenuItem = l => l && !l.is_inbox && !l.archived ? (favIs(l.id) ? {label: tr('Remove from favourites'), icon: 'star', fn: () => favSet(l.id, false)}
