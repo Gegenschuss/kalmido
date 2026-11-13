@@ -31,7 +31,17 @@ MDE_SECTION_MAX = 100000  # the new text of one section
 MDE_HEAD_MAX = 300
 MDE_HEADS_SHOWN = 100  # headings named in the error answer
 MDE_LINE_MAX = 1000  # review F1: a longer line is never a heading (the lazy heading pattern backtracks quadratically)
-MDE_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$")  # "# C#" is "C#"; closing hashes go
+MDE_HEAD_RX = re.compile(r"^\s{0,3}(#{1,6})(?:[ \t]+(.*))?$")  # Fable review 2.1111.0: linear; closing hashes go in _htext
+
+
+def _htext(m):
+    """The text of a heading match: "# C#" is "C#", "## Plan ##" is "Plan" (closing hashes only after a blank, cut in Python: a
+    pattern for them backtracked quadratically on a long run of blanks)."""
+    t = (m.group(2) or "").strip()
+    s = t.rstrip("#")
+    if s != t and (not s or s[-1] in " \t"):
+        t = s.strip()
+    return t
 MDE_FENCE_RX = re.compile(r"^\s{0,3}(`{3,}|~{3,})")
 
 
@@ -61,7 +71,7 @@ def md_headings(lines):
             continue
         m = None if fence or len(x) > MDE_LINE_MAX else MDE_HEAD_RX.match(x)
         if m:
-            out.append((i, len(m.group(1)), (m.group(2) or "").strip()))
+            out.append((i, len(m.group(1)), _htext(m)))
     return out
 
 
@@ -73,7 +83,7 @@ def md_heading_names(cur):
 def _want(name):
     """A heading as the caller names it -> the compared form ("## Plan" and "plan" name the same heading)."""
     m = MDE_HEAD_RX.match(name.strip())
-    return ((m.group(2) or "") if m else name).strip().casefold()
+    return (_htext(m) if m else name).strip().casefold()
 
 
 def _hits(hs, name):

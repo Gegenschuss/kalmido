@@ -362,7 +362,7 @@ def overview_patch(lid):
             raise BadInput(tr("The description is too long (at most {0} characters)", OV_DESC_MAX))
         from ..collab.liste2e import le2a_locked_text
         le2a_locked_text(c, lid, d)  # 2.538.0 (#4372): not encrypted -- none in a project with the lock (emptying it stays possible)
-        r0 = c.execute("SELECT description, description_at FROM lists WHERE id=?", (lid,)).fetchone()
+        r0 = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR NO KEY UPDATE", (lid,)).fetchone()  # 2.1111.0 (#5830, Fable review F2): check and save under the row lock
         exp = b.get("expect_updated_at")
         if exp is not None and (exp or None) != (r0["description_at"] or None) and d != (r0["description"] or ""):  # 2.270.0 A (#3019)
             last = c.execute("SELECT user_id FROM list_activity WHERE list_id=? AND kind='desc' ORDER BY id DESC LIMIT 1", (lid,)).fetchone()

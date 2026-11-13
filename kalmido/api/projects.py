@@ -78,7 +78,7 @@ def _v1_ov_edit(lid, mode):
     exp = md_version(b, mode == "replace", empty_ok=True)  # "" = read a description never saved (no stamp); review F3
     c = db()
     need_overview(c, lid, write=True)
-    r = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR UPDATE", (lid,)).fetchone()
+    r = c.execute("SELECT description, description_at FROM lists WHERE id=? FOR NO KEY UPDATE", (lid,)).fetchone()
     if exp is not None and ts_canon(exp) != ts_canon(r["description_at"]):  # one moment, "" = never saved (2.1095.0 #5306)
         return v1_err(409, tr("Changed in the meantime"), current=v1_call(overview_get, lid))
     cur = r["description"] or ""

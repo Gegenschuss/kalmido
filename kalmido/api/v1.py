@@ -1438,6 +1438,7 @@ def v1_task_update(tid):
     if not isinstance(sc, bool):
         raise BadInput(tr("Invalid value: {0}", "shift_chain"))
     v1_task_need_version(raw)  # 2.564.0 (#4702): agents send the version they read with a content change
+    write_lock(c, f"task-{tid}")  # 2.1111.0 (#5830, Fable review F2): the version check and the save in one locked section (re-entrant)
     stale = v1_expect(c, tid, raw)
     if stale:
         return stale

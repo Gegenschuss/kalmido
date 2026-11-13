@@ -18,13 +18,15 @@ Invented names only.
  - freelancer-matrix: tasks, lists, wiki (a person without an organisation: her own agent and her own token change her
    task's notes, her project's description and her page)
 usage: p21111_c_mdedit_test.py <datadir>"""
+import json
 import os
+import subprocess
 import sys
 
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, check, dbx, done, fresh, setup
+from kt import B, CT, check, dbx, done, fresh, setup
 
 V = B + "/api/v1"
 os.environ["KALMIDO_AGENT_CONTROL_NEW"] = "approve_all"  # the real default; the agent is set to free below, then back for the cards
@@ -243,5 +245,20 @@ M4 = card_of(api("POST", f"/wiki/pages/{PID}/replace-section", json={"heading": 
 d = F.get(B + "/api/approvals/diff", params={"chat": M4}).json().get("diff") or {}
 check(d.get("kind") == "wiki" and d.get("section") is True and d.get("added") == 1 and d.get("removed") == 0, f"the card of a page section {d}")
 check("- a new risk" not in notes(T), "nothing ran before the Yes")
+
+# 2.1111.0 (#5830, Fable review F1): the heading pattern is linear - a long line of blanks after "# x" cost ~17 ms each with the
+# lazy pattern (400 such lines ~7 s under the area's write lock); the closing hashes still go ("## Plan ##" is "Plan", "# C#" stays)
+PROBE = """import json, time
+from kalmido.core.mdedit import md_headings
+ls = ["# x" + " " * 996 + "y"] * 400 + ["## Plan ##", "# C#", "### ###", "# a #b"]
+t = time.monotonic(); hs = md_headings(ls); dt = time.monotonic() - t
+print(json.dumps({"dt": dt, "heads": [h[2] for h in hs][-4:]}))"""
+pr = subprocess.run(["docker", "exec", "-i", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", PROBE], capture_output=True, text=True)
+try:
+    pj = json.loads(pr.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    pj = {}
+check(pj.get("heads") == ["Plan", "C#", "", "a #b"], f"closing hashes cut, the rest kept {pj} {pr.stderr[-300:]}")
+check(isinstance(pj.get("dt"), float) and pj["dt"] < 1.0, f"400 long heading-like lines read in well under a second {pj}")
 
 sys.exit(done("p21111_c_mdedit"))
