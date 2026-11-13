@@ -351,15 +351,15 @@ def _ctj_run(c, at):
             if bad:
                 print(f"migrations: 5953: {k}: {len(bad)} value(s) are no JSON and become {dflt} (ids "
                       f"{', '.join(map(str, bad[:CT_SHOW]))}{', ...' if len(bad) > CT_SHOW else ''})", file=sys.stderr, flush=True)
-            q, t = qi(col, CTJ_NAMES), qi(table, CTJ_NAMES)
-            sql = (f"ALTER TABLE {t} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN {q} IS NULL "
+            q = qi(col, CTJ_NAMES)
+            sql = (f"ALTER TABLE {qi(table, CTJ_NAMES)} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN {q} IS NULL "
                    f"THEN NULL WHEN pg_input_is_valid({q}, 'jsonb') THEN {q}::jsonb ELSE '{dflt}'::jsonb END), "
                    f"ALTER COLUMN {q} SET DEFAULT '{dflt}'::jsonb")
             try:
                 with c.savepoint():
                     trg = ctj_triggers(c, table, col)
                     for name, _ in trg:
-                        c.execute(f'DROP TRIGGER "{name}" ON {t}')
+                        c.execute(f"DROP TRIGGER {qi(name, {name})} ON {qi(table, CTJ_NAMES)}")
                     c.execute(sql)
                     for _, ddl in trg:
                         c.execute(ddl)

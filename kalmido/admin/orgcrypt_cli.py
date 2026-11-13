@@ -1348,7 +1348,7 @@ def rot_fields(c, oid, k1, k2, stop=None):
             with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
                 write_lock(c, "orgcrypt")
                 w, k = osig_scope(table, ocol)
-                sql = f"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w} AND CAST({col} AS text) LIKE ?"  # pg-ok: the prefix is case-exact; 2.1111.0 (#5953): JSONB too
+                sql = f"SELECT {idc} AS rid, {col} AS v FROM {qi(table, {table})} WHERE {w} AND CAST({qi(col, {col})} AS text) LIKE ?"  # pg-ok: the prefix is case-exact; 2.1111.0 (#5953): JSONB too
                 args = [ws if kind == "ws" else oid] * k + ["%" + oc.PREFIX + "%"]
                 if last is not None:
                     sql += f" AND {idc} > ?"
