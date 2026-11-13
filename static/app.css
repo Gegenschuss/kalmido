@@ -6146,6 +6146,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .hpadd input{width:100%;min-height:2.5rem;padding:.5rem .75rem;background:var(--bg)}
 .hpadd input:focus{border-color:var(--accent)}
 body.fab-on #view .hpadd{padding-right:var(--fab-safe)}  /* 2.1111.0 (#5963): the + button does not cover the field of Today; also: dtome heading flush top, Show all on its baseline */
+.dtome h3{align-items:center}
+.dtome h3 .linkbtn{margin:-.75rem 0}  /* 2.1111.0 (#5963): the tap area (2.75rem) does not stretch the heading: the first line sits right below it */
 .dash .cevrow .cevt{font-family:inherit}  /* 2.1111.0 (#5963): all day in the normal font, not monospace */
 .dash .dtl li,.hpnl li{border-top:1px solid var(--line)}
 .dash .dtl li:first-child,.hpnl li:first-child{border-top:0}

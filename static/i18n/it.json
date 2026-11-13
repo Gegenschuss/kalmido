@@ -18543,6 +18543,5 @@
   "One-way step.": "Passo senza ritorno.",
   "The files differ from the card (names or content): the card approves exactly the files of the refused upload. Send exactly these files, or ask with a new card.": "I file differiscono dalla scheda (nomi o contenuto): la scheda approva esattamente i file del caricamento rifiutato. Invia esattamente questi file oppure chiedi con una nuova scheda.",
   "The card approves an upload: send the upload again with the same files and the header X-Kalmido-Approval: ID of the card (MCP: use_approval) - the run from the card cannot send files.": "La scheda approva un caricamento: invia di nuovo il caricamento con gli stessi file e l'intestazione X-Kalmido-Approval: ID della scheda (MCP: use_approval) - l'esecuzione dalla scheda non può inviare file.",
-  "Check the connection in the settings, or remove it.": "Controlla la connessione nelle impostazioni oppure rimuovila.",
-  "Nothing else waits for you": "Nient’altro è in attesa di te"
+  "Check the connection in the settings, or remove it.": "Controlla la connessione nelle impostazioni oppure rimuovila."
 }

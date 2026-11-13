@@ -64,13 +64,18 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
     await sleep(900);
     const M = `(() => { const q = s => document.querySelector(s), top = e => e ? Math.round(e.getBoundingClientRect().top) : null;
       const li = q('.dc-today .dtl li'), qd = q('figure.qd.dashq .qdo');
-      return {bottom: li ? Math.round(li.getBoundingClientRect().bottom) : null, vh: window.innerHeight, sw: document.documentElement.scrollWidth,
+      return {gap: (() => { const h = q('.dtome h3 > span:not(.spacer)'), f = q('.dtome .dwl li'); return h && f ? Math.round(f.getBoundingClientRect().top - h.getBoundingClientRect().bottom) : null; })(),
+        waits: [...document.querySelectorAll('#view *')].filter(e => !e.children.length && /^(Waiting for you|Nothing else waits for you)/.test(e.textContent.trim())).length,
+        bottom: li ? Math.round(li.getBoundingClientRect().bottom) : null, vh: window.innerHeight, sw: document.documentElement.scrollWidth,
         qh: qd ? Math.round(qd.getBoundingClientRect().height) : null, lh: qd ? parseFloat(getComputedStyle(qd).lineHeight) || 24 : null,
         on: (q('#tabs button.on') || {}).textContent, title: (q('#top h1 .ht') || {}).textContent, ht: top(q('.dtome h3')), box: top(q('.dtome')),
         mono: li ? getComputedStyle(q('.dc-today .dt') || li).fontFamily : ''}; })()`;
     const m = await ev(M);
     check(m.bottom !== null && m.bottom <= m.vh, '#5963: the first task of Today is in the first screen without scrolling ' + JSON.stringify(m));
     check(m.qh === null || m.qh <= m.lh * 1.5, '#5963: the quote is one line ' + m.qh + ' / ' + m.lh);
+    // 2.1111.0 A2 (#5963): "Waiting for you" stands once (no empty slim cards below the box); the first line right under the heading
+    check(m.waits === 1, '#5963: exactly one element "Waiting for you" / "Nothing else waits": ' + m.waits);
+    check(m.gap !== null && m.gap < 16, '#5963: heading to first line under 16 px: ' + m.gap);
     check(m.sw <= 412, '#5963: nothing sideways ' + m.sw);
     check(m.on && m.on.trim() === (m.title || '').trim(), `#5963: active tab and title: "${m.on}" / "${m.title}"`);
     // nothing moves after loading: the first task stays where it is

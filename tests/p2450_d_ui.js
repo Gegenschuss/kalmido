@@ -99,7 +99,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   check(d.querySelector('.dc-projects .dpb[role="img"]') && pl.some(x => /Spring shoot.*50 %/.test(x)), '#1504: with their progress');
   // slim cards
   // 2.1037.0 (#5807): bob's comments mention alice now (the News card shows only what waits), so "Waiting for you" is not empty here
-  check(d.querySelector('.dc-pinned.dempty') && txt(d, '.dc-pinned') === 'Pinned: nothing' && d.querySelector('.dc-wait:not(.dempty) .dwl'), '#1504: empty cards are one slim line');
+  check(d.querySelector('.dc-pinned.dempty') && txt(d, '.dc-pinned') === 'Pinned: nothing' && d.querySelector('.dtome .dwl') && !d.querySelector('.dc-wait'), '#1504: empty cards are one slim line');  // 2.1111.0 (#5963): the box holds the mentions, no second "Waiting for you" card
   check([...d.querySelectorAll('.dcard')].every(c => c.getAttribute('aria-labelledby') && c.querySelector('h3')), '#1504: every card still a named section');
   // agents
   const jobs = [...d.querySelectorAll('.dc-agents .djob')];
@@ -111,7 +111,7 @@ const txt = (d, s) => (d.querySelector(s)?.textContent || '').replace(/\s+/g, ' 
   w = await boot({user: 'alice', hash: 'home'}); d = w.document;
   await until(() => d.querySelector('.dc-news .hpnl'));
   const own = [...d.querySelectorAll('.dgrid .lyb[data-lyk]')].map(b => b.dataset.lyk);
-  check(own[0] === 'wait' && own.includes('search') && !own.includes('stats') && !d.querySelector('.hpcols'), '#1504: the own arrangement stays (order, Search shown, Statistics hidden) ' + own.join());
+  check(own[0] === 'today' && own.includes('search') && !own.includes('stats') && !d.querySelector('.hpcols'), '#1504: the own arrangement stays (2.1111.0 #5963: the empty Waiting card is not drawn under the box; order, Search shown, Statistics hidden) ' + own.join());
   check(d.querySelector('.dc-news .hpnl') && d.querySelector('.dc-pinned.dempty') && d.querySelector('#hp-add'), '#1504: ... with the compact cards');
   w.close();
   await call('PATCH', '/api/settings', {dashboard: ''});
