@@ -14,6 +14,7 @@
    approval_expired; "recommend" never on a one-way step
  - an agent from before 2.235.0 (control '') works as before (no gate) until its owner picks a level
  - the same as a team agent of an instance admin; another person gets 404 (freelancer-matrix: agents)
+ - 2.1117.0 (#6024): an object of the shared core takes its own project's level (a list_id in the body does not count)
 usage: p2235_a_control_api_test.py <datadir>      (KMT_NOSTART=1 / P2235A_NOSTART=1: a running server)"""
 import os
 import re
@@ -299,4 +300,18 @@ A.patch(B + f"/api/lists/{TL}", json={"agent_members": True})
 check(F.get(B + f"/api/agents/{TA}/control").status_code == 404, "a person without admin rights: 404 on a team agent")
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 run("team", A, ALICE, TA, TAH, TL)
+
+# 2.1117.0 (#6024): an object of the shared core (/agent/objects/{kind}/{id}: PATCH, its links) takes the level of ITS project,
+# not the agent's global one; a list_id in the body (that route does not read it) never names a laxer project
+TL2 = A.post(B + "/api/lists", json={"name": "Team lax"}).json()["id"]
+check(A.put(B + f"/api/lists/{TL2}/members", json={"user_id": TA, "role": "edit"}).ok, "a second list for the team agent")
+ctl(A, TA, {"level": "free", "projects": {str(TL): "approve_all", str(TL2): "free"}})
+for body in ({"name": "Renamed"}, {"name": "Renamed", "list_id": TL2}):
+    r = requests.patch(V + f"/agent/objects/list/{TL}", headers=TAH, json=body)
+    check(r.status_code == 409 and code(r) == "approval_required" and r.json()["error"]["level"] == "approve_all"
+          and r.json()["error"].get("project_id") == TL,
+          f"team agent free, project approve_all: a core object of it needs a card ({body}) {r.status_code} {r.text[:200]}")
+ctl(A, TA, {"projects": {str(TL): None}})
+r = requests.patch(V + f"/agent/objects/list/{TL}", headers=TAH, json={"name": "Renamed"})
+check(code(r) != "approval_required", f"the exception removed: the gate lets it through (the route answers itself) {r.status_code}")
 sys.exit(done("p2235_a_control_api"))
