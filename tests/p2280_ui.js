@@ -155,6 +155,9 @@ const V = B + 'api/v1';
   click(w, tabs.querySelector('[data-tab="me"]')); await until(() => d.querySelector('.ntabs [data-tab="me"].on') && vgs().length && vgs().every(x => x.classList.contains('needs')));
   let items = vgs();
   check(items.length === 3 && items.every(x => x.classList.contains('needs')) && items.some(x => /mention/.test(sumOf(x))) && items.some(x => /assigned to you/.test(sumOf(x))) && items.some(x => x.querySelector('.ngav .avatar.agent')), '#987: "For you" = the mention, the assignment (+ the agent\'s question, #5805) ' + items.map(sumOf).join('|'));
+  // 2.1088.0 (#5873): the agent's question bundle says what it wants, not only the time
+  const agq = items.find(x => x.querySelector('.ngav .avatar.agent'));
+  check(agq && /waits for your answer · /.test(sumOf(agq)), '#5873: the agent\'s question bundle has a summary line: ' + (agq ? sumOf(agq) : '-'));
   click(w, d.querySelector('.ntabs [data-tab="act"]')); await until(() => d.querySelector('.ntabs [data-tab="act"].on') && vgs().length && !vgs().some(x => x.classList.contains('needs')));
   items = vgs();
   check(items.length >= 1 && items.every(x => !x.classList.contains('needs')) && !d.querySelector('#view .nsect') && items.some(x => /completed/.test(sumOf(x)) && /Renew the domain/.test(x.querySelector('.ngt')?.textContent || '')), '#987: "Activity" = Bob\'s completion (2.66.1 #1943: no longer the agent\'s comments; #5792: nor its completion) ' + items.map(sumOf).join('|'));
