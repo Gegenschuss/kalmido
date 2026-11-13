@@ -433,7 +433,8 @@ def apb_expire(c, uid):
               (uid, iso(now - timedelta(minutes=APB_HOLD_MIN))))
     c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='expired' AND created_at<?", (uid, iso(now - timedelta(days=APB_PURGE_DAYS))))
     # 2.148.1 C (#2493): cancelled bookings that were never confirmed (address, contact data) go after APB_CANCEL_DAYS
-    c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='cancelled' AND COALESCE(confirmed_at, '')='' AND COALESCE(cancelled_at, '')<>'' "
+    # 2.1115.0 (#5951): confirmed_at / cancelled_at are TIMESTAMPTZ, "none" is NULL
+    c.execute("DELETE FROM appt_bookings WHERE user_id=? AND status='cancelled' AND confirmed_at IS NULL AND cancelled_at IS NOT NULL "
               "AND cancelled_at<?", (uid, iso(now - timedelta(days=APB_CANCEL_DAYS))))
 
 

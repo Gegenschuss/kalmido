@@ -54,7 +54,8 @@ def redo(s, nid):
     # done_at has whole seconds: two runs within one second would look alike, so a mark the run must replace
     dbw("UPDATE doc_meta SET done_at='2000-01-01T00:00:00Z' WHERE node_id=?", (nid,))
     assert s.post(B + f"/api/docs/{nid}/redo").ok
-    check(until(lambda: get(s, nid)["state"] == "done" and done_at(nid) != "2000-01-01T00:00:00Z", 90), f"recognised again {nid}")
+    # 2.1115.0 (#5951): done_at is TIMESTAMPTZ, the mark reads back as +00:00 (not Z): its day tells it apart
+    check(until(lambda: get(s, nid)["state"] == "done" and not str(done_at(nid) or "").startswith("2000-01-01"), 90), f"recognised again {nid}")
     return get(s, nid)
 
 

@@ -194,7 +194,7 @@ check(s.post(B + "/api/auth/delete-cancel", json={"token": cancel_token(m[0])}).
 # ---------------------------------------------------------------- the reminder, the cancelling by the password
 r = Fr.post(B + "/api/account/delete", json={"password": PW, "lists": CHOICE})
 check(r.ok, "asked again")
-write("UPDATE users SET delete_at=to_char((now() AT TIME ZONE 'UTC') + interval '12 hours', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"') WHERE id=?", (FID,))
+write("UPDATE users SET delete_at=now() + interval '12 hours' WHERE id=?", (FID,))  # 2.1115.0 (#5951): delete_at TIMESTAMPTZ
 m2 = mail_to("frida@example.com", "deleted tomorrow")
 check(bool(m2) and cancel_token(m2[0]) and cancel_token(m2[0]) != cancel_token(m[0]), "the reminder one day before carries a new cancel link")
 check(bool(until(lambda: json.loads(dbx("SELECT delete_plan FROM users WHERE id=?", (FID,))[0][0] or "{}").get("reminded"), 10)), "the reminder is noted once")

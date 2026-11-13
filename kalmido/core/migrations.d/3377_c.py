@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS git_issue_gone (
 """
 MIGRATIONS = [
     ("git_conns", "issue_since", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_since TEXT NOT NULL DEFAULT ''"),
-    ("git_conns", "issue_on_at", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_on_at TEXT NOT NULL DEFAULT ''"),
+    ("git_conns", "issue_on_at", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_on_at TIMESTAMPTZ"),
     ("git_conns", "issue_rw", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_rw BIGINT NOT NULL DEFAULT -1"),
     ("git_conns", "issue_error", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_error TEXT NOT NULL DEFAULT ''"),
-    ("git_conns", "issue_synced_at", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_synced_at TEXT NOT NULL DEFAULT ''"),
+    ("git_conns", "issue_synced_at", "ALTER TABLE git_conns ADD COLUMN IF NOT EXISTS issue_synced_at TIMESTAMPTZ"),
     ("git_issue_links", "snap", "ALTER TABLE git_issue_links ADD COLUMN IF NOT EXISTS snap TEXT NOT NULL DEFAULT ''"),
     ("git_issue_links", "dirty", "ALTER TABLE git_issue_links ADD COLUMN IF NOT EXISTS dirty TEXT NOT NULL DEFAULT ''"),
     ("git_issue_links", "push_due", "ALTER TABLE git_issue_links ADD COLUMN IF NOT EXISTS push_due DOUBLE PRECISION NOT NULL DEFAULT 0"),

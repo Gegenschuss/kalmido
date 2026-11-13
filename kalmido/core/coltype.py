@@ -19,10 +19,16 @@ microseconds only when there are any), the same form now_iso wrote into the TEXT
 both types (docs/dev/kern.md): never `= ''` / `COALESCE(x, '')` / `substr(x, ...)` on it - `x IS NULL`, `CAST(x AS text)`,
 `ct_day(x)` for the day.
 
+2.1115.0 (#5951): the other old time columns follow area by area, listed in core/coltime.py (CT_MORE: TIMESTAMPTZ or DATE,
+'' becomes NULL); _ct_more turns them in the same start step.
+
 One way (the leader's --einbahn): the type does not change back. A version before reads the same text (the loader), but its
 few `= ''` comparisons on these columns would fail; a backup restores the old state."""
+import re  # 2.1115.0 (#5951): ct_more_empty_indexes
 import sys
 
+from .coltime import CT_CLOSED  # 2.1115.0 (#5951, part D2): sign-in / access marks that fail closed
+from .coltime import CT_MORE  # 2.1115.0 (#5951): the other old time columns, {(table, column): "ts" | "date"}
 from .kernretire import kern_retire_floor
 from .pg import qi, system_ctx
 
@@ -98,6 +104,8 @@ CT_TIME = {  # column -> the tables that still had it as TEXT (the lines of tool
 }
 CT_TABLES = {t for ts in CT_TIME.values() for t in ts}  # the allowlists of qi() (#5296)
 CT_NAMES = set(CT_TIME)
+CT_MORE_TABLES = {t for t, _ in CT_MORE}  # 2.1115.0 (#5951): the allowlists of qi() for CT_MORE
+CT_MORE_NAMES = {k for _, k in CT_MORE} | {"created_at"}
 CT_SHOW = 5  # ids named in the log per column
 CT_ID = "type:{0}.{1}"  # its row in kalmido_migrations
 # a point in time as ISO text: a day, optionally the time (T or a space), optionally a zone; pg_input_is_valid checks the rest
@@ -204,14 +212,147 @@ def _ct_run(c, at):
     # review 2.1095 (F9): the import marks of contacts / events are copies of updated_at as text; a millisecond value reads as
     # microseconds now (ts_canon), so the copy takes the same form, else every contact / event counts as changed here
     for table in ("contacts", "events"):
-        if out.get(f"{table}.updated_at") == "done":
+        imp = c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
+                        "AND column_name='imp_at'", (table,)).fetchone()  # 2.1115.0 (#5951): a newer start made it TIMESTAMPTZ
+        if out.get(f"{table}.updated_at") == "done" and imp and imp[0] == "text":
             with c.savepoint():
                 c.execute(f"UPDATE {qi(table, CT_TABLES)} SET imp_at={ct_iso('imp_at')} WHERE imp_at ~ '\\.[0-9]' "
                           "AND pg_input_is_valid(imp_at, 'timestamptz')")
+    # 2.1115.0 (#5951): after F9 - contacts.imp_at / events.imp_at are CT_MORE columns, F9 still writes them as text
+    out.update(_ct_more(c, at))
     n = sum(1 for v in out.values() if v == "done")
     if n:
         print(f"migrations: 5306: {n} time column(s) are TIMESTAMPTZ now", flush=True)
     return out
+
+
+DAY = r"^\d{4}-\d\d-\d\d"
+
+
+def _valid_day(q):
+    """SQL: the text column q starts with a day Postgres takes (a DATE column may have held a whole point in time)."""
+    return f"(btrim({q}) ~ '{DAY}' AND pg_input_is_valid(substr(btrim({q}), 1, 10), 'date'))"
+
+
+def ct_more_types(c):
+    """{(table, column): (data_type, nullable, default)} of the CT_MORE columns that exist (2.1115.0, #5951)."""
+    out = {}
+    names = sorted({k for _, k in CT_MORE})
+    if not names:
+        return out
+    for t, col, typ, nul, dflt in c.execute(
+            "SELECT table_name, column_name, data_type, is_nullable, column_default FROM information_schema.columns "
+            "WHERE table_schema=current_schema() AND column_name = ANY(?)", (names,)).fetchall():
+        if (t, col) in CT_MORE:
+            out[(t, col)] = (typ, nul == "YES", dflt)
+    return out
+
+
+def ct_more_misfits(c, table, col, kind):
+    """[ids] (or [ctid text]) of the rows whose col is neither '' / NULL nor a value of its kind (for the log)."""
+    q = qi(col, CT_MORE_NAMES)
+    has_id = c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
+                       "AND column_name='id'", (table,)).fetchone()
+    key = "id" if has_id else "ctid::text"
+    ok = _valid_day(q) if kind == "date" else _valid(q)
+    sql = f"SELECT {key} FROM {qi(table, CT_MORE_TABLES)} WHERE {q} IS NOT NULL AND btrim({q}) <> '' AND NOT {ok} ORDER BY 1"
+    return [r[0] for r in c.execute(sql).fetchall()]
+
+
+def ct_more_empty_indexes(c, table, col):
+    """2.1115.0 (#5951): [(index name, its definition for the new type)] of the partial indexes of table whose condition
+    compares col with '' (`col <> ''` -> `col IS NOT NULL`, `col = ''` -> `col IS NULL`); Postgres rebuilds an index on
+    ALTER ... TYPE from its stored definition, and `timestamptz <> ''::text` has no operator, so _ct_more drops them and
+    creates them anew with the new condition."""
+    out = []
+    for name, d in c.execute("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=current_schema() AND tablename=?",
+                             (table,)).fetchall():
+        if " WHERE " not in d or "''" not in d.split(" WHERE ", 1)[1]:
+            continue
+        head, cond = d.split(" WHERE ", 1)
+        new = re.sub(rf"\(?\b{re.escape(col)}\s*<>\s*''(?:::text)?\)?", f"({col} IS NOT NULL)", cond)
+        new = re.sub(rf"\(?\b{re.escape(col)}\s*=\s*''(?:::text)?\)?", f"({col} IS NULL)", new)
+        if new != cond:
+            out.append((name, f"{head} WHERE {new}"))
+    return out
+
+
+def _ct_more(c, at):
+    """2.1115.0 (#5951): the CT_MORE columns that are still TEXT -> TIMESTAMPTZ / DATE (core/coltime.py says how '' and the
+    misfits turn) -> {"table.col": "done" | "kept" | "present" | "missing"}. Runs inside ct_migrate's system context."""
+    out = {}
+    types = ct_more_types(c)
+    has_created = {t for t, col, typ in c.execute(
+        "SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() "
+        "AND column_name='created_at'").fetchall() if typ == "timestamp with time zone"}
+    for (table, col), kind in sorted(CT_MORE.items()):
+        k = f"{table}.{col}"
+        typ, nullable, dflt = types.get((table, col), (None, True, None))
+        if typ != "text":
+            out[k] = "present" if typ else "missing"
+            continue
+        bad = ct_more_misfits(c, table, col, kind)
+        if bad:
+            # 2.1115.0 (#5951): review - a set value stays set, it takes the row's created_at (else the start's time)
+            print(f"migrations: 5951: {k}: {len(bad)} value(s) are no {'day' if kind == 'date' else 'point in time'} and take "
+                  f"the row's created_at (else the start's time) (ids {', '.join(map(str, bad[:CT_SHOW]))}"
+                  f"{', ...' if len(bad) > CT_SHOW else ''})", file=sys.stderr, flush=True)
+        q = qi(col, CT_MORE_NAMES)
+        empty_default = dflt is not None and dflt.split("::")[0].strip() == "''"
+        to_null = nullable or empty_default  # '' meant "never" / "none"
+        if kind == "date":
+            target, ok, val = "DATE", _valid_day(q), f"substr(btrim({q}), 1, 10)::date"
+            fill = f"'{at[:10]}'::date"
+        else:
+            target, ok, val = "TIMESTAMPTZ", _valid(q), _as_ts(q)
+            fill = (f"COALESCE({qi('created_at', CT_MORE_NAMES)}, '{at}'::timestamptz)" if table in has_created
+                    else f"'{at}'::timestamptz")
+        if kind == "date" and table in has_created:  # 2.1115.0 (#5951): review - also the misfits of a nullable day column
+            fill = f"COALESCE(CAST({qi('created_at', CT_MORE_NAMES)} AT TIME ZONE 'UTC' AS date), '{at[:10]}'::date)"
+        closed = CT_CLOSED.get((table, col))  # 2.1115.0 (#5951, part D2): '' / a misfit never reopens a used or revoked row
+        empty = "NULL" if to_null and closed != "all" else fill
+        # 2.1115.0 (#5951): review (M3 / F2) - a set value stays set: a text that is no time never becomes NULL (a locked
+        # invoice, a billed receipt, a revoked link would open again), in every column it takes the fill
+        misfit = fill
+        sql = f"ALTER TABLE {qi(table, CT_MORE_TABLES)} ALTER COLUMN {q} DROP DEFAULT"
+        if to_null and not nullable:
+            sql += f", ALTER COLUMN {q} DROP NOT NULL"
+        sql += f", ALTER COLUMN {q} TYPE {target} USING (CASE WHEN {q} IS NULL THEN NULL WHEN {ok} THEN {val} WHEN btrim({q}) = '' THEN {empty} ELSE {misfit} END)"
+        try:
+            with c.savepoint():
+                idx = ct_more_empty_indexes(c, table, col)  # review 2.1115 (B): a partial index "WHERE x <> ''" fails the TYPE
+                for name, _d in idx:
+                    c.execute(f"DROP INDEX {qi(name, {name})}")
+                c.execute(sql)
+                for _n, d in idx:
+                    c.execute(d)
+        except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
+            out[k] = "kept"
+            print(f"migrations: 5951: {k} stays TEXT: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
+            _ct_more_kept(c, table, col, dflt is not None, to_null and not nullable, to_null and closed != "all")
+            continue
+        c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'applied') ON CONFLICT(id) DO UPDATE SET "
+                  "applied_at=excluded.applied_at, note=excluded.note", (CT_ID.format(table, col), at))
+        out[k] = "done"
+    return out
+
+
+def _ct_more_kept(c, table, col, drop_default, drop_not_null, empty_null):
+    """2.1115.0 (#5951): review (M4) - a CT_MORE column whose ALTER failed stays TEXT, but the code already writes None and
+    asks IS NULL: in its own savepoint the DEFAULT goes, a column that knows "none" (nullable or DEFAULT '') loses NOT NULL
+    and its '' becomes NULL (not for a CT_CLOSED "all" mark: '' there was "used / ended"). A failure here leaves it as it was."""
+    q = qi(col, CT_MORE_NAMES)
+    parts = [f"ALTER COLUMN {q} DROP DEFAULT"] if drop_default else []
+    parts += [f"ALTER COLUMN {q} DROP NOT NULL"] if drop_not_null else []
+    try:
+        with c.savepoint():
+            if parts:
+                c.execute(f"ALTER TABLE {qi(table, CT_MORE_TABLES)} " + ", ".join(parts))
+            if empty_null:
+                c.execute(f"UPDATE {qi(table, CT_MORE_TABLES)} SET {qi(col, CT_MORE_NAMES)}=NULL WHERE btrim({q})=''")
+    except Exception as e:  # noqa: BLE001 -- the log says why, the next start tries again
+        print(f"migrations: 5951: {table}.{col} stays TEXT as it was: {type(e).__name__}: {str(e)[:200]}",
+              file=sys.stderr, flush=True)
 
 
 # ---- 2.1111.0 (#5953, rest 3 of #5306 / #5289): the JSON columns kept as TEXT become JSONB --------------------------------

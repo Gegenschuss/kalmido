@@ -245,14 +245,15 @@ def wh_today():
 
 def wh_grace_ok(c, w, oid):
     """2.380 G (#3391): a personal webhook still delivers events of an organisation's lists (grace period of the webhooks that
-    existed before 2.380). The first event after the last day ends it for good (org_grace_until = '') and tells the owner
+    existed before 2.380). The first event after the last day ends it for good (org_grace_until NULL) and tells the owner
     with a News item which organisation now needs an organisation webhook. The caller commits."""
     until = w["org_grace_until"] or ""
     if until and until >= wh_today():
         return True
     if until:
         with system_ctx(c):  # the webhook's own row and a News item for its owner (the event may come from anyone)
-            if c.execute("UPDATE webhooks SET org_grace_until='' WHERE id=? AND org_grace_until<>''", (w["id"],)).rowcount:
+            # 2.1115.0 (#5951): org_grace_until is a DATE, NULL = no grace period (was ''); review: a column left TEXT loses NOT NULL (core/coltype.py _ct_more_kept)
+            if c.execute("UPDATE webhooks SET org_grace_until=NULL WHERE id=? AND org_grace_until IS NOT NULL", (w["id"],)).rowcount:
                 o = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
                 c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) "
                           "VALUES(?,'whorgcut',NULL,NULL,NULL,NULL,?,?)",

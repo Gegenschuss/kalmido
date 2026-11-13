@@ -272,7 +272,7 @@ def rin_make(c, oid, uid, s, period):
     row = {k: t[k] for k in t.keys() if k not in DUP_SKIP}
     today = local_now().date()
     ts = iso(now_utc())
-    row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None, valid_until="",
+    row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None, valid_until=None,  # 2.1115.0 (#5951): DATE
                service_from=period, service_to=(date.fromisoformat(nxt) - timedelta(days=1)).isoformat(), series_id=s["id"], series_period=period)
     for k in ("project_title", "intro", "closing"):
         if k in row:
@@ -567,7 +567,7 @@ def rin_cashflow(c, oid, put, first, last_day, today, nf):
     st = office_settings(c, oid)
     days0 = int(st.get("payment_days") or 14)
     for d in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND kind='invoice' AND series_id IS NOT NULL AND status='draft' AND {live_sql()} "
-                       "AND (locked_at IS NULL OR locked_at='')", (oid,)):
+                       "AND locked_at IS NULL", (oid,)):
         if not any(s["id"] == d["series_id"] for s in sts):
             continue
         days = d["payment_days"] if d["payment_days"] is not None else days0

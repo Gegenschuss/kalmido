@@ -574,7 +574,7 @@ def inv_new_row(c, oid, s, kind, lang, src=None):
     intro, closing = inv_default_texts(c, oid, s, kind, lang)
     row = {"kind": kind, "lang": lang, "currency": (s.get("currency") or "EUR").upper(), "fx_rate": s.get("fx_usd") or 1.09, "vat_mode": "vat",
            "client_id": None, "recipient": json.dumps({"name": "", "lines": []}), "project_title": "", "project_ref": "", "date": today.isoformat(),
-           "valid_until": "", "contract_id": None, "raw_mode": "none", "raw_factor": 0, "prod_quotient": 3, "producing_rate": 0, "discount_pct": 0,
+           "valid_until": None, "contract_id": None, "raw_mode": "none", "raw_factor": 0, "prod_quotient": 3, "producing_rate": 0, "discount_pct": 0,
            "intro": intro, "closing": closing, "rights": json.dumps({"time": {"id": None, "text": ""}, "territory": {"id": None, "text": ""},
                                                                    "media": {"id": None, "text": ""}, "exceptions": "", "exclusive": 0, "note": ""}),
            "fields": "[]", "service_from": None, "service_to": None, "order_ref": "", "due_date": None,

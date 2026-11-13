@@ -3,5 +3,5 @@ its POST, kalmido/integrations/git_sync.py _push_comments). A row with send_at b
 broke off; the next try looks for the comment in the repository first instead of sending it again. Older versions ignore it
 (they send such a row again, as before)."""
 MIGRATIONS = [
-    ("git_issue_comments", "send_at", "ALTER TABLE git_issue_comments ADD COLUMN IF NOT EXISTS send_at TEXT NOT NULL DEFAULT ''"),
+    ("git_issue_comments", "send_at", "ALTER TABLE git_issue_comments ADD COLUMN IF NOT EXISTS send_at TIMESTAMPTZ"),
 ]

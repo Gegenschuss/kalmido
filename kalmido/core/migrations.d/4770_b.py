@@ -4,5 +4,5 @@ session's change). updated_at stays what the background stamps (the recognition 
 key), so a recognition run that finished no longer turns an undo into a conflict. NULL = not edited since: the row's
 created_at stands for it (web.doc_ver); older versions ignore the column."""
 MIGRATIONS = [
-    ("doc_meta", "edited_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS edited_at TEXT"),
+    ("doc_meta", "edited_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS edited_at TIMESTAMPTZ"),
 ]

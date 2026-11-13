@@ -1326,7 +1326,7 @@ def _clean_col(c, oid, kind, k, v):
         return i
     if typ == "date":
         if v in (None, ""):
-            return ""
+            return None if k == "warranty_until" else ""  # 2.1115.0 (#5951): office_equipment.warranty_until is DATE (NULL = none)
         if not isinstance(v, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
             raise BadInput(tr("Invalid value: {0}", k))
         try:

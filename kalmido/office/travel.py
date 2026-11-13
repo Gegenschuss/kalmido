@@ -19,10 +19,10 @@ from decimal import Decimal, InvalidOperation
 from flask import jsonify, request, Response
 
 from ..core.config import app
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, ts_canon, write_lock  # 2.1115.0 (#5951): + ts_canon
 from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_store
 from ..core.i18n import N_, csv_dialect, tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, iso, now_utc, parse_iso  # 2.1115.0 (#5951): + parse_iso
 from ..core.access import Denied, list_state_sql, live_sql, trash_sql, vis_sql
 from ..core.errors import BadInput
 from .pdf import pdf_date
@@ -87,6 +87,14 @@ def _text(v, name, mx=500):
     if not isinstance(v, str):
         raise BadInput(tr("Invalid value: {0}", name))
     return CTRL_RE.sub("", v).strip()[:mx]
+
+
+def _billed_at(v, ts):
+    """2.1115.0 (#5951): office_trip_items.billed_at is TIMESTAMPTZ - the sent time (the undo of a delete) when it is one, else ts."""
+    try:
+        return ts_canon(parse_iso(v.replace("Z", "+00:00"))) if v else ts
+    except (ValueError, TypeError, OverflowError):
+        return ts
 
 
 def _amount(v, name, lo=0, hi=10 ** 9, allow_none=False):
@@ -522,7 +530,7 @@ def rk_trip_post():
         bd = its[i].get("billed") if isinstance(its[i], dict) else None  # the undo of a delete keeps "billed on"
         if isinstance(bd, dict) and isinstance(bd.get("id"), int) and ofr_own_uid("travel") is None \
                 and _billed_ok(c, oid, {"billed_doc_id": bd["id"]}):  # 2.187.0 (#2476, review): never by level "own"
-            x = dict(x, billed_doc_id=bd["id"], billed_at=_text(its[i].get("billed_at"), "billed_at", 40) or ts)
+            x = dict(x, billed_doc_id=bd["id"], billed_at=_billed_at(_text(its[i].get("billed_at"), "billed_at", 40), ts))
         _insert_item(c, oid, tid, x, i)
     bump(c)
     c.commit()
@@ -1066,7 +1074,7 @@ def rk_unbill_post():
         # 2.47.3 (review S2): receipts on a finalised document stay billed (it can no longer lose its positions);
         # 2.144.10 (#2576, review): except on a trial document - they are free for the real invoice
         c.execute(f"UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL, updated_at=? WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
-                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.trial=0 AND d.locked_at IS NOT NULL AND d.locked_at != '')",
+                  "AND NOT EXISTS (SELECT 1 FROM office_docs d WHERE d.id=office_trip_items.billed_doc_id AND d.trial=0 AND d.locked_at IS NOT NULL)",
                   [iso(now_utc()), oid] + ids)
     removed = 0
     for did in docs:

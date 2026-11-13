@@ -7,7 +7,7 @@ from datetime import date, datetime
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx, write_lock, st_ids
+from ..core.pg import insert_id, system_ctx, write_lock, st_ids, ts_canon  # 2.1115.0 (#5951): + ts_canon
 from ..core.objparts import part_merge  # 2.610.0 (#4762): the core's merge of a list sent whole against _prev
 from ..core.objcomments import ocm_trash  # 2.972.0 (#5272)
 from ..core.schema import MAX_DEPTH
@@ -677,7 +677,7 @@ def undo_status(c, tid, u):
     cp = u.get("copy_id")
     if cp:  # recurring: drop the completed copy, move the task back to the occurrence it was on
         row = c.execute("SELECT * FROM tasks WHERE id=?", (int(cp),)).fetchone()
-        if t["status"] != 0 or t["due"] != u.get("next") or not row or row["list_id"] != t["list_id"] or row["completed_at"] != at or row["status"] == 0 \
+        if t["status"] != 0 or t["due"] != u.get("next") or not row or row["list_id"] != t["list_id"] or ts_canon(row["completed_at"]) != ts_canon(at) or row["status"] == 0 \
                 or row["created_at"] != t["created_at"] or row["title"] != t["title"] or row["repeat"] \
                 or row["id"] < tid or row["parent_id"] != t["parent_id"]:
             return tr("Changed in the meantime, nothing to undo")
@@ -723,7 +723,7 @@ def undo_status(c, tid, u):
                       "AND NOT locked",  # 2.542.0 (#4609): a subtask locked since stays as it is
                       (st, cat, cby, d, t["list_id"]))
     else:
-        if t["status"] == 0 or t["completed_at"] != at:
+        if t["status"] == 0 or ts_canon(t["completed_at"]) != ts_canon(at):  # 2.1115.0 (#5951): one moment (TIMESTAMPTZ vs the undo's text)
             return tr("Changed in the meantime, nothing to undo")
         c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
         sk_undo(c, t, u)  # 2.577.0 (#3354): back into the column the tick took it out of

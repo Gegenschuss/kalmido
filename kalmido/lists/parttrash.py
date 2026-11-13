@@ -135,7 +135,7 @@ def lpt_sprint_back(c, sid, uid):
     moved, skipped = [], []
     for tid, at in held.get("tasks") or []:
         if c.execute(f"UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=? AND list_id=? AND sprint_id IS NULL AND {live_sql()}",
-                     (sid, at, tid, lid)).rowcount:
+                     (sid, at or None, tid, lid)).rowcount:  # 2.1115.0 (#5951): sprint_at TIMESTAMPTZ, '' of an older copy = none
             moved.append(tid)
         else:
             skipped.append(tid)

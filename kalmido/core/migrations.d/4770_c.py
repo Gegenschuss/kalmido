@@ -3,5 +3,5 @@ accounts/layouts.py), like list_layouts.updated_at for a person's own one: chang
 against it (409 with the current arrangements: an undo never overwrites what someone else set as the default meanwhile).
 NULL = not set since (no check against an empty version); older versions ignore the column."""
 MIGRATIONS = [
-    ("lists", "page_layout_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS page_layout_at TEXT"),
+    ("lists", "page_layout_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS page_layout_at TIMESTAMPTZ"),
 ]
