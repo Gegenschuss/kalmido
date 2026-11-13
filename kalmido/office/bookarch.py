@@ -553,7 +553,7 @@ def ba_trash_files(c):
     the caller (system context) removes them while ret_on("trash") and forgets them (ba_trash_forget)."""
     out = {}
     for r in c.execute("SELECT id, org_id, detail FROM office_import_runs WHERE kind=? AND undone_at IS NOT NULL AND undone_at<? "
-                       "AND detail ILIKE ?", (BA_KIND, ret_trash_cut(), '%"trash_files"%')).fetchall():
+                       "AND CAST(detail AS text) ILIKE ?", (BA_KIND, ret_trash_cut(), '%"trash_files"%')).fetchall():
         try:
             names = json.loads(r["detail"] or "{}").get("trash_files") or []
         except ValueError:

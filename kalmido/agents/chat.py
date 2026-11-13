@@ -1138,7 +1138,7 @@ def med_answered(c, m):
 def med_queued_events(c, aid, event, key, ref):
     """Queued events of agent aid (or of every agent: aid None) whose data[key].id is ref: [(row, envelope)]. A cheap ILIKE
     on the stored JSON first, then the exact check."""
-    q, args = "SELECT id, agent_id, uuid, payload FROM agent_events WHERE event IN ({}) AND payload ILIKE ?".format(
+    q, args = "SELECT id, agent_id, uuid, payload FROM agent_events WHERE event IN ({}) AND CAST(payload AS text) ILIKE ?".format(
         ",".join("?" * len(event))), [*event, f'%"{key}": {{"id": {int(ref)},%']
     if aid is not None:
         q += " AND agent_id=?"

@@ -633,8 +633,8 @@ def le2b_trash_sec_plain(c):
     start. A switch still running empties its section trash at its finish (lists/parttrash.py lpt_section_purge_list).
     Idempotent, the caller commits. Returns the copies dropped. One way: those sections cannot be restored any more."""
     return c.execute("DELETE FROM list_part_trash WHERE kind='section' AND list_id IN (SELECT id FROM lists WHERE e2e='on') "
-                     """AND position('"name": "e2e1:' in snap)=0 AND position('"name": ""' in snap)=0 """
-                     """AND position('"name": null' in snap)=0""").rowcount  # review: an empty name is no plain text (_trash_plain)
+                     """AND position('"name": "e2e1:' in CAST(snap AS text))=0 AND position('"name": ""' in CAST(snap AS text))=0 """
+                     """AND position('"name": null' in CAST(snap AS text))=0""").rowcount  # review: an empty name is no plain text (_trash_plain)
 
 
 def _trash_plain(r):
@@ -700,7 +700,7 @@ def le2b_scrub_trash_tasks(c, ids):
     rows, seen = [], set()
     for ch in [sorted(ids)[i:i + 500] for i in range(0, len(ids), 500)]:  # review 1: the database picks the copies naming them
         alt = "|".join(str(i) for i in ch)
-        for r in c.execute("SELECT id, list_id, kind, ref_id, held FROM list_part_trash WHERE kind IN (?, ?) AND held ~ ? ORDER BY id",
+        for r in c.execute("SELECT id, list_id, kind, ref_id, held FROM list_part_trash WHERE kind IN (?, ?) AND CAST(held AS text) ~ ? ORDER BY id",
                            (FIELD_KIND, TZW_KIND, rf'"task_id":\s*({alt})\s*[,}}]|\[\s*({alt})\s*,')).fetchall():
             if r["id"] not in seen:
                 seen.add(r["id"])

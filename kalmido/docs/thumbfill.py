@@ -153,7 +153,7 @@ def p5390_scan_fill(c):
         return 0
     below = int(st.get("below") or 2 ** 62)
     rows = c.execute(f"""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                        WHERE d.node_id < ? AND d.state='done' AND POSITION('"_scan"' IN COALESCE(d.auto, ''))=0 AND {live_sql("n")}
+                        WHERE d.node_id < ? AND d.state='done' AND POSITION('"_scan"' IN CAST(d.auto AS text))=0 AND {live_sql("n")}
                           AND (d.source='scan' OR LOWER(n.mime)='application/pdf' OR LOWER(n.mime) LIKE 'image/%' OR LOWER(n.name) LIKE '%.pdf')  -- pg-ok: LOWER() on the column
                         ORDER BY d.node_id DESC LIMIT ?""", (below, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only
     if not rows:
@@ -210,7 +210,7 @@ def p5393_page_fill(c):
         return 0
     below = int(st.get("below") or 2 ** 62)
     rows = c.execute(f"""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                        WHERE d.node_id < ? AND d.state='done' AND COALESCE(d.thumb, '')<>'' AND POSITION('"_pg"' IN COALESCE(d.auto, ''))=0 AND {live_sql("n")}
+                        WHERE d.node_id < ? AND d.state='done' AND COALESCE(d.thumb, '')<>'' AND POSITION('"_pg"' IN CAST(d.auto AS text))=0 AND {live_sql("n")}
                           AND ((LOWER(n.mime)='application/pdf' OR LOWER(n.name) LIKE '%.pdf') AND n.size <= ?  -- pg-ok: LOWER() on the column
                                OR LOWER(n.mime) LIKE 'image/%' AND n.size <= ?)  -- pg-ok: LOWER() on the column; never a file it would not measure
                         ORDER BY d.node_id DESC LIMIT ?""", (below, PG_PDF, PG_IMG, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only

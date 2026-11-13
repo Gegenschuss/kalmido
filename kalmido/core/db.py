@@ -31,7 +31,7 @@ from . import config  # 2.369.5 (#2517): pulled up from functions
 from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copies onto the shared core
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 from .moneycol import mc_migrate  # 2.755.0 (#5293): the plain money columns of the office as NUMERIC(14,2)
-from .coltype import ct_migrate  # 2.1095.0 (#5306): the old created_at / updated_at / deleted_at as TIMESTAMPTZ
+from .coltype import ct_json_migrate, ct_migrate  # 2.1095.0 (#5306): the old created_at / updated_at / deleted_at as TIMESTAMPTZ
 from .tplmove import tpl_move  # 2.905.0 (#5288): templates onto the shared core
 from .objretype import obj_retype  # 2.1101.0 (#5954): obj_history / obj_undo / obj_revoked onto real types
 
@@ -1046,6 +1046,8 @@ def init_db(guard=True):
         clk("mc_migrate")
         ct_migrate(c, iso(now_utc()))  # 2.1095.0 (#5306): TEXT -> TIMESTAMPTZ where every value is a point in time (else the column stays, the log says why)
         clk("ct_migrate")
+        ct_json_migrate(c, iso(now_utc()))  # 2.1111.0 (#5953): JSON TEXT -> JSONB (no JSON = the default, sealed text stays, the log says why)
+        clk("ct_json_migrate")
         from ..office.contacts_cl import fk_migrate
         fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
         clk("contact_fk_migrate")

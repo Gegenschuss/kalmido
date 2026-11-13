@@ -1408,7 +1408,7 @@ def odoc_list():
         like = f"%{like_escape(q)}%"
         # 2.369.0 A (#3200): the search of a paged list runs here; some recipients are stored with \\uXXXX escapes
         like_esc = f"%{like_escape(json.dumps(q)[1:-1])}%"
-        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\' OR recipient ILIKE ? ESCAPE '\\')"
+        sql += " AND (number ILIKE ? ESCAPE '\\' OR project_title ILIKE ? ESCAPE '\\' OR project_ref ILIKE ? ESCAPE '\\' OR CAST(recipient AS text) ILIKE ? ESCAPE '\\' OR CAST(recipient AS text) ILIKE ? ESCAPE '\\')"
         args += [like, like, like, like, like_esc]
     # 2.369.0 A (#3200): a page by (date, id), the order of the list: date is NOT NULL, ties and empty dates stay stable
     n = request.args.get("limit") or ""

@@ -1589,8 +1589,8 @@ def office_in_use(c, kind, rid, oid):
         # 2.42.0 (#828): the rates may be encrypted -> compared after decrypting (an organisation has few contracts)
         return any(str(rid) in (x.get("rates") or {}) for x in office_rows(c, oid, "contracts"))
     if kind == "equipment":
-        return bool(c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
-                    or c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND items ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
+        return bool(c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND CAST(items AS text) ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid},%')).fetchone()
+                    or c.execute(f"SELECT 1 FROM office_sets WHERE org_id=? AND CAST(items AS text) ILIKE ? AND {live_sql()} LIMIT 1", (oid, f'%"equipment_id": {rid}}}%')).fetchone())
     if kind == "texts":
         if c.execute(f"SELECT 1 FROM office_contracts WHERE org_id=? AND (rights_time_id=? OR rights_territory_id=? OR rights_media_id=?) AND {live_sql()} LIMIT 1",
                      (oid, rid, rid, rid)).fetchone():

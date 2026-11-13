@@ -49,6 +49,7 @@ from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx, ts_canon  # 2.1095.0 (#5306): ts_canon
 from ..core.moneycol import MC_COLS, MC_FITS  # 2.765.0 (#5315): the money columns NUMERIC(14,2) and their rule
+from ..core.coltype import CT_JSON  # 2.1111.0 (#5953): the JSON columns that were TEXT (JSONB now)
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
@@ -881,6 +882,18 @@ def _coerce(v, typ):
     return _BAD  # json, binary, other time stamps: not taken over
 
 
+def _umz_json(v):
+    """2.1111.0 (#5953): the value of a JSON column that was TEXT before (core/coltype.py CT_JSON, JSONB now) -> its JSON text,
+    _BAD for what JSONB refuses (no JSON, a NUL, NaN, too long): the column keeps its default, the row comes (an error in the
+    INSERT would drop the whole row). A file of before holds the JSON text, a file of now too (the driver reads JSONB as text)."""
+    try:
+        j = json.loads(v) if isinstance(v, str) else v
+        s = json.dumps(j, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError, RecursionError):
+        return _BAD
+    return _BAD if len(s) > UMZ_TEXT_MAX or "\\u0000" in s else s
+
+
 def _umz_snips(v, by):
     """2.273.0 A (#3030): the code snippets of a task from the file -> the stored JSON (the importer is their author)."""
     if isinstance(v, str) and v.startswith("["):  # stored as JSON text (a list's ciphertext "e2e1:..." stays behind)
@@ -1002,6 +1015,8 @@ def umz_row(c, table, src, fixed, ts):
             continue
         if table == "tasks" and k == "snippets":  # 2.273.0 A (#3030): jsonb, checked like new snippets (a list's ciphertext stays behind)
             v = _umz_snips(v, fixed.get("created_by"))
+        elif cols[k][0] == "jsonb" and any(x == k for x, _ in CT_JSON.get(table, ())):  # 2.1111.0 (#5953): as when they were TEXT
+            v = _umz_json(v)
         else:
             v = _coerce(v, cols[k][0])
         if v is not _BAD:
@@ -1165,7 +1180,7 @@ def umz_earlier(c, uid, src, eid=""):
     a = [f'%"{k}": "{v}"%' for k, v in (("src", src), ("export_id", eid or src)) if v and UMZ_EID_RE.fullmatch(v)]
     if not a:
         return []
-    w = " OR ".join("report ILIKE ?" for _ in a)
+    w = " OR ".join("CAST(report AS text) ILIKE ?" for _ in a)
     return c.execute(f"SELECT id, created, created_at, report FROM imports WHERE user_id=? AND source=? AND undone_at IS NULL AND ({w}) ORDER BY id",
                      (uid, UMZ_SOURCE, *a)).fetchall()
 

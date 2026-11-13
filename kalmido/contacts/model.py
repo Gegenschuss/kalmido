@@ -381,7 +381,7 @@ def contact_by_email(c, uid, email):
     q = ",".join("?" * len(ids))
     em = '"' + email.lower().replace('"', "") + '"'
     em = em.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND deleted_at IS NULL AND lower(emails) ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
+    r = c.execute(f"SELECT id FROM contacts WHERE book_id IN ({q}) AND deleted_at IS NULL AND lower(CAST(emails AS text)) ILIKE ? ESCAPE '\\' ORDER BY id LIMIT 1",
                   [*ids, f"%{em}%"]).fetchone()
     return r[0] if r else None
 
@@ -1047,7 +1047,7 @@ def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, tra
         where += f" AND id IN {ids_sql}"
         args += x
     if group:
-        where += " AND groups ILIKE ? ESCAPE '\\'"
+        where += " AND CAST(groups AS text) ILIKE ? ESCAPE '\\'"
         args.append("%" + like_escape(json.dumps(group, ensure_ascii=False)) + "%")
     n = c.execute(f"SELECT COUNT(*) FROM contacts WHERE {where}", args).fetchone()[0]
     # 2.281.0 E (#3117): only the columns contact_brief reads -- the photo (up to 512 KB each) as a flag, not its data;

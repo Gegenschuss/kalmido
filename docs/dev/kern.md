@@ -43,6 +43,12 @@ turns an older database at the start); the other old time, yes / no and JSON col
 `tools/coltypes_baseline.txt`). SQL that must work for both types: `CAST(x AS text) = ''` instead of `x = ''`, `ct_day(x)` for
 the day instead of `substr(x, 1, 10)`, `ct_iso(x)` for a key or mark that Python compares with a value it read, and a TEXT time
 compared with a `TIMESTAMPTZ` one is cast on its own side (`NULLIF(t.completed_at, '')::timestamptz`).
+Since 2.1111.0 (#5953) the JSON columns of the areas are `JSONB` too (`CT_JSON` in `kalmido/core/coltype.py` turns an older
+database at the start; kept as `TEXT` with `coltype-ok`: the columns sealed as a whole, `office_docs.totals` of the hash chain,
+`budget_meta.mappings`). Python reads them as JSON text as before (`json.loads`), but in JSONB's own form (keys by length, `", "`
+/ `": "`): compare their content, not their text. SQL never puts `LIKE` / `ILIKE` / `~` / `position()` / `lower()` / `md5()` /
+`COALESCE(x, '')` on the column itself: `CAST(x AS text) ILIKE ?` for a text search, `CAST(x AS jsonb)->'k'` / `@>` for its content.
+A new JSON column is `JSONB` from the start (`tools/check_coltypes.py`).
 
 Give the table an `org_id` (`kalmido/core/rls.py` protects every such table by itself) and say where its rows go in the exports:
 `obj_register(..., export={...})` (stage Q11, below "Export register"), not a hand entry in the export lists (`tools/check_export_tables.py`

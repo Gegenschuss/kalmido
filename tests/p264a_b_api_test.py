@@ -525,13 +525,13 @@ for s_, t_, note_, h_ in ((A, T5, MK + "MoveNote", 5), (A, T6, "StayNote", 6), (
 r = A.post(B + f"/api/lists/{L3}/time/delete-all", json={"confirm": "Other open"})
 W3 = r.json().get("wipe") if r.ok else None
 check(r.ok and W3, f"#5562: delete all times of the open project {r.status_code} {r.text[:200]}")
-check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND held LIKE ?", (L3, f"%{MK}%"))) == 2,
+check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND CAST(held AS text) LIKE ?", (L3, f"%{MK}%"))) == 2,  # 2.1111.0 (#5953): the column is JSONB
       "#5562: before the move both copies quote the task")
 r = A.patch(B + f"/api/tasks/{T5}", json={"list_id": L, "title": cipher(40)})
 check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T5,))[0][0] == L, f"#5562: the task moves into the locked project {r.status_code} {r.text[:200]}")
-left_ = [x[0] for x in dbx("SELECT held FROM list_part_trash WHERE list_id=? AND held LIKE ?", (L3, f"%{MK}%"))]
+left_ = [x[0] for x in dbx("SELECT held FROM list_part_trash WHERE list_id=? AND CAST(held AS text) LIKE ?", (L3, f"%{MK}%"))]  # 2.1111.0 (#5953): the column is JSONB
 check(not left_, f"#5562: no text of the moved task in the trash copies of its old project {left_}")
-check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND (held LIKE '%StayValue%' OR held LIKE '%StayNote%')", (L3,))) == 2,
+check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND (CAST(held AS text) LIKE '%StayValue%' OR CAST(held AS text) LIKE '%StayNote%')", (L3,))) == 2,  # 2.1111.0 (#5953): the column is JSONB
       "#5562: the copies keep the other task's value and note")
 r = A.post(B + f"/api/lists/{L3}/time/restore", json={"wipe": W3})
 back = sorted((x[0], x[1]) for x in dbx("SELECT note, task_title FROM time_entries WHERE list_id=?", (L3,)))
