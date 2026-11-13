@@ -522,7 +522,11 @@ check(rc == 0 and '"rotated_at"' in out and "R2-" not in out, "status names rota
 # ---------------------------------------------------------------- the personal office of a person without an organisation
 # freelancer-matrix: orgcrypt
 FID, Fr = freelancer(B, A, "fanny")
-check(Fr.get(B + "/api/orgs/0/encryption").status_code == 404, "freelancer without a personal office: 404")
+# 2.1124.0 (#6047): without a personal office the state is a plain 200 {has_key: false} (was a 404 in the console / the log);
+# the box stays hidden, the GET makes no office, the recovery key below still 404s
+r = Fr.get(B + "/api/orgs/0/encryption")
+check(r.status_code == 200 and r.json().get("has_key") is False and "step" not in r.json(), f"freelancer without a personal office: 200, no key {r.status_code} {r.text[:150]}")
+check(not one("SELECT id FROM orgs WHERE personal_of=?", (FID,)), "freelancer: the state GET makes no personal office")
 r = Fr.put(B + O + "/settings", json={"company_fields": {"name": "Frida Film", "iban": TEST_IBAN}})
 check(r.ok, "freelancer: personal office with an IBAN " + r.text[:150])
 POID = one("SELECT id FROM orgs WHERE personal_of=?", (FID,))
