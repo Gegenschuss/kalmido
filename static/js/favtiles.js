@@ -525,12 +525,16 @@ drg_attach(document, {
 // Checked once per frame on scrolling, on resizing and whenever the drawer opens or draws anew (sections unfolded, other panel);
 // the size watcher on the drawer's parts also catches heights that grow without a change in the page (a section's unfolding).
 let fv2_moreQ = 0;
-const fv2_moreRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fv2_more()) : null;
+const fv2_moreRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => fv2_more()) : null, fv2_moreSeen = new Set();
 function fv2_more() {
   if (fv2_moreQ) return;
   fv2_moreQ = requestAnimationFrame(() => {
     fv2_moreQ = 0; const s = document.getElementById('side'); if (!s) return;
-    if (fv2_moreRO) for (const el of [s, ...s.children]) fv2_moreRO.observe(el);
+    if (fv2_moreRO) {  // watch the drawer's current parts only (parts of an earlier drawing are let go)
+      const now = new Set([s, ...s.children]);
+      for (const el of fv2_moreSeen) if (!now.has(el)) { fv2_moreRO.unobserve(el); fv2_moreSeen.delete(el); }
+      for (const el of now) if (!fv2_moreSeen.has(el)) { fv2_moreRO.observe(el); fv2_moreSeen.add(el); }
+    }
     const more = s.scrollHeight - s.scrollTop - s.clientHeight > 2;
     if (s.classList.contains('sb-more') !== more) s.classList.toggle('sb-more', more);
   });
