@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -155,8 +156,12 @@ r = Fr.post(B + O + "/legacy/archive", data={"run_id": rid, "kind": "invoice", "
 check(r.status_code == 201, "an archived invoice " + r.text[:160])
 aid = r.json()["id"]
 g = Fr.get(B + O + f"/legacy/archive/{aid}").json()
-check(g.get("updated_at") and g["updated_at"] == one("SELECT created_at FROM office_archive WHERE id=?", (aid,))
-      and one("SELECT updated_at FROM office_archive WHERE id=?", (aid,)) == "", "never corrected: its version is created_at " + str(g.get("updated_at")))
+# 2.1112.2 (#5986): since #5306 office_archive.updated_at is TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP (fragment 4770_a) -
+# no '' any more: a never corrected entry carries its insert time there, and that is the version the API answers (the same
+# instant, compared as a point in time - the suite's database reader gives its own text form)
+_db_ua = one("SELECT to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US') FROM office_archive WHERE id=?", (aid,))
+check(g.get("updated_at") and _db_ua and datetime.fromisoformat(g["updated_at"]) == datetime.fromisoformat(_db_ua + "+00:00"),
+      "never corrected: its version is the row's own updated_at " + str(g.get("updated_at")) + " / " + str(_db_ua))
 r = Fr.patch(B + O + f"/legacy/archive/{aid}", json={"paid": 1, "expect_updated_at": g["updated_at"]})
 check(r.ok and r.json().get("paid") == 1 and r.json().get("updated_at") not in ("", g["updated_at"]), "A marks it paid: a new version " + r.text[:160])
 u1 = r.json()["updated_at"]
