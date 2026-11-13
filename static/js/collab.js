@@ -327,7 +327,7 @@ function newsText(it, U) {
     case 'proposal': return tr('{0} has a proposal for you: {1}', d.assistant ? q(tr('Assistant')) : who, q(d.title || ''));  // 2.3.0; 2.75.0 (#1411): the built-in assistant has no person
     case 'upscan': return tr('The virus scanner found {0} in your file {1}. The file is locked.', esc(d.sig || '?'), q(d.name || ''));  // 2.61.0 (#1818)
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
-    case 'integfail': return esc(d.text || '');  // 2.367.3 (#2971): written in the person's language by the server (collab/integfail.py)
+    case 'integfail': return esc(d.text || '') + (d.what === 'mailbox' || d.what === 'git' || d.what === 'hookin' ? ' ' + esc(tr('Check the connection in the settings, or remove it.')) : '');  // 2.1111.0 (#5963): the way to the solution  // 2.367.3 (#2971): written in the person's language by the server (collab/integfail.py)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
     case 'docflow': return d.flow ? tr('Flow {0}: {1}', q(d.flow), q(d.name || '')) : tr('Document flow: {0}', q(d.name || ''));  // 2.581.0 (#4803): docs/flows.py
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
