@@ -129,6 +129,7 @@ function qd_node(/** @type {string} */ cls, d = new Date()) {
   au.className = 'qda'; au.textContent = '— ' + q[5];
   if (q[6]) au.title = q[6];
   cap.append(au); fig.append(bq, cap);
+  if (cls === 'dashq') { fig.tabIndex = 0; fig.setAttribute('role', 'button'); fig.setAttribute('aria-expanded', 'false'); }  // 2.1111.0 (#5963): one line on the start page, a tap opens it
   return fig;
 }
 const qd_html = (/** @type {string} */ cls) => qd_node(cls).outerHTML;
@@ -136,3 +137,10 @@ const qd_html = (/** @type {string} */ cls) => qd_node(cls).outerHTML;
 function qd_fill() {
   for (const el of document.querySelectorAll('[data-qd]')) if (el instanceof HTMLElement) el.replaceWith(qd_node(el.dataset.qd || ''));
 }
+// 2.1111.0 (#5963): the start page's quote is one line; a tap (or Enter / Space) opens the full text and the author, a second one closes it
+function qd_toggle(/** @type {Event} */ e) {
+  const f = e.target instanceof Element ? e.target.closest('.qd.dashq') : null; if (!f) return;
+  if (e instanceof KeyboardEvent) { if (e.key !== 'Enter' && e.key !== ' ') return; e.preventDefault(); }
+  f.setAttribute('aria-expanded', String(f.classList.toggle('open')));
+}
+if (typeof document !== 'undefined') { document.addEventListener('click', qd_toggle); document.addEventListener('keydown', qd_toggle); }

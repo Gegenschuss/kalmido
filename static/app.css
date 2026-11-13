@@ -6532,6 +6532,13 @@ html.mini-chat body.in-chat #view .chview .chmsgs{padding-inline:.75rem}  /* 2.1
 /* 2.955.0 (#5239): on Today the placeholder holds the room of a two-line quote, so the first load does not push the blocks down */
 .dash .qdslot,.qd.dashq{min-height:2.9rem}
 .dash .qdslot{margin:-.5rem 0 1rem}
+/* 2.1111.0 (#5963): the start page's quote is one line (a tap opens it), the slot holds exactly that line: nothing jumps */
+.qd.dashq,.dash .qdslot{margin:-.5rem 0 .5rem;min-height:1.5rem}
+.qd.dashq{cursor:pointer}
+.qd.dashq .qdo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--fs-b)}
+.qd.dashq figcaption{display:none}
+.qd.dashq.open .qdo{white-space:normal;overflow:visible}
+.qd.dashq.open figcaption{display:block}
 .authscreen input:not([type=checkbox]){border-radius:.75rem;background:var(--bg3);border:1px solid var(--line2)}
 .authscreen input:not([type=checkbox]):focus{border-color:var(--accent);box-shadow:0 0 0 .1875rem color-mix(in srgb,var(--accent) 22%,transparent);outline:none}
 .authscreen .btn{height:auto;min-height:2.75rem;border-radius:.75rem}
