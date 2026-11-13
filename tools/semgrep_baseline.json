@@ -605,14 +605,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/umz_undoplan.py",
-   "code": "c.execute(f\"UPDATE {table} SET deleted_at=? WHERE id=? AND deleted_at IS NULL\", (ts, rid)) # no node, or a locked page",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/umz_undoplan.py",
    "code": "for r in c.execute(f\"SELECT * FROM {table} WHERE id IN ({_qs(part)})\", part).fetchall():",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",

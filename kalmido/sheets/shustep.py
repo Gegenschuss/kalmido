@@ -31,6 +31,7 @@ from .core import SH_STEP_KINDS, ShBook, sh_check_list, sh_freeze, sh_may_rebind
 from .shbook import SHB_TABS_MAX, _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
 from ..core.pg import qi, table_columns, ts_canon
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
+from .shkern import shk_restore, shk_trash  # 2.1093.0 (#5472)
 from .shshare import shs_need_own
 from .web import sh_order_apply, shx_col_apply, shx_place
 
@@ -199,7 +200,6 @@ def _tab_trash(added):
         when = ts if out else (ch["undone_at"] if added else ch["new_raw"])
         # 2.1093.0 (#5472): in and out through the core's trash (sheets/shkern.py, checked: the step's rights were checked by
         # the undo), with the step's time -- the way back compares it
-        from .shkern import shk_restore, shk_trash  # shkern loads sheets/core.py, as this module does
         if out:
             n = 0 if t["deleted_at"] else 1
             if n:

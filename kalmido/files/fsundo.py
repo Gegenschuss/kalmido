@@ -21,6 +21,7 @@ from ..core.undoweb import undo_need_reg
 from ..core.objhooks import GONE
 from ..core.writes import obj_track
 from ..office.periodlock import pl_tree_need_open
+from .fskern import fsk_restore, fsk_trash  # 2.1093.0 (#5472)
 from .fslock import fsl_move_guard, fsl_of
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored
 from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_of, fs_area_root_need_free
@@ -96,8 +97,7 @@ def fsu_need(c, uid, rid, oid):
         fs_ref_need_move(c, uid, x, restore=True)
         nm = _free_name(c, x["parent_id"], x["owner_id"], x["org_id"], x["name"], skip=int(rid))  # review F5: as the restore route
         c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, int(rid)))
-        from .fskern import fsk_restore  # 2.1093.0 (#5472): the core's trash (checked above; fskern loads the core at its top)
-        fsk_restore(c, uid, rid, checked=True)
+        fsk_restore(c, uid, rid, checked=True)  # 2.1093.0 (#5472): the core's trash (checked above)
         fs_log_add(c, rid, "restore")
         fs_trash_restored(c, uid, x)
 
@@ -105,8 +105,7 @@ def fsu_need(c, uid, rid, oid):
         if x["parent_id"] is None and n["role"] != "owner":
             raise Denied(403)
         _kept, refs = fs_trash_prepare(c, uid, x)
-        from .fskern import fsk_trash  # 2.1093.0 (#5472): the core's trash (checked above)
-        fsk_trash(c, uid, rid, checked=True)
+        fsk_trash(c, uid, rid, checked=True)  # 2.1093.0 (#5472): the core's trash (checked above)
         fs_log_add(c, rid, "trash")
         for r in refs:
             fs_ref_trashed(c, uid, r, False)
