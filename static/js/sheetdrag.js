@@ -139,13 +139,13 @@ function sd_anim(el, base, ty, ms, done) {
   el.style.transition = red ? 'none' : `transform ${Math.round(ms)}ms cubic-bezier(.2,.8,.2,1)`;
   el.style.transform = `${base}translateY(${Math.round(ty)}px)`;  // also at 0: openPop clearing it tells fin the sheet opened anew
   const tf = el.style.transform;
-  const fin = () => { el._sdT = 0; el._sdF = null; if (el.style.transform === tf) done(); };  // opened anew meanwhile: leave it
-  clearTimeout(el._sdT);
+  const fin = () => { if (el.style.transform === tf) done(); };  // opened anew meanwhile: leave it
+  el._sdD?.cancel();
   if (red) { fin(); return; }
-  el._sdF = fin; el._sdT = setTimeout(fin, ms + 20);
+  el._sdD = debounce(fin, ms + 20); el._sdD();  // core.js debounce: one timer, flush / cancel (no hand-made clearTimeout pair)
 }
 // a settle still running ends now (a new touch on the sheet)
-function sd_finish(el) { if (el._sdT) { clearTimeout(el._sdT); const f = el._sdF; el._sdT = 0; el._sdF = null; f?.(); } }
+function sd_finish(el) { el._sdD?.flush(); }
 // settle the sheet at the visible height h: slide there by transform, then set the height once and drop the transform
 function sd_settle(el, g, h, keep) {
   sd_anim(el, g.base, Math.max(0, g.maxH - h), 220, () => {
