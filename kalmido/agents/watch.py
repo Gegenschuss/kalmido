@@ -15,6 +15,7 @@ net under every other way a job ends, the tick also clears the delivery marks of
 from datetime import timedelta
 
 from ..core.access import task_visible
+from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
 from ..core.config import PUBLIC_URL
 from ..core.db import iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
@@ -90,7 +91,7 @@ def watch_stalled(c, users, S, LG):
                   "hint": "No progress on this job for a while. Report progress, end it (done / failed) or say what blocks it."})
     c.execute("""UPDATE job_watch SET cleared_at=? WHERE kind='job_stalled' AND cleared_at IS NULL AND NOT EXISTS
                  (SELECT 1 FROM agent_jobs j WHERE j.id=job_watch.job_id AND j.state='running'
-                  AND CAST(j.id AS TEXT) || '@' || j.updated_at = job_watch.ref)""", (iso(now),))
+                  AND CAST(j.id AS TEXT) || '@' || """ + ct_iso("j.updated_at") + """ = job_watch.ref)""", (iso(now),))  # 2.1095.0 (#5306): the form Python read
 
 
 def watch_stranded(c, users, S, LG):

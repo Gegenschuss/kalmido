@@ -806,7 +806,7 @@ def ocm_move_q4c(c):
         return 0
     n = c.execute("""INSERT INTO obj_comment_trash(kind, comment_id, body, enc)
                      SELECT 'tchat', x.message_id, COALESCE(x.body, ''), x.enc FROM tchat_trash_text x
-                     JOIN tchat_msgs m ON m.id=x.message_id WHERE COALESCE(m.deleted_at, '') <> ''
+                     JOIN tchat_msgs m ON m.id=x.message_id WHERE COALESCE(CAST(m.deleted_at AS text), '') <> ''
                      ON CONFLICT DO NOTHING""").rowcount
     kern_retire_floor(c, how=OCM_Q4C_HOW)  # the minor of the image that moves (core/kernretire.py, as ocm_move)
     return n

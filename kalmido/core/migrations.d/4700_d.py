@@ -2,5 +2,5 @@
 before, saved without the check): its dialog sends it back as expect_updated_at, saved elsewhere meanwhile -> 409 instead
 of overwriting. New column only: older versions ignore it."""
 MIGRATIONS = [
-    ("office_cc_lines", "updated_at", "ALTER TABLE office_cc_lines ADD COLUMN IF NOT EXISTS updated_at TEXT"),
+    ("office_cc_lines", "updated_at", "ALTER TABLE office_cc_lines ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"),
 ]

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS module_cards (
   user_id BIGINT REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, icon TEXT NOT NULL DEFAULT 'grid',
   mods TEXT NOT NULL DEFAULT '', known TEXT NOT NULL DEFAULT '', dflt BIGINT NOT NULL DEFAULT 0,
   created_by BIGINT, -- no FK: who made it, kept when that account is gone
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+  created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL);
 CREATE TABLE IF NOT EXISTS module_card_people (
   card_id BIGINT NOT NULL REFERENCES module_cards(id) ON DELETE CASCADE,
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY (card_id, user_id));

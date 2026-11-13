@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS office_ledger_entries (
   year BIGINT NOT NULL, kind TEXT NOT NULL DEFAULT 'manual', day TEXT NOT NULL DEFAULT '',
   debit TEXT NOT NULL DEFAULT '', credit TEXT NOT NULL DEFAULT '', amount TEXT NOT NULL DEFAULT '0.00',
   text TEXT NOT NULL DEFAULT '', ref TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL, created_by BIGINT, updated_at TEXT NOT NULL, updated_by BIGINT);
+  created_at TIMESTAMPTZ NOT NULL, created_by BIGINT, updated_at TIMESTAMPTZ NOT NULL, updated_by BIGINT);
 """
 AFTER = [
     "CREATE INDEX IF NOT EXISTS office_ledger_entries_year ON office_ledger_entries(org_id, year, kind)",

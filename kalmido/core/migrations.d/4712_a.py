@@ -28,13 +28,13 @@ in the trash would show again --, the trigger keeps mirroring for it, nothing br
 MIGRATIONS = [
     ("ev_cals", "rev", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 1"),
     ("ev_cals", "created_by", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS created_by BIGINT"),  # who: no FK (the history keeps a gone account's id)
-    ("ev_cals", "updated_at", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''"),
+    ("ev_cals", "updated_at", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP"),
     ("ev_cals", "updated_by", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS updated_by BIGINT"),
-    ("ev_cals", "deleted_at", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS deleted_at TEXT"),
+    ("ev_cals", "deleted_at", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"),
     ("ev_cals", "deleted_by", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),
     ("books", "rev", "ALTER TABLE books ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 1"),
     ("books", "created_by", "ALTER TABLE books ADD COLUMN IF NOT EXISTS created_by BIGINT"),
-    ("books", "updated_at", "ALTER TABLE books ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''"),
+    ("books", "updated_at", "ALTER TABLE books ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP"),
     ("books", "updated_by", "ALTER TABLE books ADD COLUMN IF NOT EXISTS updated_by BIGINT"),
     ("books", "deleted_by", "ALTER TABLE books ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),
 ]

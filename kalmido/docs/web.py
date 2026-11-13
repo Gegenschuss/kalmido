@@ -10,6 +10,7 @@ from decimal import Decimal, InvalidOperation
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR
+from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, insert_id
 from .notes import dn_view  # 2.635.0 (#4807 d)
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
@@ -250,7 +251,7 @@ def _doc(c, nid, write=False):
 # ---- list + search ------------------------------------------------------------------------------------------------------
 # 2.428.0 (#3579): the sort of the list (?sort=&dir=), only from this list. SQL for the plain columns; sender names and amounts
 # are sealed at rest and sorted here after opening (None = sealed in Python).
-DOC_SORTS = {"date": "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", "added": "n.created_at", "due": "NULLIF(d.due_date, '')",
+DOC_SORTS = {"date": "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))", "added": "n.created_at", "due": "NULLIF(d.due_date, '')",
              "title": "lower(COALESCE(NULLIF(d.title, ''), n.name))", "sender": None, "amount": None,  # 2.750.0 (#4876): the own title, else the file name
              "type": None, "review": "d.review"}  # 2.769.0 (#5340): + type (sealed name) and "to review" (the folder's list)
 
@@ -977,13 +978,13 @@ def _flow_extra(c, ws, can):
 
 def _rule_ver(c, rid):
     """2.635.0 (#4856): the version of a flow (expect_updated_at of PATCH): updated_at, for a row never saved since: created_at."""
-    r = c.execute("SELECT COALESCE(NULLIF(updated_at, ''), created_at) FROM doc_rules WHERE id=?", (rid,)).fetchone()
+    r = c.execute("SELECT COALESCE(" + ct_iso("updated_at") + ", " + ct_iso("created_at") + ") FROM doc_rules WHERE id=?", (rid,)).fetchone()
     return r[0] if r else ""
 
 
 def _rules_v(c, ws):
     """2.635.0 (#4856): the flows of ws as rules_get gives them, each with its version (updated_at)."""
-    ver = {r[0]: r[1] for r in c.execute("SELECT id, COALESCE(NULLIF(updated_at, ''), created_at) FROM doc_rules WHERE ws=?", (ws,))}
+    ver = {r[0]: r[1] for r in c.execute("SELECT id, COALESCE(" + ct_iso("updated_at") + ", " + ct_iso("created_at") + ") FROM doc_rules WHERE ws=?", (ws,))}
     return [{**r, "updated_at": ver.get(r["id"], "")} for r in S.rules_get(c, ws)]
 
 

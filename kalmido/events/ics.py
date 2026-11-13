@@ -8,6 +8,7 @@ import icalendar
 from flask import jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, TZ
+from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
 from ..core.i18n import tr
 from ..core.db import bump, db, err, now_utc, parse_iso
 from ..accounts.session import me
@@ -703,7 +704,7 @@ def import_ics(c, uid, cal_id, raw, dry=False):
             res["updated" if old else "created"] += 1
             continue
         eid = store_parsed(c, uid, cal_id, v, eid=old["id"] if old else None, keep_attendees=not v.get("attendees_raw"))
-        c.execute("UPDATE events SET imp_at=updated_at, imp_rev=? WHERE id=?",
+        c.execute(f"UPDATE events SET imp_at={ct_iso('updated_at')}, imp_rev=? WHERE id=?",
                   (_ics_mod(cs[ms[0]] if len(ms) == 1 else cs[0]), eid))  # 2.273.0 F2 (#3048): the import marker
         res["updated" if old else "created"] += 1
     return res

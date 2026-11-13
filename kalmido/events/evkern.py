@@ -213,8 +213,8 @@ def ev_kern_drop(c):
             return out
         write_lock(c, KERN_RETIRE_LOCK)  # one process of the instance at a time (reentrant: kern_retire below takes it again)
         have = [x for x in OLD_TABLES if c.execute("SELECT to_regclass(?) IS NOT NULL", (x[0],)).fetchone()[0]]
-        c.execute("UPDATE ev_cals SET updated_at=changed_at WHERE updated_at=''")  # what ev_kern_copy did (#4712)
-        c.execute("UPDATE books SET updated_at=changed_at WHERE updated_at=''")
+        c.execute("UPDATE ev_cals SET updated_at=changed_at WHERE CAST(updated_at AS text)=''")  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ  # what ev_kern_copy did (#4712)
+        c.execute("UPDATE books SET updated_at=changed_at WHERE CAST(updated_at AS text)=''")
         for t, col, kind, tb in have:
             made = []
             col = qi(col, _OLD_NAMES)

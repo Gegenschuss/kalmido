@@ -5,5 +5,5 @@ created_at, the next change gives the row that version first (core/conflict.py k
 before neither reads nor writes the column.
 """
 MIGRATIONS = [
-    ("lists", "updated_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''"),
+    ("lists", "updated_at", "ALTER TABLE lists ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP"),
 ]

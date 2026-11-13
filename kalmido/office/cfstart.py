@@ -50,7 +50,7 @@ def cfs_start_fix(c):
     """Review 2.1067.0 (F1), every start: a start balance an older version (after a step back) set again on a row of the
     core's trash (its upsert leaves deleted_at) is live again -> number of rows."""
     return c.execute("UPDATE office_cf_start SET deleted_at=NULL, deleted_by=NULL "
-                     "WHERE deleted_at IS NOT NULL AND updated_at <> '' AND updated_at::timestamptz > deleted_at").rowcount
+                     "WHERE deleted_at IS NOT NULL AND CAST(updated_at AS text) <> '' AND updated_at::timestamptz > deleted_at").rowcount
 
 
 def _cfs_adj_limit(c, oid, row):

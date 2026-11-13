@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS task_offer_links (
   doc_id BIGINT REFERENCES office_docs(id) ON DELETE SET NULL,
   root_id BIGINT, -- no FK (2.552.0 #4647): the chain's id, its first version can be deleted
   item_key TEXT NOT NULL DEFAULT '', auto_h DOUBLE PRECISION, set_h DOUBLE PRECISION,
-  gone BIGINT NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+  gone BIGINT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS task_offer_links_list ON task_offer_links(list_id, root_id);
 """

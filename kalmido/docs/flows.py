@@ -57,7 +57,7 @@ CTX = "doc_flow_runs.data"
 FL_URL_CHECK = []      # f(c, url) -> normalized url, raises BadInput (integrations/docflowhook.py; empty = webhooks off)
 FL_RUNS_SHOWN = 20     # runs of a document the sheet lists
 FL_TICK_DOCS = 100     # documents one scheduled flow looks at per tick
-SCHED_COL = {"date": "d.doc_date", "due": "d.due_date", "added": "substr(d.created_at, 1, 10)"}
+SCHED_COL = {"date": "d.doc_date", "due": "d.due_date", "added": "substr(CAST(d.created_at AS text), 1, 10)"}
 _IN = threading.local()  # set while the actions of a flow run: a change they make starts no "changed" flow (depth 1)
 
 

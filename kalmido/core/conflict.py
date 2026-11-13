@@ -108,5 +108,5 @@ def kern_version_seed(c, table, rid):
     if table not in KERN_SEED_TABLES:
         raise ValueError(table)
     with system_ctx(c):  # structure only (a copy of the row's own created_at): also for a member who may not write the row
-        c.execute(f"UPDATE {table} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR updated_at='')", (int(rid),))
+        c.execute(f"UPDATE {table} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR CAST(updated_at AS text)='')"  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ, (int(rid),))
     return c.execute(f"SELECT * FROM {table} WHERE id=?", (int(rid),)).fetchone()  # the caller holds the write_lock

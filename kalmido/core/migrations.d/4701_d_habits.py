@@ -2,5 +2,5 @@
 the habit dialog sends it back as expect_updated_at (saved meantime on another device -> 409). A nullable column only:
 older versions ignore it; a habit without one counts with its created_at."""
 MIGRATIONS = [
-    ("habits", "updated_at", "ALTER TABLE habits ADD COLUMN IF NOT EXISTS updated_at TEXT"),
+    ("habits", "updated_at", "ALTER TABLE habits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"),
 ]

@@ -849,7 +849,7 @@ def tidy_changed_since(updated_at, sent_at):
 # someone via a public link (user_id NULL, tasks/validation.py); the tidy agent's own entries (kind tidy) never count
 TIDY_PERSON_SQL = """FROM activity a LEFT JOIN users u ON u.id=a.user_id
                      WHERE a.task_id=%s AND a.kind!='tidy' AND (a.user_id IS NULL OR COALESCE(u.kind,'')!='agent')
-                       AND substr(a.created_at,1,19) {op} substr(%s,1,19)"""
+                       AND date_trunc('second', CAST(a.created_at AS timestamptz)) {op} date_trunc('second', CAST(%s AS timestamptz))"""  # 2.1095.0 (#5306): TEXT or TIMESTAMPTZ
 
 
 def tidy_person_after(c, tid, sent_at):
@@ -872,8 +872,8 @@ def tidy_tick(c):
     # agent's change (the dispatcher's fields and comments, the tidy agent itself) no longer sends the same tidy every few
     # minutes in the name of whoever made the task (the agent's tidy is not refused for it either, v1 tidy)
     for p in c.execute("""SELECT task_id, sent_at FROM tidy_pending WHERE sent_at IS NOT NULL
-                 AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) %s sent_at
-                 AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at)
+                 AND (SELECT updated_at FROM tasks WHERE id=tidy_pending.task_id) %s sent_at::timestamptz
+                 AND NOT EXISTS (SELECT 1 FROM activity a WHERE a.task_id=tidy_pending.task_id AND a.kind='tidy' AND a.created_at>=tidy_pending.sent_at::timestamptz)
                  AND NOT EXISTS (SELECT 1 FROM obj_comments k WHERE k.kind='task' AND k.ref_id=tidy_pending.task_id AND COALESCE(k.extra->>'suggestion','')!=''
                                  AND k.created_at>=tidy_pending.sent_at::timestamptz)
                  AND EXISTS (SELECT 1 %s)

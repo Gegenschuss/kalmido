@@ -773,7 +773,7 @@ def pt_mail_tick(c):
                              AND (p.last_mail_at IS NULL OR p.last_mail_at<=?)
                              AND ((t.status=2 AND p.mailed_status!=2) OR (t.status!=2 AND p.mailed_status=2) OR EXISTS(
                                SELECT 1 FROM obj_comments k WHERE k.kind='task' AND k.ref_id=p.task_id AND COALESCE((k.extra->>'portal')::boolean, false)
-                               AND k.user_id IS NOT NULL AND k.deleted_at IS NULL AND k.created_at>COALESCE(p.last_mail_at, p.created_at)::timestamptz))
+                               AND k.user_id IS NOT NULL AND k.deleted_at IS NULL AND k.created_at>COALESCE(NULLIF(p.last_mail_at, '')::timestamptz, p.created_at::timestamptz)))
                              ORDER BY p.id LIMIT 100""", (cut,)).fetchall()
         for p in rows:
             since = parse_iso(p["last_mail_at"] or p["created_at"])

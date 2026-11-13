@@ -21,6 +21,7 @@ import re
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..collab.liste2e import le2e_is_cipher
 from ..core.db import connect
+from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
 from ..core.orgcrypt import _kek, _kek_check, _row, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from .wkhist import WikiUnreadable, wkh_body  # 2.280.0 C (#3114): loads before this module (kalmido/__init__.py ORDER)
 from .wkhist import wkh_sid, wsb_body_or  # 2.369.5 (#2517): pulled up from functions
@@ -92,7 +93,7 @@ def wks_unindexed(c, w, a, ks, limit=WKS_CATCH_UP):
     OSW_MARK (made before its rules: umlauts with ae, short word starts), so those pages are indexed once more."""
     return c.execute(f"SELECT p.id, p.org_id, p.owner_id, p.body, p.updated_at FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} "
                      "AND left(p.path, 5)<>'e2e1:' AND NOT EXISTS (SELECT 1 FROM obj_search_words x WHERE x.kind='wiki_page' "
-                     "AND x.ref_id=p.id AND (x.h='x:' || p.updated_at || ':' || CAST(? AS text) OR x.h='u:' || p.updated_at "
+                     f"AND x.ref_id=p.id AND (x.h='x:' || {ct_iso('p.updated_at')} || ':' || CAST(? AS text) OR x.h='u:' || {ct_iso('p.updated_at')} "
                      "AND EXISTS (SELECT 1 FROM obj_search_words y WHERE y.kind='wiki_page' AND y.ref_id=p.id AND y.h=?))) "
                      f"ORDER BY p.id LIMIT {int(limit)}", [*a, ks, OSW_MARK]).fetchall()
 

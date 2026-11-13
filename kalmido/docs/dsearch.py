@@ -211,8 +211,8 @@ def dsr_filters(c, args, where, params, base_where, base_params):
     nt = flat("not_tag")
     if nt:
         where.append("NOT " + _in("d.node_id IN (SELECT node_id FROM doc_node_tags WHERE tag_id", nt, params) + ")")
-    for key, expr, op in (("from", "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", ">="), ("to", "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", "<="),
-                          ("added_from", "substr(n.created_at, 1, 10)", ">="), ("added_to", "substr(n.created_at, 1, 10)", "<=")):
+    for key, expr, op in (("from", "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))", ">="), ("to", "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))", "<="),
+                          ("added_from", "substr(CAST(n.created_at AS text), 1, 10)", ">="), ("added_to", "substr(CAST(n.created_at AS text), 1, 10)", "<=")):
         v = str(args.get(key) or "")[:10]
         if re.fullmatch(_ISO, v):
             where.append(f"{expr} {op} ?")
@@ -272,7 +272,7 @@ def dsr_filters(c, args, where, params, base_where, base_params):
             no = [i for name in p["not_" + kind] for i in dsr_label_ids(c, wss, kind, name)]
             if no:
                 where.append(f"({col} IS NULL OR NOT " + _in(col, no, params) + ")")
-    for key, expr in (("date", "COALESCE(d.doc_date, substr(n.created_at, 1, 10))"), ("added", "substr(n.created_at, 1, 10)")):
+    for key, expr in (("date", "COALESCE(d.doc_date, substr(CAST(n.created_at AS text), 1, 10))"), ("added", "substr(CAST(n.created_at AS text), 1, 10)")):
         for f, t in p[key]:
             if f:
                 where.append(f"{expr} >= ?")

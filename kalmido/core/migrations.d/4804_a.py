@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS hub_mailbox_rules (
   take_mail BIGINT NOT NULL DEFAULT 0, target_id BIGINT REFERENCES fs_nodes(id) ON DELETE SET NULL, tags TEXT NOT NULL DEFAULT '[]',
   sender_from_mail BIGINT NOT NULL DEFAULT 1, after TEXT NOT NULL DEFAULT 'seen', after_folder TEXT NOT NULL DEFAULT '',
   delete_mail BIGINT NOT NULL DEFAULT 0, hits BIGINT NOT NULL DEFAULT 0, last_hit_at TEXT,
-  created_by BIGINT REFERENCES users(id) ON DELETE SET NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+  created_by BIGINT REFERENCES users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL);
 CREATE INDEX IF NOT EXISTS ix4804_rules_box ON hub_mailbox_rules(box_id);
 CREATE INDEX IF NOT EXISTS ix4804_rules_target ON hub_mailbox_rules(target_id) WHERE target_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix4804_rules_created_by ON hub_mailbox_rules(created_by) WHERE created_by IS NOT NULL;

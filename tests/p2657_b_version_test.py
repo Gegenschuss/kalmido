@@ -102,7 +102,9 @@ def settings_rule(who, h):
     r = requests.patch(V + f"/event-calendars/{K}", headers={**h, "If-Match": ver_of(h, "/event-calendars", K)}, json={"color": "#336699"}, timeout=30)
     check(r.ok and r.json().get("color") == "#336699", f"{who}: the version as If-Match = changed ({r.status_code} {r.text[:120]})")
     # an old calendar without a version (before 2.566.0)
-    sql_w("UPDATE ev_cals SET updated_at='' WHERE id=?", (K,))
+    # 2.1095.0 (#5306): updated_at is TIMESTAMPTZ now - '' cannot be stored any more; core/coltype.py turned an old '' into the
+    # row's created_at, which is what this state looks like after the move
+    sql_w("UPDATE ev_cals SET updated_at=created_at WHERE id=?", (K,))
     created = dbx("SELECT created_at FROM ev_cals WHERE id=?", (K,))[0][0]
     v0 = ver_of(h, "/event-calendars", K)
     check(v0 == created, f"{who}: an old calendar shows created_at as its version ({v0} / {created})")
@@ -159,7 +161,7 @@ r = A.patch(B + f"/api/lists/{L}", json={"name": "Garden plot", "expect_updated_
 check(r.ok and dbx("SELECT name FROM lists WHERE id=?", (L,))[0][0] == "Garden plot", f"with the version now = changed ({r.status_code})")
 v2 = r.json().get("updated_at") if r.ok else None
 # an old project without a version: the change takes created_at
-sql_w("UPDATE lists SET updated_at='' WHERE id=?", (L,))
+sql_w("UPDATE lists SET updated_at=created_at WHERE id=?", (L,))  # 2.1095.0 (#5306): '' is created_at after the move (core/coltype.py)
 created = dbx("SELECT created_at FROM lists WHERE id=?", (L,))[0][0]
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Garden old", "expect_updated_at": created})
 check(r.ok and dbx("SELECT name FROM lists WHERE id=?", (L,))[0][0] == "Garden old", f"an old project takes created_at as its version ({r.status_code} {r.text[:120]})")

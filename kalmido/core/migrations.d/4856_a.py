@@ -2,5 +2,5 @@
 (core/conflict.py): updated_at = when its content or place was saved last ('' = never since it was made: created_at counts,
 docs/web.py _rule_ver). A column with a DEFAULT only: older versions ignore it."""
 MIGRATIONS = [
-    ("doc_rules", "updated_at", "ALTER TABLE doc_rules ADD COLUMN IF NOT EXISTS updated_at TEXT NOT NULL DEFAULT ''"),
+    ("doc_rules", "updated_at", "ALTER TABLE doc_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP"),
 ]
