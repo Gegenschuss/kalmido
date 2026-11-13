@@ -21,6 +21,15 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1108.0] - 2026-11-13
+
+Package 2.1108 (Bündel: Seitenleiste Handy: Kopf mit Logo springt, wenn ei, Wissensseite: Titel nicht doppelt, Kopf kompakter).
+### Fixed
+- Phone drawer: the head (logo, name, workspace) stays in place and keeps its width on every page; only the list below scrolls, the search stays right under the head, the scroll bar no longer narrows it (#5964).
+### Changed
+- Knowledge page on a phone: the head bar shows the page's title instead of "Knowledge pages", the page head keeps back arrow, path and one "…" menu that also holds the head bar's entries; a first heading that only repeats the page title is hidden in the drawn page (text, editor and export keep it) (#5965).
+- Phone: the grip over the tab bar that opens the favourites is now a small tab with a star instead of a bare grey line (#5965).
+
 ## [2.1105.0] - 2026-11-13
 
 Package 2.1095 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -241,7 +250,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1105.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1108.0...HEAD
+[2.1108.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1108.0
 [2.1105.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1105.0
 [2.1104.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1104.0
 [2.1103.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1103.0
