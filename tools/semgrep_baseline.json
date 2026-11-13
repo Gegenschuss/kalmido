@@ -477,14 +477,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/orgcrypt_cli.py",
-   "code": "sql = f\"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w} AND {col} LIKE ?\" # pg-ok: the prefix is case-exact",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/orgcrypt_cli.py",
    "code": "sql = f\"SELECT {idc} AS rid, {col} AS v FROM {table} WHERE {w}\"",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -2884,14 +2876,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/office/pbtransfer.py",
    "code": "for r in c.execute(f\"SELECT * FROM {t} WHERE {w}{extra} ORDER BY id\", (src,) * n + args).fetchall():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/office/pbtransfer.py",
-   "code": "if cols and c.execute(f\"SELECT 1 FROM {t} WHERE {w} AND ({' OR '.join(f'strpos({x}, ?)>0' for x in cols)}) LIMIT 1\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
