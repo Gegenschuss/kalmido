@@ -148,7 +148,10 @@ const PH = {mobile: true};  // a phone for jsdom
   await until(() => d.querySelector('.office .ofdbar'), 60);
   await sleep(300);
   check(d.querySelectorAll('.office [data-ofd="new"]').length === 1 && !!d.querySelector('.office .empty.eact [data-ofd="new"]'), '#1637: the empty list has exactly one "New quotation", the big one in the empty state');
-  check(!d.querySelector('.office .empty.eact [data-ofd="new"] ~ *') && !!d.querySelector('.office .empty.eact > span'), '#1637: the button comes after the text (2.417.0 #3445: one button again, no menu beside it)');
+  // 2.1112.2 (#5983): since #5450 (job/4293) the empty state is render.js emptyState: the text is its title <b>, the button sits in .eacts after it
+  { const e = d.querySelector('.office .empty.eact'), t = e && e.querySelector(':scope > b'), a = e && e.querySelector(':scope > .eacts');
+    check(!d.querySelector('.office .empty.eact [data-ofd="new"] ~ *') && !!t && /\S/.test(t.textContent) && !!a?.querySelector('[data-ofd="new"]') && e.lastElementChild === a
+      && !!(t.compareDocumentPosition(a) & 4), '#1637: the button comes after the text (2.417.0 #3445: one button again, no menu beside it)'); }
   w.eval(`go('office/invoices')`); await until(() => d.querySelector('.office .ofdkinds [data-kind="invoice"]'), 60);  // 2.380.0 (#3409): the invoices' own area
   check(!!d.querySelector('.office .ofdbar'), '#1637: the other kinds keep their bar');
   w.close();
@@ -195,7 +198,7 @@ const PH = {mobile: true};  // a phone for jsdom
     const {cmd, ev, ctx, shot} = o;
     check(await ffLogin(o) === 200, 'office: login');
     const ready = async (n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('.office .ofdbar')`).catch(() => false)); i++) await sleep(300); await sleep(600); };
-    const office = `(() => { ${rect} const q = s => document.querySelector(s); const empty = q('.office .empty'), btn = empty && empty.querySelector('[data-ofd="new"]'), txt = empty && empty.querySelector(':scope > span'), srch = q('.office .ofdbar .ctsearch'), sel = q('.office .ofdbar select');
+    const office = `(() => { ${rect} const q = s => document.querySelector(s); const empty = q('.office .empty'), btn = empty && empty.querySelector('[data-ofd="new"]'), txt = empty && empty.querySelector(':scope > b'), srch = q('.office .ofdbar .ctsearch'), sel = q('.office .ofdbar select');
       return JSON.stringify({mg: R(q('#view .ofpt') || q('#view .ofpb .ofpback')), l2: R(q('.office .ofcbody')), l3: R(q('.office .ofdkinds button')), srch: R(srch), sel: R(sel), btn: R(btn), txt: R(txt), news: document.querySelectorAll('.office [data-ofd="new"]').length, h2: !!q('.office .ofchead h2'), over: document.documentElement.scrollWidth > innerWidth + 1}); })()`;
     for (const [wd, tag] of [[1345, '1345'], [390, '390']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: 850}});
