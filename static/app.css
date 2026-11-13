@@ -5137,7 +5137,7 @@ select.orgrolesel,.wsorg .mrow select.orgrolesel{min-height:2.75rem;min-width:8.
 .ndms{margin-bottom:.375rem}
 a.nitem.ndm{text-decoration:none;color:inherit}
 .dtome{margin:0 0 1rem;padding:.75rem .875rem;border-radius:var(--r-l);background:color-mix(in srgb,var(--accent) 10%,transparent);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
-.dtome h3{display:flex;align-items:center;gap:.375rem;margin:.75rem 0 .375rem;font-size:var(--fs-b);font-weight:600;color:var(--text)}
+.dtome h3{display:flex;align-items:baseline;gap:.375rem;margin:0 0 .375rem;font-size:var(--fs-b);font-weight:600;color:var(--text)}
 .dtome .dwl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.125rem}
 .dwl .dwb{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;width:100%;text-align:left;color:var(--text2);border-radius:var(--r-s);padding:0 .25rem;background:none;border:0;font:inherit;cursor:pointer}
 .dwl .dwb:hover{background:var(--bg3)}
@@ -6145,6 +6145,8 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .hpadd{margin:0 0 .375rem}
 .hpadd input{width:100%;min-height:2.5rem;padding:.5rem .75rem;background:var(--bg)}
 .hpadd input:focus{border-color:var(--accent)}
+body.fab-on #view .hpadd{padding-right:var(--fab-safe)}  /* 2.1111.0 (#5963): the + button does not cover the field of Today; also: dtome heading flush top, Show all on its baseline */
+.dash .cevrow .cevt{font-family:inherit}  /* 2.1111.0 (#5963): all day in the normal font, not monospace */
 .dash .dtl li,.hpnl li{border-top:1px solid var(--line)}
 .dash .dtl li:first-child,.hpnl li:first-child{border-top:0}
 .dash .dtl .dtt{flex:0 1 auto}
