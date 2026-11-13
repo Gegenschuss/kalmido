@@ -3337,7 +3337,8 @@ emptying the trash, deleting folders, undoing an import, a batch with `action: d
 A project can have its own level (`projects`), which wins over the agent's. The project of a step is the one of the object it
 writes (a task, a section, a comment's task ...; an object of the shared core under `/agent/objects/{kind}/{id}`, also its
 links, the project that object lies in *(2.1117.0, #6024)*); a `list_id` in the body counts only where the route reads it
-(creating or moving into a project), never to pick a laxer project. A personal agent never gets more in a project
+(creating or moving into a project), never to pick a laxer project. Such an object in a project the agent sees takes that
+project's level (capped by the owner's rights), no longer the general cap at `routine` of places Kalmido cannot place. A personal agent never gets more in a project
 than its owner's own rights there (owner / admin = `free`, member who edits = `routine`, reading / commenting =
 `approve_all`). One-way steps (`one_way.fixed`: deleting, anything that costs money, login and registration, migrations
 without a way back; plus the owner's own items, `one_way.custom`) need a card on **every** level; Kalmido enforces deleting,

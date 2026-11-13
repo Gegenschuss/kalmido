@@ -135,7 +135,7 @@ def tdfill(j):
             if k not in t and not (k == "content" and "content_n" in t):
                 t[k] = type(v)() if isinstance(v, (list, dict)) else v
         for k in j.get("tutc") or ():
-            if isinstance(t.get(k), str) and t[k] and not t[k].endswith("+00:00"):
+            if isinstance(t.get(k), str) and t[k] and not re.search(r"(Z|[+-]\d\d:\d\d)$", t[k]):
                 t[k] += "+00:00"
     return j
 

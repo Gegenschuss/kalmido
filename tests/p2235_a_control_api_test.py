@@ -311,6 +311,9 @@ for body in ({"name": "Renamed"}, {"name": "Renamed", "list_id": TL2}):
     check(r.status_code == 409 and code(r) == "approval_required" and r.json()["error"]["level"] == "approve_all"
           and r.json()["error"].get("project_id") == TL,
           f"team agent free, project approve_all: a core object of it needs a card ({body}) {r.status_code} {r.text[:200]}")
+TT = A.post(B + "/api/tasks", json={"title": "Team task", "list_id": TL}).json()["id"]
+r = requests.patch(V + f"/agent/objects/task/{TT}", headers=TAH, json={"title": "x", "list_id": TL2})
+check(r.status_code == 409 and r.json()["error"].get("project_id") == TL, f"a core object with list_id (a task): its project's level {r.status_code}")
 ctl(A, TA, {"projects": {str(TL): None}})
 r = requests.patch(V + f"/agent/objects/list/{TL}", headers=TAH, json={"name": "Renamed"})
 check(code(r) != "approval_required", f"the exception removed: the gate lets it through (the route answers itself) {r.status_code}")

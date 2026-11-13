@@ -100,6 +100,8 @@ check(len(json.dumps(z2["tasks"])) < len(json.dumps(lean["tasks"])), "td=2: smal
 filled2 = {t["id"]: t for t in node_fill(z2["tasks"], z2["tdef"], z2["tutc"])}
 check(filled2 == ft, f"td=2 filled by tdFill = the whole state ({[i for i in ft if filled2.get(i) != ft[i]][:3]})")
 check({t["id"]: t for t in node_fill(full["tasks"], td, z2["tutc"])} == ft, "tdFill with tutc leaves whole tasks (the delta's) as they are")
+zz = node_fill([{"id": 1, "created_at": "2026-11-13T10:00:00.000Z", "updated_at": "2026-11-13T10:00:00+02:00"}], {}, z2["tutc"])[0]
+check(zz["created_at"].endswith("Z") and zz["updated_at"].endswith("+02:00"), f"tdFill: a time with its zone (an offline task's Z) stays {zz}")
 ls2 = F.get(B + f"/api/state/lists?td=2&ids={L}").json()
 check(ls2.get("tutc") == z2["tutc"] and {t["id"]: t for t in node_fill(ls2["tasks"], ls2["tdef"], ls2["tutc"])} == {t["id"]: t for t in ls_full["tasks"]},
       "/api/state/lists?td=2 filled = without td")

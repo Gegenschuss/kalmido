@@ -221,14 +221,14 @@ function lzTake(j) {
 // serializers.TD_DEFAULTS) puts them back before anything reads the tasks (applyState, lzLoad, the delta), so a task is the one
 // the whole state has (t.x === null, 'x' in t). content stays out where the note is long (content_n). The one fill function.
 // 2.1117.0 (#6023): asked with td=2 the points in time of S.tutc (serializers.TD_UTC, always UTC) come without their zone
-// +00:00; it goes back on here too (a text that has it already stays, so a whole task of the delta passes unchanged).
+// +00:00; it goes back on here too (a text with a zone already stays: a whole task of the delta, an offline task's ...Z).
 S.tdef = null; S.tutc = null;
 function tdFill(ts, def = S.tdef, utc = S.tutc) {
   if (!def || !ts) return ts;
   const ks = Object.keys(def), us = utc || [];
   for (const t of ts) {
     for (const k of ks) if (!(k in t) && !(k === 'content' && 'content_n' in t)) { const v = def[k]; t[k] = v !== null && typeof v === 'object' ? (Array.isArray(v) ? [] : {}) : v; }
-    for (const k of us) { const v = t[k]; if (typeof v === 'string' && v && !v.endsWith('+00:00')) t[k] = v + '+00:00'; }
+    for (const k of us) { const v = t[k]; if (typeof v === 'string' && v && !/(Z|[+-]\d\d:\d\d)$/.test(v)) t[k] = v + '+00:00'; }
   }
   return ts;
 }
