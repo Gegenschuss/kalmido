@@ -23,6 +23,7 @@ One way (the leader's --einbahn): the type does not change back. A version befor
 few `= ''` comparisons on these columns would fail; a backup restores the old state."""
 import sys
 
+from .kernretire import kern_retire_floor
 from .pg import qi, system_ctx
 
 CT_TIME = {  # column -> the tables that still had it as TEXT (the lines of tools/coltypes_baseline.txt before 2.1095)
@@ -208,4 +209,170 @@ def _ct_run(c, at):
     n = sum(1 for v in out.values() if v == "done")
     if n:
         print(f"migrations: 5306: {n} time column(s) are TIMESTAMPTZ now", flush=True)
+    return out
+
+
+# ---- 2.1111.0 (#5953, rest 3 of #5306 / #5289): the JSON columns kept as TEXT become JSONB --------------------------------
+# A new database makes them JSONB at once (core/schema.py, the fragments of migrations.d); ct_json_migrate (init_db, after
+# ct_migrate) turns an existing one, column by column, each in its own savepoint:
+#   - a value Postgres reads as JSONB keeps it (an array, an object or a scalar: the readers decide, as before)
+#   - '' / no JSON / JSON that JSONB refuses (a "\u0000", NaN) becomes the column's default ('{}' or '[]'); the log names the
+#     column, the count and the first ids of the non-empty ones (`migrations: 5953: ...`), as core/tplmove.py does
+#   - a column that holds sealed text (kenc1: / e2e1:) outside JSON is not turned (the value would be lost), the log says so
+#   - triggers that name the column (UPDATE OF / WHEN, e.g. the search index core/objsearch.py) are taken off and put back
+#     unchanged inside the same savepoint (Postgres refuses to change the type of a column a trigger names)
+#   - a column Postgres refuses to turn stays TEXT, the log says why, the next start tries again
+# Reading stays as it was: the driver gives JSONB to Python as its JSON text (core/pg.py, TextLoader) - json.loads works; the
+# text is JSONB's own form (keys by length then bytes, ", " / ": ", no duplicate keys). SQL on these columns works for both
+# types (docs/dev/kern.md): never LIKE / ILIKE / || / lower() / position() / COALESCE(x, '') / = '' on the column itself -
+# CAST(x AS text) for text matching, CAST(x AS jsonb) -> / @> for its content.
+# Kept as TEXT (marked coltype-ok in the schema, the reason there): the columns sealed as a whole (core/orgcrypt.py FIELDS:
+# office_bookarch.raw, office_contracts.rates, office_doc_log.detail, office_doc_parts.sheet, office_meals.amounts / guests /
+# host, office_roles.costs, office_trips.people), office_docs.totals (the GoBD hash chain office/chain.py hch_canon hashes its
+# numbers; JSONB would turn -0.0 into 0.0 and 1e+16 into 10000000000000000) and budget_meta.mappings (its key order is the
+# age of an entry, life/budget.py _meta_put drops the oldest).
+# One way (the leader's --einbahn): a version before would run its text operators on JSONB (ILIKE on contacts' e-mails, the
+# search index trigger): the back limit rises to this minor (core/kernretire.py kern_retire_floor); a backup restores the old state.
+CT_JSON = {  # table -> ((column, default), ...): the json lines of tools/coltypes_baseline.txt before 2.1111 that move
+    "admin_alerts": (("tmpl", "[]"),),
+    "agent_events": (("payload", "{}"),),
+    "agent_server": (("flow_models", "{}"), ("flow_web", "{}")),
+    "bookmarks": (("tags", "[]"),),
+    "budget_meta": (("runs", "[]"),),
+    "contacts": (("addresses", "[]"), ("emails", "[]"), ("groups", "[]"), ("phones", "[]"), ("urls", "[]")),
+    "doc_cfg": (("data", "{}"),),
+    "doc_fields": (("options", "{}"),),
+    "doc_mail": (("tags", "[]"),),
+    "doc_meta": (("auto", "{}"),),
+    "doc_office_moves": (("items", "[]"),),
+    "field_trash": (("def", "{}"), ("vals", "[]")),
+    "filters": (("rules", "{}"),),
+    "folder_props": (("props", "{}"),),
+    "form_entries": (("answers", "{}"),),
+    "forms": (("questions", "[]"),),
+    "git_closes": (("undo", "{}"),),
+    "git_conns": (("etags", "{}"),),
+    "hub_mailbox_rules": (("tags", "[]"),),
+    "hub_mails": (("files", "[]"),),
+    "imports": (("created", "{}"), ("report", "{}")),
+    "list_activity": (("data", "{}"),),
+    "list_fields": (("options", "{}"),),
+    "list_part_trash": (("held", "{}"), ("snap", "{}")),
+    "list_rules": (("act_val", "{}"),),
+    "lists": (("folder_own", "[]"),),
+    "member_memos": (("data", "{}"),),
+    "merge_runs": (("merged_ids", "[]"), ("snapshot", "{}"), ("summary", "{}")),
+    "msv_links": (("remote_me", "{}"),),
+    "nl_runs": (("counts", "{}"), ("errors", "[]")),
+    "nl_segments": (("rule", "{}"),),
+    "oauth_clients": (("redirect_uris", "[]"),),
+    "office_contracts": (("trans", "{}"),),
+    "office_doc_parts": (("settings", "{}"), ("totals", "{}")),
+    "office_docs": (("abs_refs", "[]"), ("fields", "[]"), ("recipient", "{}"), ("rights", "{}")),
+    "office_equipment": (("maint", "[]"), ("trans", "{}")),
+    "office_fixed_costs": (("seats", "[]"),),
+    "office_import_runs": (("counts", "{}"), ("detail", "{}")),
+    "office_pack_installs": (("meta", "{}"),),
+    "office_rgroups": (("rights", "{}"), ("specials", "[]")),
+    "office_roles": (("trans", "{}"),),
+    "office_services": (("trans", "{}"),),
+    "office_sets": (("items", "[]"),),
+    "office_settings": (("data", "{}"),),
+    "office_texts": (("trans", "{}"),),
+    "office_trips": (("vma_days", "[]"),),
+    "org_fields": (("options", "{}"),),
+    "retention_log": (("detail", "{}"),),
+    "sched_poll_votes": (("answers", "{}"),),
+    "sheet_columns": (("options", "[]"),),
+    "space_moves": (("detail", "{}"),),
+    "support_grants": (("uses", "[]"),),
+    "time_sheets": (("log", "[]"),),
+    "time_wipes": (("entries", "[]"),),
+    "wiki_pages": (("attrs", "{}"),),
+    "wiki_spaces": (("wkx_holds", "{}"),),
+}
+CTJ_NAMES = {*CT_JSON, *(x for cols in CT_JSON.values() for x, _ in cols)}  # the allowlist of qi() (#5296)
+CTJ_SEALED = ("kenc1:", "e2e1:")  # core/orgcrypt.py PREFIX, collab/liste2e.py LE2E_PREFIX: sealed text, never JSON
+CTJ_HOW = ("the JSON columns of the areas are JSONB (#5953) - an older version would search and write them as text; go back "
+           "only with a backup from before")
+
+
+def ctj_types(c):
+    """{(table, column): data_type} of the CT_JSON columns that exist."""
+    q = ",".join("?" * len(CT_JSON))
+    return {(r[0], r[1]): r[2] for r in c.execute(
+        f"SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() "
+        f"AND table_name IN ({q})", tuple(CT_JSON)).fetchall() if any(r[1] == x for x, _ in CT_JSON[r[0]])}
+
+
+def ctj_misfits(c, table, col):
+    """([ids] (ctid text without an id column) of the rows whose col is neither '' nor JSON that JSONB takes, sealed: bool)."""
+    q = qi(col, CTJ_NAMES)
+    has_id = c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
+                       "AND column_name='id'", (table,)).fetchone()
+    key = "id" if has_id else "ctid::text"
+    rows = c.execute(f"SELECT {key}, left(btrim({q}), 8) FROM {qi(table, CTJ_NAMES)} WHERE {q} IS NOT NULL AND btrim({q}) <> '' "
+                     f"AND NOT pg_input_is_valid({q}, 'jsonb') ORDER BY 1").fetchall()
+    return [r[0] for r in rows], any(str(r[1] or "").startswith(CTJ_SEALED) for r in rows)
+
+
+def ctj_triggers(c, table, col):
+    """[(name, CREATE TRIGGER text)] of the user triggers on table that name col (UPDATE OF col, or col in their WHEN)."""
+    return [(r[0], r[1]) for r in c.execute(
+        "SELECT DISTINCT t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t JOIN pg_depend d ON d.classid='pg_trigger'::regclass "
+        "AND d.objid=t.oid JOIN pg_attribute a ON a.attrelid=d.refobjid AND a.attnum=d.refobjsubid "
+        "WHERE NOT t.tgisinternal AND t.tgrelid=to_regclass(?) AND a.attname=? ORDER BY 1", (table, col)).fetchall()]
+
+
+def ct_json_migrate(c, at):
+    """init_db (2.1111.0, #5953): every CT_JSON column that is still TEXT becomes JSONB (the block above CT_JSON), each in a
+    savepoint of the start's transaction (at = the start's time, ISO) -> {"table.col": "done" | "kept" | "present" | "missing"}.
+    System context: the check must see every organisation's rows (as ct_migrate)."""
+    with system_ctx(c):
+        return _ctj_run(c, at)
+
+
+def _ctj_run(c, at):
+    out = {}
+    types = ctj_types(c)
+    for table, cols in CT_JSON.items():
+        for col, dflt in cols:
+            k = f"{table}.{col}"
+            typ = types.get((table, col))
+            if typ != "text":
+                out[k] = "present" if typ else "missing"
+                continue
+            bad, sealed = ctj_misfits(c, table, col)
+            if sealed:
+                out[k] = "kept"
+                print(f"migrations: 5953: {k} stays TEXT: it holds sealed text (ids {', '.join(map(str, bad[:CT_SHOW]))})",
+                      file=sys.stderr, flush=True)
+                continue
+            if bad:
+                print(f"migrations: 5953: {k}: {len(bad)} value(s) are no JSON and become {dflt} (ids "
+                      f"{', '.join(map(str, bad[:CT_SHOW]))}{', ...' if len(bad) > CT_SHOW else ''})", file=sys.stderr, flush=True)
+            q, t = qi(col, CTJ_NAMES), qi(table, CTJ_NAMES)
+            sql = (f"ALTER TABLE {t} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN {q} IS NULL "
+                   f"THEN NULL WHEN pg_input_is_valid({q}, 'jsonb') THEN {q}::jsonb ELSE '{dflt}'::jsonb END), "
+                   f"ALTER COLUMN {q} SET DEFAULT '{dflt}'::jsonb")
+            try:
+                with c.savepoint():
+                    trg = ctj_triggers(c, table, col)
+                    for name, _ in trg:
+                        c.execute(f'DROP TRIGGER "{name}" ON {t}')
+                    c.execute(sql)
+                    for _, ddl in trg:
+                        c.execute(ddl)
+            except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
+                out[k] = "kept"
+                print(f"migrations: 5953: {k} stays TEXT: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
+                continue
+            c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'applied') ON CONFLICT(id) DO UPDATE SET "
+                      "applied_at=excluded.applied_at, note=excluded.note", (CT_ID.format(table, col), at))
+            out[k] = "done"
+    n = sum(1 for v in out.values() if v == "done")
+    if n:
+        print(f"migrations: 5953: {n} JSON column(s) are JSONB now", flush=True)
+    if any(v in ("done", "present") for v in out.values()):
+        kern_retire_floor(c, how=CTJ_HOW)
     return out

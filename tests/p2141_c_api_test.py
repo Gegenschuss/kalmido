@@ -172,7 +172,7 @@ n1 = cons(Bo, C1)
 check(n1["status"] == "yes" and n1["at"].startswith("2025-03-05") and n1["source"] == "Import: consents.csv · Messe", f"the proof: date + source ({n1})")
 check(cons(Bo, C2)["source"] == "Import: consents.csv" and cons(Bo, C2)["at"].startswith("2025-04-01"), "no source column value: the file name only")
 check(cons(Bo, C3)["source"] == "Form" and cons(Bo, C5)["status"] == "unsub", "an existing consent stays, an unsubscribe stays")
-check(len(dbx("SELECT id FROM contacts WHERE lower(emails) LIKE '%nobody@%'")) == 0, "no contact is created")
+check(len(dbx("SELECT id FROM contacts WHERE lower(CAST(emails AS text)) LIKE '%nobody@%'")) == 0, "no contact is created")  # 2.1111.0 (#5953): the column is JSONB
 # header-less comma file, ISO date with time
 r = Bo.post(IM, json={"ws": WA, "csv": "dora@example.com,2025-06-01T08:00:00Z,Web\n", "apply": True})
 check(r.ok and r.json()["applied"] == 1 and cons(Bo, C4)["at"].startswith("2025-06-01"), f"no header, comma, ISO with time ({r.text[:200]})")

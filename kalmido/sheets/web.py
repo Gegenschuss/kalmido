@@ -303,7 +303,7 @@ def shx_col_apply(c, r, col_id, b, uid, step=False):
         cur = c.execute("SELECT options FROM sheet_columns WHERE id=?", (col_id,)).fetchone()["options"]
         opts, added, ocf = sh_option_ops(sh_options(cur), b["options_ops"])
         cf += ocf
-        if json.dumps(opts, ensure_ascii=False) != cur:
+        if opts != sh_options(cur):  # 2.1111.0 (#5953): options is JSONB (its own text form): compared by content
             f["options"] = json.dumps(opts, ensure_ascii=False)
     if "pos" in b:
         p = b["pos"]

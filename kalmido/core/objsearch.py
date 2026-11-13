@@ -189,15 +189,16 @@ OSR_SOURCES = {
     "note": {"table": "notes", "org": "(SELECT l.org_id FROM lists l WHERE l.id={r}.list_id)", "owner": "{r}.created_by",
              "node": "{r}.list_id", "title": "{r}.title", "body": "{r}.body", "more": "{r}.tags",
              "cols": ("title", "body", "tags", "list_id")},
+    # 2.1111.0 (#5953): the JSON lists of contacts / bookmarks are JSONB - CAST to text for kalmido_osr_vals (TEXT before)
     # a contact: its name A; names, company, function, note, e-mails, phones, addresses, groups B; names = the names, the
     # company and the phone numbers (digits) for the part-of-a-word match
     "contact": {"table": "contacts", "org": "{r}.org_id", "owner": "{r}.created_by", "node": "{r}.book_id",
                 "title": "COALESCE(NULLIF({r}.fn, ''), {r}.org)",
                 "body": "concat_ws(' ', {r}.given, {r}.middle, {r}.family, {r}.nickname, {r}.org, {r}.dept, {r}.title, left({r}.note, 500), "
-                        "kalmido_osr_vals({r}.emails, ARRAY['value']), kalmido_osr_vals({r}.phones, ARRAY['value']), "
-                        "kalmido_osr_vals({r}.addresses, ARRAY['street', 'city', 'code', 'country']), kalmido_osr_vals({r}.groups, NULL))",
+                        "kalmido_osr_vals(CAST({r}.emails AS text), ARRAY['value']), kalmido_osr_vals(CAST({r}.phones AS text), ARRAY['value']), "
+                        "kalmido_osr_vals(CAST({r}.addresses AS text), ARRAY['street', 'city', 'code', 'country']), kalmido_osr_vals(CAST({r}.groups AS text), NULL))",
                 "names": "concat_ws(' ', {r}.fn, {r}.given, {r}.family, {r}.nickname, {r}.org, "
-                         "kalmido_osr_vals({r}.phones, ARRAY['value'], true))",
+                         "kalmido_osr_vals(CAST({r}.phones AS text), ARRAY['value'], true))",
                 "cols": ("fn", "given", "middle", "family", "nickname", "org", "dept", "title", "note", "emails", "phones",
                          "addresses", "groups", "book_id", "org_id", "created_by")},
     # a knowledge page: its name only (the text is sealed, wiki/wksearch.py); names = the name (part of a word)
@@ -219,7 +220,7 @@ OSR_SOURCES = {
     # 2.1026.0 (#5280): a bookmark (reading list's links): title A, description, note, site, tags B, address and the page's
     # text C; names = the site (part of a word); was an ILIKE over these columns (life/bookmarks.py bm_list)
     "bookmark": {"table": "bookmarks", "org": "{r}.org_id", "owner": "{r}.user_id", "node": "NULL::bigint",
-                 "title": "{r}.title", "body": "concat_ws(' ', {r}.description, {r}.note, {r}.site, kalmido_osr_vals({r}.tags, NULL))",
+                 "title": "{r}.title", "body": "concat_ws(' ', {r}.description, {r}.note, {r}.site, kalmido_osr_vals(CAST({r}.tags AS text), NULL))",
                  "more": "concat_ws(' ', {r}.url, {r}.text)", "names": "{r}.site",
                  "cols": ("title", "description", "note", "site", "tags", "url", "text", "org_id", "user_id")},
 }

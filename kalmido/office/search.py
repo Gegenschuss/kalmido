@@ -93,7 +93,7 @@ def bs_office_hits(c, uid, q):
     rows = c.execute(f"""SELECT d.id, d.kind, d.number, d.project_title, d.project_ref, d.recipient, d.date, cl.name AS client_name
             FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id
             WHERE d.org_id=? AND {live_sql('d')} AND (d.number ILIKE ? ESCAPE '\\' OR d.project_title ILIKE ? ESCAPE '\\' OR d.project_ref ILIKE ? ESCAPE '\\'
-                OR d.recipient ILIKE ? ESCAPE '\\' OR cl.name ILIKE ? ESCAPE '\\')
+                OR CAST(d.recipient AS text) ILIKE ? ESCAPE '\\' OR cl.name ILIKE ? ESCAPE '\\')
             ORDER BY (lower(d.number) LIKE ? ESCAPE '\\') DESC, d.date DESC, d.id DESC LIMIT {BS_LIMIT * 6} -- pg-ok: both sides lower-cased""",
                      (oid, like, like, like, like, like, f"{like_escape(low)}%")).fetchall()
     n = 0

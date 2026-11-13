@@ -78,8 +78,8 @@ END $$;
 CREATE OR REPLACE FUNCTION kalmido_otg_rekey(lid BIGINT, o BIGINT, n BIGINT) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
   UPDATE list_rules SET trig_val = n::text WHERE list_id = lid AND trig = 'ltag' AND trig_val = o::text;
-  UPDATE list_rules SET act_val = jsonb_set(kalmido_otg_j(act_val), '{tag_id}', to_jsonb(n))::text
-    WHERE list_id = lid AND act = 'tag' AND jsonb_typeof(kalmido_otg_j(act_val)) = 'object' AND kalmido_otg_j(act_val)->'tag_id' = to_jsonb(o);
+  UPDATE list_rules SET act_val = jsonb_set(kalmido_otg_j(CAST(act_val AS text)), '{tag_id}', to_jsonb(n))
+    WHERE list_id = lid AND act = 'tag' AND jsonb_typeof(kalmido_otg_j(CAST(act_val AS text))) = 'object' AND kalmido_otg_j(CAST(act_val AS text))->'tag_id' = to_jsonb(o);
   UPDATE list_rules SET more_acts = (SELECT jsonb_agg(CASE WHEN jsonb_typeof(e.x) = 'object' AND e.x->>'kind' = 'tag' AND e.x->'tag_id' = to_jsonb(o)
                                                       THEN jsonb_set(e.x, '{tag_id}', to_jsonb(n)) ELSE e.x END ORDER BY e.i)
                                      FROM jsonb_array_elements(kalmido_otg_j(more_acts)) WITH ORDINALITY AS e(x, i))::text

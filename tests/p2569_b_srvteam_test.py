@@ -117,12 +117,12 @@ def settled(n):
 # ---------------------------------------------------------------- "Members may see and use the agent" off
 n_ev = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=?", (TK,))[0][0]
 check(Ca.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{TK}> CARL-NORIGHT FAKE_COMMENT {T1}"}).ok, "carl mentions the agent")
-check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND payload LIKE '%CARL-NORIGHT%'", (TK,))[0][0] == 0,
+check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND CAST(payload AS text) LIKE '%CARL-NORIGHT%'", (TK,))[0][0] == 0,  # 2.1111.0 (#5953): the column is JSONB
       "switch off: a member's mention reaches the team agent not at all")
 # 2.777.0 (#5378): a member of the team agent's organisation may write to it without a project opened to him - Kalmido answers
 # with a fixed text, nothing reaches the agent (was: refused)
 r = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "Hello CARL-CHAT"})
-check(r.status_code == 201 and dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND payload LIKE '%CARL-CHAT%'", (TK,))[0][0] == 0,
+check(r.status_code == 201 and dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND CAST(payload AS text) LIKE '%CARL-CHAT%'", (TK,))[0][0] == 0,  # 2.1111.0 (#5953): the column is JSONB
       f"switch off: the member's chat never reaches the agent, Kalmido answers ({r.status_code})")
 check(Bo.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{TK}> FAKE_COMMENT {T1}"}).ok, "the owner mentions it")
 check(until(lambda: agent_comments(T1), 40), "the owner's order: the agent commented")
@@ -224,7 +224,7 @@ check(Fr.put(B + f"/api/lists/{FL}/members", json={"user_id": FAG, "role": "edit
 check(Fr.patch(B + f"/api/lists/{FL}", json={"listen_agent_ids": [FAG]}).ok, "her agent listens in")
 bg = lambda: dbx("SELECT COUNT(*) FROM bg_jobs WHERE kind='srvagent:run' AND user_id=?", (FAG,))[0][0]  # noqa: E731
 check(Gi.post(B + "/api/tasks", json={"title": "GINA-ORDER do this", "list_id": FL}).ok, "gina adds a task")
-check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='task_added' AND payload LIKE '%GINA-ORDER%'", (FAG,))[0][0] == 1,
+check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='task_added' AND CAST(payload AS text) LIKE '%GINA-ORDER%'", (FAG,))[0][0] == 1,  # 2.1111.0 (#5953): the column is JSONB
       "the agent hears of gina's task (data)")
 check(bg() == 0 and not runs(FAG), "but gina's task starts no run (no queue row)")
 check(Gi.post(B + f"/api/agents/{FAG}/chat", json={"body": "GINA-CHAT"}).status_code in (403, 404), "gina cannot chat with frida's agent")

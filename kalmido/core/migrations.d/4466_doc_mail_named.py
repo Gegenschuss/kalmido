@@ -7,7 +7,7 @@ MIGRATIONS = [
     ("doc_mail", "aid", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS aid TEXT NOT NULL DEFAULT ''"),
     ("doc_mail", "name", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS name TEXT NOT NULL DEFAULT ''"),
     ("doc_mail", "target_folder", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS target_folder BIGINT"),
-    ("doc_mail", "tags", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS tags TEXT NOT NULL DEFAULT '[]'"),
+    ("doc_mail", "tags", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'"),
     ("doc_mail", "active", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE"),
     ("doc_mail", "updated_at", "ALTER TABLE doc_mail ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP"),
 ]

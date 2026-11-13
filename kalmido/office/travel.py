@@ -252,6 +252,11 @@ def rk_vma_clean(b, cur=None):
             if len(row) > 1:
                 days[d] = row
         out["vma_days"] = json.dumps([days[k] for k in sorted(days)], ensure_ascii=False)
+        try:  # 2.1111.0 (#5953): vma_days is JSONB (its own key order): the same days are no change (office/owrite.py compares text)
+            if cur and json.loads(cur.get("vma_days") or "[]") == json.loads(out["vma_days"]):
+                out["vma_days"] = cur.get("vma_days")
+        except (TypeError, ValueError):
+            pass
     if "vma_off" in b or not cur:
         out["vma_off"] = 1 if b.get("vma_off") else 0
     return out

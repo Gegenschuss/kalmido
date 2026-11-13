@@ -295,7 +295,7 @@ ms = wait_mail(M1, 3)
 TOK2 = link_in(ms[2], "c") if len(ms) > 2 else None
 r = pub.post(f"{B}/s/b/c/{TOK2}", data={"f": fkey(pub.get(f"{B}/s/b/c/{TOK2}").text)}, allow_redirects=False)
 B2, ct2 = dbx("SELECT id, contact_id FROM appt_bookings WHERE email=? AND status='confirmed' AND id<>?", (M1, B1))[0]
-check(ct2 == row[2] and dbx("SELECT COUNT(*) FROM contacts WHERE emails LIKE ?", (f"%{M1}%",))[0][0] == 1, "the existing contact is taken, no double")
+check(ct2 == row[2] and dbx("SELECT COUNT(*) FROM contacts WHERE CAST(emails AS text) LIKE ?", (f"%{M1}%",))[0][0] == 1, "the existing contact is taken, no double")  # 2.1111.0 (#5953): the column is JSONB
 
 # the customer cancels
 r = pub.get(f"{B}/s/b/x/{CX1}")

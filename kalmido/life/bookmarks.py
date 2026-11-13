@@ -255,7 +255,7 @@ def bm_list(c, uid, a):
         args += x
     tag = (a.get("tag") or "").strip()[:BM_TAG_MAX]
     if tag:
-        w += " AND b.tags ILIKE ? ESCAPE '\\'"
+        w += " AND CAST(b.tags AS text) ILIKE ? ESCAPE '\\'"
         args.append(_like(json.dumps(tag, ensure_ascii=False)))  # stored with ensure_ascii=False (review L3)
     off = as_int(a.get("offset") or 0, "offset", 0, 1_000_000)
     rows = c.execute(f"""SELECT b.id, b.user_id, b.org_id, b.url, b.title, b.description, b.site, b.tags, b.note, b.state, b.image,

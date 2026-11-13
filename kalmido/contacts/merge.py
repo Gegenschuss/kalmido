@@ -90,6 +90,17 @@ def ctm_join(k, rows):
     return out[:ITEMS_MAX]
 
 
+def ctm_same(k, a, b):
+    """2.1111.0 (#5953): is stored value a the value b? The JSON lists (CTM_LISTS) are JSONB, read in JSONB's own key order:
+    compared by content, not by their text."""
+    if k in CTM_LISTS and a != b:
+        try:
+            return json.loads(a or "[]") == json.loads(b or "[]")
+        except (TypeError, ValueError):
+            return False
+    return a == b
+
+
 def ctm_ids(target, ids):
     t = as_int(target, "target", 1)
     if ids is not None and not isinstance(ids, list):
@@ -145,7 +156,7 @@ def ctm_fields(rows, pick):
         if src is not None:
             for k in CTM_NL:
                 f[k] = src[k]
-    return {k: v for k, v in f.items() if v != t[k]}
+    return {k: v for k, v in f.items() if not ctm_same(k, t[k], v)}
 
 
 def ctm_pick(pick, all_ids):
@@ -384,7 +395,7 @@ def ctm_undo(c, uid, rid):
             restore_task(c, x)
     if t is not None:
         before, after = snap.get("target") or {}, snap.get("after") or {}
-        f = {k: before[k] for k, v in after.items() if k in before and t[k] == v}
+        f = {k: before[k] for k, v in after.items() if k in before and ctm_same(k, t[k], v)}
         # a birthday / anniversary task the merge made for the target goes again when its date goes back to empty
         keep = set(snap.get("t_occ") or [])
         for o in c.execute("SELECT kind, task_id FROM contact_occ WHERE contact_id=?", (t["id"],)).fetchall():

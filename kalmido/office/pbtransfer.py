@@ -112,7 +112,7 @@ def pbt_target(c, uid, v):
 
 def _text_cols(c, t):
     return [r[0] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() "
-                                    "AND table_name=? AND data_type='text' ORDER BY column_name", (t,))]
+                                    "AND table_name=? AND data_type IN ('text', 'jsonb') ORDER BY column_name", (t,))]  # 2.1111.0 (#5953): + JSONB
 
 
 def pbt_files(src):
@@ -164,7 +164,7 @@ def pbt_plan(c, uid, src, dst):
         # a protected value this version does not know how to seal anew: never moved half readable
         done = set(FIELDS.get(t, ())) | {col for (tt, col) in JSON_KEYS if tt == t} | {"cost_enc"}
         cols = [x for x in _text_cols(c, t) if x not in done]
-        if cols and c.execute(f"SELECT 1 FROM {t} WHERE {w} AND ({' OR '.join(f'strpos({x}, ?)>0' for x in cols)}) LIMIT 1",
+        if cols and c.execute(f"SELECT 1 FROM {t} WHERE {w} AND ({' OR '.join(f'strpos(CAST({x} AS text), ?)>0' for x in cols)}) LIMIT 1",
                               (src,) * n + ("kenc1:",) * len(cols)).fetchone():
             conflicts.append(tr("{0}: encrypted data that cannot be moved", t))
     taken = [r[0] for r in c.execute(

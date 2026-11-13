@@ -666,7 +666,7 @@ def upg_alerts(c, uid):
         return
     rx = re.compile(r"(?<![\w.@-])(?:" + "|".join(re.escape(x) for x in names) + r")(?![\w.@-])", re.I)
     sub = lambda v: rx.sub(f"#{int(uid)}", v) if isinstance(v, str) else v  # noqa: E731
-    like = " OR ".join(["message ILIKE ? OR tmpl ILIKE ? OR key ILIKE ?"] * len(names))
+    like = " OR ".join(["message ILIKE ? OR CAST(tmpl AS text) ILIKE ? OR key ILIKE ?"] * len(names))
     pat = [f"%{x}%" for x in names for _ in range(3)]
     for r in c.execute(f"SELECT id, key, message, tmpl FROM admin_alerts WHERE {like}", pat).fetchall():
         try:

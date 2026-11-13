@@ -1679,7 +1679,7 @@ def imr_used(c, oid, kind, rid, limit=3):
         if len(out) < limit:
             out += [x.get("name") or "" for x in office_rows(c, oid, "contracts") if str(rid) in (x.get("rates") or {})][:limit - len(out)]
     elif kind == "equipment":
-        for x in c.execute(f"SELECT name FROM office_sets WHERE org_id=? AND (items ILIKE ? OR items ILIKE ?) AND {live_sql()} ORDER BY id LIMIT ?",
+        for x in c.execute(f"SELECT name FROM office_sets WHERE org_id=? AND (CAST(items AS text) ILIKE ? OR CAST(items AS text) ILIKE ?) AND {live_sql()} ORDER BY id LIMIT ?",
                            (oid, f'%"equipment_id": {int(rid)},%', f'%"equipment_id": {int(rid)}}}%', limit)):
             out.append(x["name"])
     return out

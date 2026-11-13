@@ -4,7 +4,7 @@ agent_runs.web = the web state of a run with web access ('' = none): the people 
 counts (searches, fetched pages, VAT checks); the control gate reads it while the run is on. agent_usage.web_searches /
 web_fetches = the provider's web tool uses of one usage report. New columns with defaults only: older versions ignore them."""
 MIGRATIONS = [
-    ("agent_server", "flow_web", "ALTER TABLE agent_server ADD COLUMN IF NOT EXISTS flow_web TEXT NOT NULL DEFAULT '{}'"),
+    ("agent_server", "flow_web", "ALTER TABLE agent_server ADD COLUMN IF NOT EXISTS flow_web JSONB NOT NULL DEFAULT '{}'"),
     ("agent_runs", "web", "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS web TEXT NOT NULL DEFAULT ''"),
     ("agent_usage", "web_searches", "ALTER TABLE agent_usage ADD COLUMN IF NOT EXISTS web_searches INTEGER NOT NULL DEFAULT 0"),
     ("agent_usage", "web_fetches", "ALTER TABLE agent_usage ADD COLUMN IF NOT EXISTS web_fetches INTEGER NOT NULL DEFAULT 0"),

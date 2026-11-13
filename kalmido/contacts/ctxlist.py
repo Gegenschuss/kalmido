@@ -436,7 +436,7 @@ def ctx_dupes_for(c, uid, fn, emails, phones, skip=None):
             conds.append("lower(fn)=?")
             args.append(x)
         elif k == "email":  # 2.981.0 (#5278): contacts.search went -- the e-mail in the contact's list of e-mails
-            conds.append("emails ILIKE ? ESCAPE '\\'")
+            conds.append("CAST(emails AS text) ILIKE ? ESCAPE '\\'")
             args.append("%" + like_escape(x) + "%")
         else:  # the last 9 digits of a phone number in the phone numbers of the shared search index (core/objsearch.py names)
             conds.append("id IN (SELECT s.ref_id FROM obj_search s WHERE s.kind='contact' AND s.names LIKE ?)")  # pg-ok: digits in folded names, case does not matter
@@ -578,7 +578,7 @@ def ctx_groups_change(c, uid, b):
         g2 = groups_of(r)[1] if r["deleted_at"] is None else None
         return {"groups": json.dumps(g2[:ITEMS_MAX], ensure_ascii=False)} if g2 is not None else None
 
-    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups ILIKE ? ESCAPE '\\' AND deleted_at IS NULL", [*books, pat]).fetchall():
+    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND CAST(groups AS text) ILIKE ? ESCAPE '\\' AND deleted_at IS NULL", [*books, pat]).fetchall():
         g = ctx_jl(r["groups"])
         if not any(isinstance(x, str) and x.casefold() == key for x in g):
             continue

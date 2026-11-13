@@ -219,7 +219,7 @@ def kpi_mark(c, oid):
                   "(SELECT md5(string_agg(id || ':' || status || ':' || COALESCE(locked_at, '') || ':' || updated_at || ':' || date, ',' ORDER BY id)) "
                   f"FROM office_docs WHERE org_id=? AND {live_sql()}), "  # 2.1005.0 (#5415): a draft into the trash changes the fingerprint
                   "(SELECT md5(string_agg(id || ':' || doc_id || ':' || amount || ':' || date, ',' ORDER BY id)) FROM office_payments WHERE org_id=?), "
-                  "(SELECT md5(data) FROM office_settings WHERE org_id=?)",  # 2.525.0 review (#4187): home currency, tax reserve
+                  "(SELECT md5(CAST(data AS text)) FROM office_settings WHERE org_id=?)",  # 2.525.0 review (#4187): home currency, tax reserve
                   (oid, oid, oid)).fetchone()
     return tuple(str(x) for x in r)
 
