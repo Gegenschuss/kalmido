@@ -11,7 +11,7 @@ from flask import jsonify
 from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, db, iso_ms, now_utc
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, ts_canon  # 2.1111.0 (#5306 follow-up): ts_canon
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
@@ -307,7 +307,9 @@ def ms_set(c, uid, b, action):
         want = dict(items[i])
         exp = want.pop("_expect", None)
         new = {k: v for k, v in want.items() if r[k] != v}
-        if new and exp and r["updated_at"] != exp:  # changed again after the step: the undo does not overwrite it
+        # 2.1111.0 (#5306 follow-up): updated_at is TIMESTAMPTZ (read as ts_canon: microseconds), exp the iso_ms text the set
+        # answered with (milliseconds) - compared as one moment, else every undo counted as a change in between
+        if new and exp and ts_canon(r["updated_at"]) != ts_canon(exp):  # changed again after the step: the undo does not overwrite it
             conflicts.append(i)
             return None
         return new
