@@ -116,6 +116,8 @@ def text(t, col):
         c.execute(ddl)
     return len(trg)
 out = {'trg': text('contacts', 'emails') + text('contacts', 'groups'), 'lists': %(lists)s}
+text('contacts', 'urls')  # 2.1111.0 (#5953, Fable review F1): a NUL escape / a bare NaN is repaired, not the whole value dropped
+c.execute("UPDATE contacts SET urls='[{\\"value\\": \\"a\\\\u0000b\\", \\"n\\": NaN}, -Infinity]' WHERE id=?", (%(ca)d,))
 text('lists', 'folder_own')
 out['old'] = [c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND column_name=?", x).fetchone()[0] for x in (('contacts', 'emails'), ('lists', 'folder_own'))]
 c.execute("UPDATE contacts SET emails='', groups='[ \\"b\\" ,\\"a\\"]' WHERE id=?", (%(ca)d,))
@@ -125,6 +127,7 @@ out['first'] = ct_json_migrate(c, '2026-11-13T08:00:00+00:00')
 ty = lambda t, x: c.execute("SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND column_name=?", (t, x)).fetchone()[0]
 out['types'] = [ty('contacts', 'emails'), ty('contacts', 'groups'), ty('lists', 'folder_own')]
 out['a'] = [json.loads(x) for x in c.execute("SELECT emails, groups FROM contacts WHERE id=?", (%(ca)d,)).fetchone()]
+out['urls'] = json.loads(c.execute("SELECT urls FROM contacts WHERE id=?", (%(ca)d,)).fetchone()[0])
 out['f'] = [json.loads(x) for x in c.execute("SELECT emails, groups FROM contacts WHERE id=?", (%(cf)d,)).fetchone()]
 out['dflt'] = c.execute("SELECT column_default FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='contacts' AND column_name='emails'").fetchone()[0]
 out['trg_after'] = len(ctj_triggers(c, 'contacts', 'emails')) + len(ctj_triggers(c, 'contacts', 'groups'))
@@ -141,6 +144,8 @@ check(first.get("contacts.emails") == "done" and first.get("contacts.groups") ==
 check(mig.get("types") == ["jsonb", "jsonb", "text"], f"migration: JSONB after the turn, sealed text keeps TEXT {mig.get('types')}")
 check(first.get("lists.folder_own") == "kept" and mig.get("sealed") == "kenc1:c2VhbGVk", f"migration: sealed text is not lost {mig.get('sealed')}")
 check(mig.get("a") == [[], ["b", "a"]], f"migration: '' = the default, JSON in another form keeps its value {mig.get('a')}")
+check(mig.get("urls") == [{"value": "ab", "n": None}, None], f"migration: a NUL escape goes, a bare NaN is null - the rest of the value stays {mig.get('urls')}")
+check("5953: contacts.urls: 1 value(s) lose a NUL escape or a bare NaN" in err, f"migration: the log names the repaired value {err[-600:]}")
 check(mig.get("f") == [[], {"z": 1, "a": [1, 2]}], f"migration: no JSON = the default, an object keeps its value {mig.get('f')}")
 check("'[]'::jsonb" in str(mig.get("dflt") or ""), f"migration: the default is JSONB {mig.get('dflt')}")
 check(mig.get("trg_after") == mig.get("trg"), f"migration: the triggers are back {mig.get('trg_after')} / {mig.get('trg')}")

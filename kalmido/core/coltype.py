@@ -293,6 +293,16 @@ CT_JSON = {  # table -> ((column, default), ...): the json lines of tools/coltyp
 }
 CTJ_NAMES = {*CT_JSON, *(x for cols in CT_JSON.values() for x, _ in cols)}  # the allowlist of qi() (#5296)
 CTJ_SEALED = ("kenc1:", "e2e1:")  # core/orgcrypt.py PREFIX, collab/liste2e.py LE2E_PREFIX: sealed text, never JSON
+CTJ_NAN_RX = r"([:,\[]\s*)-?(NaN|Infinity)(?=\s*[,}\]])"  # Python's json wrote NaN bare ("?" in a literal stays, pg.translate)
+
+
+def ctj_fixed(q):
+    """2.1111.0 (#5953, Fable review F1): SQL of a value JSONB refuses in a repaired form - the escape \u0000 (JSONB takes no NUL)
+    goes and a bare NaN / Infinity becomes null; a value only falls back to the column's default when even that is no JSON (one
+    NUL in a string would else cost a whole settings block)."""
+    return f"regexp_replace(replace({q}, '\\u0000', ''), '{CTJ_NAN_RX}', '\\1null', 'g')"
+
+
 CTJ_HOW = ("the JSON columns of the areas are JSONB (#5953) - an older version would search and write them as text; go back "
            "only with a backup from before")
 
@@ -311,9 +321,10 @@ def ctj_misfits(c, table, col):
     has_id = c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
                        "AND column_name='id'", (table,)).fetchone()
     key = "id" if has_id else "ctid::text"
-    rows = c.execute(f"SELECT {key}, left(btrim({q}), 8) FROM {qi(table, CTJ_NAMES)} WHERE {q} IS NOT NULL AND btrim({q}) <> '' "
-                     f"AND NOT pg_input_is_valid({q}, 'jsonb') ORDER BY 1").fetchall()
-    return [r[0] for r in rows], any(str(r[1] or "").startswith(CTJ_SEALED) for r in rows)
+    rows = c.execute(f"SELECT {key}, left(btrim({q}), 8), pg_input_is_valid({ctj_fixed(q)}, 'jsonb') FROM {qi(table, CTJ_NAMES)} "
+                     f"WHERE {q} IS NOT NULL AND btrim({q}) <> '' AND NOT pg_input_is_valid({q}, 'jsonb') ORDER BY 1").fetchall()
+    return ([r[0] for r in rows if not r[2]], any(str(r[1] or "").startswith(CTJ_SEALED) for r in rows),
+            [r[0] for r in rows if r[2]])  # review F1: [ids] repaired (NUL / NaN), not dropped
 
 
 def ctj_triggers(c, table, col):
@@ -342,7 +353,7 @@ def _ctj_run(c, at):
             if typ != "text":
                 out[k] = "present" if typ else "missing"
                 continue
-            bad, sealed = ctj_misfits(c, table, col)
+            bad, sealed, fixd = ctj_misfits(c, table, col)
             if sealed:
                 out[k] = "kept"
                 print(f"migrations: 5953: {k} stays TEXT: it holds sealed text (ids {', '.join(map(str, bad[:CT_SHOW]))})",
@@ -351,9 +362,13 @@ def _ctj_run(c, at):
             if bad:
                 print(f"migrations: 5953: {k}: {len(bad)} value(s) are no JSON and become {dflt} (ids "
                       f"{', '.join(map(str, bad[:CT_SHOW]))}{', ...' if len(bad) > CT_SHOW else ''})", file=sys.stderr, flush=True)
+            if fixd:
+                print(f"migrations: 5953: {k}: {len(fixd)} value(s) lose a NUL escape or a bare NaN to fit JSONB (ids "
+                      f"{', '.join(map(str, fixd[:CT_SHOW]))}{', ...' if len(fixd) > CT_SHOW else ''})", file=sys.stderr, flush=True)
             q = qi(col, CTJ_NAMES)
             sql = (f"ALTER TABLE {qi(table, CTJ_NAMES)} ALTER COLUMN {q} DROP DEFAULT, ALTER COLUMN {q} TYPE JSONB USING (CASE WHEN {q} IS NULL "
-                   f"THEN NULL WHEN pg_input_is_valid({q}, 'jsonb') THEN {q}::jsonb ELSE '{dflt}'::jsonb END), "
+                   f"THEN NULL WHEN pg_input_is_valid({q}, 'jsonb') THEN {q}::jsonb WHEN pg_input_is_valid({ctj_fixed(q)}, 'jsonb') "
+                   f"THEN ({ctj_fixed(q)})::jsonb ELSE '{dflt}'::jsonb END), "
                    f"ALTER COLUMN {q} SET DEFAULT '{dflt}'::jsonb")
             try:
                 with c.savepoint():
