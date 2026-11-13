@@ -513,7 +513,10 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   (one block per section with the fingerprint of the English text). Ways in: the command search ("Help" + one entry per
   section, palette.js `hlp_palItems`), "Help for this area" in the header's "…", "How it works" in empty states
   (`hlp_linkHtml`), Settings > Help. `tools/check_userhelp.py` (CI): every **label** of a section is a text of `static/js`,
-  every language has a current translation whose labels are the screen's words.
+  every language has a current translation whose labels are the screen's words. *2.1090.0 (#5899):* a section marks its way
+  with one `<!-- show: <key> -->` line per step (keys of `docs/help-targets.json`, an unknown one turns the lint red);
+  `GET /api/help/section` gives them as `steps` and the page shows "Show me" under the section (the spotlight of
+  `static/js/showme.js`, the places' own headings, no agent's line).
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the
