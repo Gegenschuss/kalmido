@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.1100.0** (2026-11-13):
-- **Office**: loading errors show the reason and "Try again" instead of an empty page; the Bookkeeping role sees its money areas again.
-- **Core**: links between items (mail, device, contact, letter) live in one shared link core; the shared trash now also takes a folder's pages and tables.
-- **Help**: "Show me" steps under help topics, plus "How to" topics for pages, tables, team chat, budget, lists and sharing.
-- **Self-hosting**: the database runs `postgres:17.12` instead of the moving `postgres:17` tag.
+**2.1125.0** (2026-11-13):
+- **Files**: tags of files, folders and documents now live in the shared core; a tag name is unique per workspace, and people a single item is shared with no longer see other tag names.
+- **Database**: 53 yes/no columns move to real booleans at the first start (one-way, back up before updating).
+- **Reliability**: fixed the IndexedDB "connection is closing" error line.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
