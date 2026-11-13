@@ -449,7 +449,9 @@ check(task(t6)["repeat"] == "" and "RRULE:FREQ=HOURLY;INTERVAL=2" in TO.get(B + 
 put(TO, RH, mk("rr-2", "SUMMARY:Hourly", "DUE;TZID=Europe/Berlin:20261005T100000", "RRULE:FREQ=DAILY;COUNT=3"))
 check(task(t6)["repeat"] == "FREQ=DAILY;COUNT=3" and TO.get(B + RH).text.split("BEGIN:VTODO")[1].count("RRULE") == 1, "switching to a supported rule replaces the kept one")
 # subtasks: the child first (RELATED-TO to a UID that is not there yet), then the parent
-check(put(TO, WORK + "child.ics", mk("child-1", "SUMMARY:Child", "RELATED-TO;RELTYPE=PARENT:parent-1")).status_code == 201, "child before parent")
+# 2.1112.2 (#5994): the answer in the message (the bound '9999' of dav_find_uid was no TIMESTAMPTZ: 500)
+r = put(TO, WORK + "child.ics", mk("child-1", "SUMMARY:Child", "RELATED-TO;RELTYPE=PARENT:parent-1"))
+check(r.status_code == 201, f"child before parent {r.status_code} {r.text[:200]}")
 tc = by_uid("child-1")
 check(task(tc)["parent_id"] is None and "RELATED-TO;RELTYPE=PARENT:parent-1" in TO.get(B + WORK + "child.ics").text,
       "the parent UID is kept until the parent arrives")

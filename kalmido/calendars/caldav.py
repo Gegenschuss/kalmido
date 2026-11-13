@@ -974,14 +974,16 @@ def dav_find_name(c, lid, name):
 
 
 def dav_find_uid(c, uid_, lid=None, trashed_since=None):
-    """Task ids carrying this UID (in list lid first), live ones (and trashed ones since trashed_since)."""
+    """Task ids carrying this UID (in list lid first), live ones (and trashed ones since trashed_since).
+    2.1112.2 (#5994): without trashed_since the bound is 'infinity' (was '9999': no point in time for the TIMESTAMPTZ
+    deleted_at of #5306, so every PUT with RELATED-TO / an own id failed); as text 'infinity' also sorts after every ISO time."""
     ids = [r[0] for r in c.execute("""SELECT t.id FROM dav_meta m JOIN tasks t ON t.id=m.task_id WHERE m.uid=?
                                       AND (t.deleted_at IS NULL OR t.deleted_at>=?) ORDER BY t.list_id=? DESC, t.id""",
-                                   (uid_, trashed_since or "9999", lid or 0))]
+                                   (uid_, trashed_since or "infinity", lid or 0))]
     own = _own_id(DAV_UID_RE, uid_)
     if own:
         r = c.execute("""SELECT t.id FROM tasks t LEFT JOIN dav_meta d ON d.task_id=t.id WHERE t.id=? AND d.uid IS NULL
-                         AND (t.deleted_at IS NULL OR t.deleted_at>=?)""", (own, trashed_since or "9999")).fetchone()
+                         AND (t.deleted_at IS NULL OR t.deleted_at>=?)""", (own, trashed_since or "infinity")).fetchone()
         if r and r[0] not in ids:
             ids.append(r[0])
     return ids
