@@ -31,6 +31,7 @@ const call = async (method, url, body, ck, hdr = {}) => { const r = await fetch(
   const bobSays = body => call('POST', `/api/team/rooms/${ROOM}/messages`, {body}, BK);
   const ag = await call('POST', '/api/admin/agents', {scopes: ['read', 'comments'], username: 'claude', display_name: 'Claude'}, CK);
   const AH = {Authorization: 'Bearer ' + ag.token};
+  await call('PUT', `/api/lists/${L.id}/members`, {user_id: ag.id, role: 'edit'}, CK);  // an agent talks to the people it works with
 
   const w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   const card = () => d.querySelector('#msgpop:not(.mpgone)');

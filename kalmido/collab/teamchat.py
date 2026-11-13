@@ -459,6 +459,9 @@ def tchat_new_for(c, uid, after, limit=20):
         if m["room_id"] in muted and not mention:
             continue
         b = tchat_msg_brief(c, m)
+        first = (m["body"] or "").strip().split("\n", 1)[0] if not m["enc"] else ""  # the first line only (the brief joins them)
+        if first:
+            b["text"] = comment_plain(c, md_brief(first), user_names(c, [int(x) for x in OCM_MENTION_RE.findall(first)]))[:140] or b["text"]
         out.append({"id": m["id"], "room_id": m["room_id"], "thread": m["thread_of"], "user_id": m["user_id"],
                     "text": b["text"], "enc": bool(b.get("enc")), "file": bool(b.get("file")), "mention": mention})
     return out[:limit], max([top, after] + [m["id"] for m in rows])  # a message after the MAX above counts too
