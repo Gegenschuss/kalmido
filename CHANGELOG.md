@@ -21,6 +21,41 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1117.0] - 2026-11-13
+
+Package 2.1112.2 (Teil 2/2: Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sa).
+
+### Fixed
+- Times read back in their shortest exact form again (whole seconds, milliseconds, microseconds): since the move of the old tables onto TIMESTAMPTZ (#5306) a version written with milliseconds came back with six digits, so undo, bulk restore of contacts and version checks saw a change that was none (#5986; heals p21191_a_api #5971, p2473_c_api #5984, p2473_c_ui #5703, p2220_ui #5974).
+- Undo of a contact bulk change no longer reports a conflict when the step fell on a whole second (#5978); moving wiki pages compares the expected version as a point in time (#5977); the journal's version check accepts the same moment in another spelling (#5976).
+- CalDAV: a PUT with RELATED-TO or an own id no longer ends with an error 500 (#5994).
+- Moving a task out of a project with a key works again - the ticket number trigger writes a real time (#5982).
+- The wiki search index mark of a page saved on a whole second matches again, so the page is not indexed anew every run (#5981).
+- Agents: linking and unlinking two objects (POST / DELETE /agent/objects/{kind}/{id}/links) is a routine write under the agent control, no longer the always-allowed agent channel (#5975).
+- Suites adjusted to TIMESTAMPTZ and to the shared empty / error states: d2_api #5968, p21029_b_liststate #5970, p2369_a_api #5980, p2190_d_hardening #5973, p3136_state_size seed #5184, p2281_e_small #5979, p2280_c_api #5104, p2755_b_money #5990, p2747_a_buero #5989, p2790_b_trash_stage3 #5992, p2924_b_kern_calbook #5995, p284_a_api #5993, p2593_c_undo_locked #5987, export_coverage #5969, p2570_b_undo #5986, p2778_b_sheet_wiki_undo #5991, p2306_e_mcp_scope #5157, p2625_d_junit #5988, p214411_a_ui #5972, p2461_e_ui #5983, p250_b_ui #5985, p4472_toolbars_ui #5996.
+
+Package 2.1117 (Bündel: Startmenge /api/state (lz=1) liegt ehrlich gemesse, Agenten-Kontrolle: Verknüpfen von Objekten nimmt d).
+
+### Changed
+- The start state of a big account is lighter again (#6023): the app asks `GET /api/state` and `/api/state/lists` with `td=2`, which also sends the tasks' `created_at` / `updated_at` / `deleted_at` without their zone `+00:00` (always UTC, named in `tutc`); the app puts it back before any use. Measured start set of the 200-project account: 2.04 MB -> 1.98 MB, under the 2 MB budget. `td=1` and no `td` (older apps, agents) stay as they were.
+
+### Fixed
+- Agent control (#6024): a write to an object of the shared core (`/api/v1/agent/objects/{kind}/{id}` and its links) now takes the level of the project the object lies in, read from the object itself; a `list_id` in the body no longer counts there, so it can never pick a laxer project.
+
+Package 2.1111 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: SQLite-Erbe Rest 3: JSON-Spalten (89) von TEXT auf, Sammelpaket: Aufg).
+
+### Added
+- #5830: Agents send only the change of a long text: one shared building block (`kalmido/core/mdedit.py`) appends text (at the end or under a heading) or replaces the section below a heading, for knowledge pages, a task's notes and a project's description. New routes `POST /api/v1/wiki/pages/{id}/replace-section`, `POST /api/v1/tasks/{id}/notes/append` / `.../notes/replace-section`, `POST /api/v1/lists/{id}/overview/append` / `.../overview/replace-section`; MCP `wiki_replace_section`, `task_notes_append`, `task_notes_replace_section`, `project_overview_append`, `project_overview_replace_section`. Same rights, lock, history and undo as the whole write; replacing a section needs the version; a heading that is missing (404) or there twice (409) names the headings and writes nothing. Approval cards of these steps show only the lines they add or remove.
+
+### Changed
+- #5963: Start page tidied up: the page title and the active tab share one name (Today), the sentence under the greeting names only today's tasks, the deadline lines stand once (in the box "Waiting for you"), no empty "Waiting for you" / "News" lines below it, the quote is one line (tap to open), the box heading sits flush with "Show all" on its line, "all day" in the normal font, and the + button no longer covers the field of the Today card - the first tasks of today are visible without scrolling on a phone.
+- #5963: A failed connection in the news says how to fix it ("Check the connection in the settings or remove it").
+- #5953: The JSON columns of the areas are JSONB in Postgres (75 columns; sealed and hash-chained ones stay text with a reason). An existing database is turned at the first start: JSON keeps its value, a NUL escape or a bare NaN is repaired, a value that is no JSON at all becomes the column's default (logged with the ids). SQL that read these columns as text works for both types; the account import takes them.
+- #5830: Appending to a knowledge page uses the shared building block; a missing heading reads "No heading … in this text". Checking the version and saving a task (PATCH) or a project description now happen in one locked section.
+
+### Fixed
+- #5306: Undoing a bulk change of contacts no longer always reports a change in between (the expected time is compared as one moment).
+
 ## [2.1113.0] - 2026-11-13
 
 Package 2.1106 (Bündel: Wackel-Test p2579_c_ui, Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Weich rot: p2100_ui, Weich rot: p2106_b_ui u.).
@@ -272,7 +307,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1113.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1117.0...HEAD
+[2.1117.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1117.0
 [2.1113.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1113.0
 [2.1108.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1108.0
 [2.1105.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1105.0
