@@ -8591,6 +8591,7 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 #side{--sb-on:color-mix(in srgb,var(--accent) 78%,var(--text))}
 #side .srow.on,#side .sbbt.on{background:color-mix(in srgb,var(--accent) 12%,transparent);box-shadow:none;color:var(--sb-on);font-weight:600}
 #side .srow.on svg,#side .srow.on .c,#side .sbbt.on .sbbtn,#side .sbbt.on svg,#side .sbbi.on,#side .sbbi.on svg{color:var(--sb-on)}
+@media (pointer:coarse){ #side .sbbt,#side .sbbtn{min-height:max(2.75rem,var(--srow-h))} }  /* 2.1113.0 (#5966): the trees' rows as high as every other row of the drawer (44 px for a finger) */
 /* 2.442.0 (#2810): a low window (zoom 200 %, a phone on its side): more room for the content. Lying windows only: an upright
    phone gets this low with the keyboard open (interactive-widget=resizes-content) and nothing may jump while typing. The
    view switch folds to icons plus the active name, the head and the tab bar get thinner, the task's comment box stays in
