@@ -605,14 +605,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/umz_undoplan.py",
-   "code": "for r in c.execute(f\"SELECT {cc}, node_id FROM {ct} WHERE {cc} IN ({_qs(part)})\", part).fetchall():",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/umz_undoplan.py",
    "code": "for r in c.execute(f\"SELECT {sel} FROM {table} WHERE id IN ({_qs(part)})\", part).fetchall():",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -1677,22 +1669,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/docs/web.py",
    "code": "c.execute(f\"UPDATE {S.LABEL_KINDS[kind]} SET name=? WHERE id=?\", (S.doc_seal(c, r[0], \"doc_senders.name\", name) if kind == \"sender\" else name, lid))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/docs/web.py",
-   "code": "r = c.execute(f\"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?\", (lid,)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/docs/web.py",
-   "code": "r = c.execute(f\"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?\", (lid,)).fetchone()",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
