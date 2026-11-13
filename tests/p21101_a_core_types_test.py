@@ -167,4 +167,4 @@ hf = [x for x in hist(Fr, OF) if x["action"] == "update"]
 check(len(hf) == 1 and hf[0]["after"] == {"note": "two"}, f"freelancer: her history on the new types {hf}")
 r = Fr.post(B + f"/api/obj/{K}/{OF}/undo", json={"sess": SESS, "op": "undo"})
 check(r.ok and r.json()["note"] == "one", f"freelancer: her undo {r.status_code} {r.text[:200]}")
-sys.exit(done())
+sys.exit(done("p21101_a_core_types"))
