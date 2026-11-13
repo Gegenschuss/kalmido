@@ -44,6 +44,8 @@ const PROBE = `(() => {
     const f0 = window[n], f = window[n] = function () { const P = window.__dp; if (P && !P.done) { const b = document.body.classList.contains('pgdrag') ? P.fitDrag : P.fitAfter; b[n] = (b[n] || 0) + 1; } return f0.apply(this, arguments); };
     f.__w = 1;
   }
+  // 2.1102.0 (#5516): which resting watchers still waited when the drag ended (core.js dragRestFlush runs them): the first flush
+  if (!dragRestFlush.__w) { const f0 = dragRestFlush; dragRestFlush = function () { const P = window.__dp; if (P && !P.done && !P.pend) P.pend = [...DRAGREST.fns.keys()]; return f0.apply(this, arguments); }; dragRestFlush.__w = 1; }
   if (!window.__rt0) { window.__rt0 = rafThrottle;
     rafThrottle = fn => window.__rt0((...a) => { const t = performance.now(); fn(...a); const v = document.getElementById('view');
       const t1 = performance.now(); void getComputedStyle(document.body).color; const t2 = performance.now();  // style first (the whole document), then layout
@@ -58,7 +60,7 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
   return {frames: fr.length, med: q(fr, 0.5), p95: q(fr, 0.95), steps: P.steps.length, stepMed: q(P.steps, 0.5), stepP95: q(P.steps, 0.95), styMed: q(P.sty, 0.5), layMed: q(P.lay, 0.5), styP95: q(P.sty, 0.95), layP95: q(P.lay, 0.95),
     ro: window.__ro.n, roMs: Math.round(window.__ro.ms * 10) / 10, by: Object.fromEntries(Object.entries(window.__ro.by).map(([k, v]) => [k, v.n + 'x/' + Math.round(v.ms) + 'ms'])),
     clsDuring: P.cls.length > 0 && P.cls.every(Boolean), vwMin: Math.min(...P.vw), vwMax: Math.max(...P.vw), rows: document.querySelectorAll('#view .trow[data-id]').length,
-    tiles: document.querySelectorAll('#view .dc-card').length, fitDrag: P.fitDrag, fitAfter: P.fitAfter, ms: Math.round(P.at[P.at.length - 1] - P.at[0]), cv: P.cv, st: document.getElementById('view')?.scrollTop}; })()`;
+    tiles: document.querySelectorAll('#view .dc-card').length, fitDrag: P.fitDrag, fitAfter: P.fitAfter, pend: P.pend || [], ms: Math.round(P.at[P.at.length - 1] - P.at[0]), cv: P.cv, st: document.getElementById('view')?.scrollTop}; })()`;
 
 (async () => {
   await sleep(600);
@@ -142,7 +144,10 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
         // 20 times (limit 29) and the three together reached the 60 steps although the 200 ms held for every one of them
         const fv = Object.values(r1.fitDrag), fmax = Math.max(0, ...fv);
         check(fv.every(v => v <= Math.ceil(r1.ms / 200) + 1) && fmax < r1.steps, `${W} list: the bar watchers rest during the drag (at most ${fmax} fits of one watcher for ${r1.steps} steps in ${r1.ms} ms, each at most every 200 ms) ` + JSON.stringify(r1.fitDrag));
-        check((r1.fitAfter.fitTop || 0) + (r1.fitAfter.fitDtop || 0) + (r1.fitAfter.lsd_sync || 0) >= 1, `${W} list: the bars are fitted after release ` + JSON.stringify(r1.fitAfter));
+        // 2.1102.0 (#5516, CI red of 2.1077.0): only when a watcher still waited at release - the release runs only what waits
+        // (dragRestFlush); when the last 200 ms run came just before it nothing waits and the sine ends at the start width, so
+        // no fit is due. 'lsd' fits always, 'top' / 'dtop' only on a changed width. The result check below (the bars fit) stays
+        if (r1.pend.includes('lsd')) check((r1.fitAfter.lsd_sync || 0) >= 1, `${W} list: the bars are fitted after release (a watcher waited: ${r1.pend}) ` + JSON.stringify(r1.fitAfter));
       }
       // after release: the bars fit the final width (the watchers ran once more)
       check(await ready(ev, `(() => { const t = document.getElementById('top'), d = document.querySelector('#detail .dtop'); return !!t && t.scrollWidth <= t.clientWidth + 1 && (!d || d.scrollWidth <= d.clientWidth + 1); })()`, 20), `${W} list: the head bar and the panel's bar fit after release`);
