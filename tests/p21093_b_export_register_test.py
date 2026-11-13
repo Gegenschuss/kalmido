@@ -56,6 +56,9 @@ from kalmido.core.objexport import OEX
 OLD_ORG = {
     ("lists/tags.json", "obj_tags", f"scope_kind='list' AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)"),
     ("org/labels.json", "obj_tags", "scope_kind='org' AND org_id=?"),
+    # 2.1119.0 (#5277): the tags of the file store moved into the core (obj_tags scope ws, links kind fs_entry), wanted
+    ("documents/tags.json", "obj_tags", "scope_kind='ws' AND org_id=?"),
+    ("documents/document_tags.json", "obj_tag_links", "kind='fs_entry' AND obj_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("lists/playbooks.json", "obj_versions", f"kind='playbook' AND ref_id IN (SELECT id FROM playbooks WHERE list_id IN ({LSQ}))"),
     ("tasks/tags.json", "obj_tag_links", f"""kind='task' AND obj_id IN ({TSQ}) AND tag_id IN (SELECT id FROM obj_tags WHERE (scope_kind='list'
      AND scope_id IN (SELECT CAST(x.id AS TEXT) FROM ({LSQ}) x)) OR (scope_kind='org' AND org_id=?))"""),

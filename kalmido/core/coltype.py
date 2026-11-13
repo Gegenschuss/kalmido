@@ -332,8 +332,8 @@ def ctj_misfits(c, table, col):
 def ctj_triggers(c, table, col):
     """[(name, CREATE TRIGGER text)] of the user triggers on table that name col (UPDATE OF col, or col in their WHEN)."""
     return [(r[0], r[1]) for r in c.execute(
-        "SELECT DISTINCT t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t JOIN pg_depend d ON d.classid='pg_trigger'::regclass "
-        "AND d.objid=t.oid JOIN pg_attribute a ON a.attrelid=d.refobjid AND a.attnum=d.refobjsubid "
+        "SELECT DISTINCT t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t JOIN pg_depend d ON d.classid='pg_trigger'::regclass "  # pg-ok: pg_trigger.oid, a catalog of Postgres
+        "AND d.objid=t.oid JOIN pg_attribute a ON a.attrelid=d.refobjid AND a.attnum=d.refobjsubid "  # pg-ok: pg_trigger.oid
         "WHERE NOT t.tgisinternal AND t.tgrelid=to_regclass(?) AND a.attname=? ORDER BY 1", (table, col)).fetchall()]
 
 

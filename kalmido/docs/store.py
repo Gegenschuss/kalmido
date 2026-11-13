@@ -949,9 +949,9 @@ def _learn_seen(c, m, uid, f, lid):
         r = c.execute("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     if r and r[0] == "admin":
         return True
-    q = ("SELECT 1 FROM obj_tag_links WHERE kind='fs_entry' AND tag_id=? AND obj_id<>? AND obj_id" if f == "tag" else  # 2.1119.0 (#5277)
-         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>? AND node_id")
-    return bool(c.execute(f"{q} IN {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
+    q = ("SELECT 1 FROM obj_tag_links WHERE kind='fs_entry' AND tag_id=? AND obj_id<>? AND obj_id IN" if f == "tag" else  # 2.1119.0 (#5277)
+         f"SELECT 1 FROM doc_meta WHERE {'sender_id' if f == 'sender' else 'type_id'}=? AND node_id<>? AND node_id IN")
+    return bool(c.execute(f"{q} {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
 
 
 def classify(c, m, node, text, given=None, seer=None):
