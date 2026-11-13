@@ -27,7 +27,8 @@ A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en",
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en"})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 FID, Fr = freelancer(B, A)
-CANON = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{6})?\+00:00$")
+# 2.1121.0 (#6042): since #5986 a point in time reads back in the shortest exact form (.063, not .063000)
+CANON = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d{1,6})?\+00:00$")
 
 
 def get(s, oid):
