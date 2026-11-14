@@ -76,6 +76,7 @@ if (!process.env.P21163A_NOSTART) execFileSync('bash', [path.join(__dirname, 'st
       await nav(B + '?w=' + W + '#wiki/' + OP);
       check(await until(`/Read me before the shoot/.test(document.querySelector('#wk-md')?.textContent || '')`, {timeout: 20000}), `#6087 ${W}: the page reads with its text`);
       check(await ev(`!document.querySelector('#wk-cm') && !document.querySelector('#view [data-wk="pen"]')`), `#6087 ${W}: no editor, no pen`);
+      check(await ev(`(() => { const b = document.querySelector('#view .wkpage [data-wk="pmenu"]'); return !!b && !!b.offsetWidth && getComputedStyle(b).opacity === '1'; })()`), `#6087 ${W}: the page's "…" is in sight without hovering`);
       const m = await pmenu();
       check(m && m.includes('History') && m.includes('Copy link') && m.includes('Copy as [[link]]'), `#6087 ${W}: the "…" has History and the links ${JSON.stringify(m)}`);
       check(m && !m.some(x => /^(Rename…|Delete|Edit as Markdown|Read-only|Share…)$/.test(x)), `#6087 ${W}: nothing that writes in the "…" ${JSON.stringify(m)}`);
