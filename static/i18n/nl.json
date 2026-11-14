@@ -18560,5 +18560,18 @@
   "To ({0})": "Aan ({0})",
   "Without an e-mail address: {0}": "Zonder e-mailadres: {0}",
   "No receipts here yet": "Hier zijn nog geen bonnen",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Bonnen blijven in hun eigen onderdeel. Open er een om hem daar te bekijken, te wijzigen of te boeken."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Bonnen blijven in hun eigen onderdeel. Open er een om hem daar te bekijken, te wijzigen of te boeken.",
+  "Present": "Presenteren",
+  "Slide": "Dia",
+  "Slide {0} of {1}": "Dia {0} van {1}",
+  "Previous slide": "Vorige dia",
+  "Next slide": "Volgende dia",
+  "End presentation": "Presentatie beëindigen",
+  "Presentation: {0}": "Presentatie: {0}",
+  "Who sees the whole knowledge area": "Wie het hele kennisgebied ziet",
+  "Nobody sees the whole knowledge area yet.": "Nog niemand ziet het hele kennisgebied.",
+  "The person can change these pages.": "De persoon kan deze pagina's wijzigen.",
+  "The person can read these pages.": "De persoon kan deze pagina's lezen.",
+  "{0} no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with them on its own stays visible.": "{0} ziet deze mappen en alles erin niet meer, ook niet wat later wordt toegevoegd. Een map of pagina erin die je apart met die persoon deelt, blijft zichtbaar.",
+  "Shares your whole knowledge area with a person or an agent: every folder and page, also the ones added later. Single folders can be kept out afterwards.": "Deelt je hele kennisgebied met een persoon of een agent: elke map en pagina, ook die later worden toegevoegd. Losse mappen kun je daarna uitsluiten."
 }

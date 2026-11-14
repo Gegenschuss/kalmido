@@ -51,6 +51,10 @@ path that mirrors the tree). The file store's routes ask these generic hooks; th
   2.1045.0 (#5823): fs_area_rule(..., root_share=("agent_id",)) -- the area's root folder itself may be shared with these
       target kinds (a whole knowledge area with agents; still no organisation access, rename, move, trash):
   fs_area_root_shares(c, nid) -> tuple            the allowed target kinds on root nid (() elsewhere)
+  2.1160.0 (#5862): root_share may be a function (c, root node row) -> tuple: the targets depend on the root (a private
+      knowledge area also people, an organisation's agents only); excl=(c, root id, value) -> [node ids] checks the folders
+      kept out of a person's share of the whole area (fs_shares.excl, PATCH /api/files/shares/<id> {excluded}).
+  fs_area_root_excl(c, nid) -> function | None     the area's excl check when nid is an area root, else None
 """
 import re
 
@@ -134,10 +138,12 @@ def fs_area_root_of(c, nid):
 FS_AREA_RULES = {}
 
 
-def fs_area_rule(area, *, kinds, org_open=False, name=None, before=None, after=None, share=None, root_share=()):
+def fs_area_rule(area, *, kinds, org_open=False, name=None, before=None, after=None, share=None, root_share=(), excl=None):
     """Register the rule of a closed area (module docstring); again = replace (a module reload)."""
     FS_AREA_RULES[area] = {"kinds": {(k, r) for k, r in kinds}, "org_open": bool(org_open), "name": name, "before": before,
-                           "after": after, "share": share, "root_share": tuple(root_share)}
+                           "after": after, "share": share,
+                           "root_share": root_share if callable(root_share) else tuple(root_share),  # 2.1160.0 (#5862)
+                           "excl": excl}
 
 
 def fs_area_root_shares(c, nid):
@@ -146,7 +152,18 @@ def fs_area_root_shares(c, nid):
     (fs_area_root_need_free)."""
     r = fs_area_root_of(c, nid)
     rule = FS_AREA_RULES.get(r[1]) if r else None
+    if rule and callable(rule["root_share"]):  # 2.1160.0 (#5862): the targets depend on the root (module docstring)
+        n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
+        return tuple(rule["root_share"](c, n)) if n else ()
     return rule["root_share"] if rule else ()
+
+
+def fs_area_root_excl(c, nid):
+    """2.1160.0 (#5862): the area's check of the folders kept out of a person's share of the whole area (fs_area_rule excl)
+    when node nid is an area's root, else None."""
+    r = fs_area_root_of(c, nid)
+    rule = FS_AREA_RULES.get(r[1]) if r else None
+    return rule["excl"] if rule else None
 
 
 def fs_area_of(c, nid):

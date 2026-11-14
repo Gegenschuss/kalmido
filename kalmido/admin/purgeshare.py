@@ -48,6 +48,7 @@ from ..contacts.orgbooks import obk_hand_on
 from ..core.access import Denied, list_role
 from ..core.objhooks import OBJ  # 2.566.0 (#4712): the kinds whose reference node is the object's own (counted as itself)
 from ..core.db import iso, iso_ms, now_utc
+from ..core.dlock import dl_chain_cut  # 2.1160.0 (#5862)
 from ..core.i18n import tr
 from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import OrgCryptError
@@ -96,7 +97,10 @@ def _folder_shares(c, uid, ref_kind, rid):
     chain = fs_chain(c, n["id"])
     if not chain or fs_deleted(chain):
         return []
-    return _node_shares(c, [x["id"] for x in chain])
+    ids = [x["id"] for x in chain]
+    # 2.1160.0 (#5862, Fable review 1): a share above a folder kept out for that person (a whole knowledge area shared with
+    # them, its exclusions) gives them nothing here -- no heir, no share of an object in an excluded folder (core/dlock.py)
+    return [r[:3] for r in _node_shares(c, ids, node=True) if r[3] in dl_chain_cut(c, r[1], ids)]
 
 
 def _item(c, uid, oid, rid, direct, folder, write, fallback=None, fits=None):
@@ -118,12 +122,13 @@ def _item(c, uid, oid, rid, direct, folder, write, fallback=None, fits=None):
     return {"id": rid, "heir": heir, "others": others, "shared": bool(people)}
 
 
-def _node_shares(c, ids):
-    """[(since, person, role)] of the live shares of nodes ids with people (a group: each of its members)."""
+def _node_shares(c, ids, node=False):
+    """[(since, person, role)] of the live shares of nodes ids with people (a group: each of its members); node=True: + the
+    share's node id (2.1160.0 #5862)."""
     if not ids:
         return []
     q = ",".join("?" * len(ids))
-    return [tuple(r) for r in c.execute(f"""SELECT s.created_at, COALESCE(s.user_id, m.user_id), s.role FROM fs_shares s
+    return [tuple(r) if node else tuple(r)[:3] for r in c.execute(f"""SELECT s.created_at, COALESCE(s.user_id, m.user_id), s.role, s.node_id FROM fs_shares s
                                             LEFT JOIN group_members m ON m.group_id=s.group_id
                                             WHERE s.node_id IN ({q}) AND COALESCE(s.user_id, m.user_id) IS NOT NULL
                                             AND (s.expires_at IS NULL OR s.expires_at>?)""", (*ids, iso(now_utc()))).fetchall()]

@@ -44,7 +44,8 @@ const FEAT = 'cal,comments,collab,wiki,files';
   check(!!dlg && /Knowledge/.test(dlg.querySelector('h3')?.textContent || ''), 'the Share dialog opens on "Knowledge"');
   const opts = [...(dlg?.querySelectorAll('#ab-sht option[value]') || [])].map(o => o.value).filter(Boolean);
   check(JSON.stringify(opts) === JSON.stringify([`agent_id:${ag.id}`]), 'only her own agent is offered ' + JSON.stringify(opts));
-  check(await until(() => /No agent sees the whole knowledge area yet/.test(dlg.querySelector('.fsextra')?.textContent || '')), 'the section: no agent yet');
+  // 2.1160.0 (#5862): a private area also goes to people, the empty section says "Nobody …"
+  check(await until(() => /Nobody sees the whole knowledge area yet/.test(dlg.querySelector('.fsextra')?.textContent || '')), 'the section: nobody yet');
   dlg.querySelector('#ab-sht').value = `agent_id:${ag.id}`;
   dlg.querySelector('#ab-shr').value = 'edit';
   dlg.querySelector('[data-abs="add"]').click();
@@ -54,7 +55,7 @@ const FEAT = 'cal,comments,collab,wiki,files';
   yes()?.click();
   check(await until(async () => ((await call('GET', `/api/files/nodes/${root}`)).shares || []).some(s => s.agent_id === ag.id && s.role === 'edit')),
     'the share is on the server (edit)');
-  const pickBtn = await until(() => dlg.querySelector(`.fsextra [data-wka-pick="${ag.id}"]`));
+  const pickBtn = await until(() => dlg.querySelector('.fsextra [data-wka-pick]'));  // 2.1160.0 (#5862): keyed by the share, not the agent
   check(!!pickBtn && /Alibot/.test(dlg.querySelector('.fsextra')?.textContent || ''), 'below the agent: "Exclude folders…"');
   pickBtn?.click();
   const box = await until(() => d.querySelector(`.wkapick input[value="${priv}"]`));

@@ -77,9 +77,41 @@ def _dl_eff(raw):
 
 
 def dl_wiki_folders(c, uid):
-    """2.1045.0 (#5823): the knowledge folders (node ids) excluded for account uid -- empty for people and agents without."""
+    """2.1045.0 (#5823): the knowledge folders (node ids) excluded for account uid -- empty for people and agents without.
+    2.1160.0 (#5862): a person's come from the shares of whole knowledge areas made for them (fs_shares.excl, _dl_person_wkf)."""
     d = dl_of(c, uid)
-    return d["_wkf"] if d else frozenset()
+    # 2.1160.0 (#5862, Fable review 4): an agent keeps the exclusions of a share it got while it was a person (make_agent
+    # leaves its user_id rows, _shares_role still counts them) -- they only ever narrow
+    return d["_wkf"] | _dl_person_wkf(c, uid) if d else _dl_person_wkf(c, uid)
+
+
+def _dl_person_wkf(c, uid):
+    """2.1160.0 (#5862): the knowledge folders kept out of the shares of whole knowledge areas made for person uid (fs_shares.excl
+    on the area's root, set in its Share dialog) -- the same rule as an agent's (dl_chain_cut). An expired share's exclusions
+    still count: they only ever narrow, and the share itself gives nothing any more. Cached per request; read as system (ids only,
+    the share rows of this one account, also when the asker is someone else: the Share dialog's inherited shares)."""
+    if not uid:
+        return frozenset()
+    cache = g.setdefault("_dl_wkp", {}) if has_request_context() else None
+    if cache is not None and uid in cache:
+        return cache[uid]
+    out = set()
+    with system_ctx(c):  # ids only: the share rows of this one account, whoever asks (the Share dialog names other people)
+        for r in c.execute("SELECT excl FROM fs_shares WHERE user_id=? AND excl IS NOT NULL", (int(uid),)):
+            out.update(dl_excl_parse(r[0]))
+    out = frozenset(out)
+    if cache is not None:
+        cache[uid] = out
+    return out
+
+
+def dl_excl_parse(raw):
+    """2.1160.0 (#5862): the folder ids of a stored fs_shares.excl (invalid parts dropped, at most DL_WIKI_MAX)."""
+    try:
+        d = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return []
+    return [int(x) for x in (d if isinstance(d, list) else []) if isinstance(x, int) and not isinstance(x, bool) and x > 0][:DL_WIKI_MAX]
 
 
 def dl_chain_cut(c, uid, ids):
@@ -106,6 +138,7 @@ def dl_forget():
     if has_request_context():
         g.pop("_dl", None)
         g.pop("_dl_t", None)
+        g.pop("_dl_wkp", None)  # 2.1160.0 (#5862)
 
 
 def dl_of(c, uid):
