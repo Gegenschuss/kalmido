@@ -31,7 +31,7 @@ from ..accounts.wsareas import wsa_org_off
 from ..core.access import list_role, list_state_sql, live_sql, vis_sql
 from ..core.db import usettings
 from ..core.i18n import N_, tr
-from ..core.orgcrypt import oc_dec_fields
+from ..core.orgcrypt import OrgCryptError, oc_dec_fields
 from ..docs.store import doc_opener
 from ..life.budget import bud_dec, bud_hidden, entry_out
 from ..office.books import bk_ws
@@ -72,13 +72,15 @@ def rcx_office(c, uid, oid, area):
         return None
     if area == "meals" and not office_feature_on(office_settings(c, off), "money.meals"):
         return None  # the country pack's function is off: the office answers 404 there
+    if office_allowed(c, uid, off, write=False) is not None:
+        return None  # review F1: a guest reads nothing of the office, also with a group (office_org: 403 after ofr_check)
     r = ofr_rights(c, uid, off)
     if r is None:  # not ruled by groups: the admins' routes (office_org admin=True)
         owner = pb_owner(c, off)
         if owner is not None:
             return (off, None) if owner == uid else None
         role = org_role(c, uid, off)
-        if role == "admin" or (role == "accounting" and office_allowed(c, uid, off, write=False) is None):
+        if role in ("admin", "accounting"):
             return off, None
         return None
     lv = r["levels"].get(area, "none")
@@ -133,10 +135,18 @@ def _meals(c, uid, oid, limit):
     if not acc:
         return []
     off, own = acc
-    rows = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=? AND {live_sql()} ORDER BY date DESC, id DESC "
-                     f"LIMIT {_cap(limit) if own is None else 5000}", (off,)).fetchall()
-    if own is not None:
-        rows = bw_own_rows(c, off, rows, own)  # entered by the person or with the person as host (office/meals.py bw_rows)
+    if own is not None:  # entered by the person or with the person as host (office/meals.py bw_rows); review F3: the host
+        # column (sealed) is opened only for the rows of others, and only the ids / host / author are read for that
+        few = c.execute(f"SELECT id, created_by, host FROM office_meals WHERE org_id=? AND {live_sql()} ORDER BY date DESC, id DESC LIMIT 5000",
+                        (off,)).fetchall()
+        ids = [r["id"] for r in bw_own_rows(c, off, few, own)][:limit]
+        if not ids:
+            return []
+        rows = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=? AND id IN ({','.join('?' * len(ids))}) "
+                         "ORDER BY date DESC, id DESC", (off, *ids)).fetchall()
+    else:
+        rows = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=? AND {live_sql()} ORDER BY date DESC, id DESC "
+                         f"LIMIT {_cap(limit)}", (off,)).fetchall()
     items = []
     for r in rows[:limit]:
         d = oc_dec_fields(c, off, "office_meals", r)
@@ -209,11 +219,19 @@ def rcx_groups(c, uid, oid, key, limit):
         left = limit - sum(len(x[2]) for x in out)
         if left <= 0:
             break
-        out += RCX_READ[k](c, uid, oid, left)
+        out += _part(c, uid, oid, k, left)
     return out
+
+
+def _part(c, uid, oid, key, limit):
+    """One part; review F2: a row that cannot be opened (a key gone) leaves this part out instead of failing the file store."""
+    try:
+        return RCX_READ[key](c, uid, oid, limit)
+    except OrgCryptError:
+        return []
 
 
 def rcx_collection(c, uid, oid):
     """{key, name, subs: [{key, name}]} of the space's "Receipts" (only the parts with something for uid), or None."""
-    subs = [{"key": k, "name": tr(RCX_KEYS[k])} for k in RCX_PARTS if RCX_READ[k](c, uid, oid, 1)]
+    subs = [{"key": k, "name": tr(RCX_KEYS[k])} for k in RCX_PARTS if _part(c, uid, oid, k, 1)]
     return {"key": "receipts", "name": tr(RCX_KEYS["receipts"]), "subs": subs} if subs else None

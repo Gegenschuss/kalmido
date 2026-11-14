@@ -155,6 +155,18 @@ check(rc_of(top(A, f"org:{ORG}")) is not None, "#4895: 'Receipts' at the top of 
 check(groups(Bo, "rcoffice", f"org:{ORG}") == [] and rc_of(top(Bo, f"org:{ORG}")) is None,
       "#4895: a member without the office's receipts sees neither the part nor the receipt")
 check(ODOC not in [x["id"] for gr in groups(A, "rcoffice") for x in gr["items"]], "#4895: the private space shows no receipt of the organisation")
+r = A.post(B + "/api/office/meals", json={"date": "2026-04-02", "place_name": "Bistro Nord", "occasion": "Kick-off", "host": {"id": ALICE},
+                                          "guests": [{"name": "Gina Gast", "extra": "Example GmbH"}], "amounts": [{"kind": "food", "rate": 19, "gross": "50.00"}]})
+check(r.status_code == 201, f"setup: a meal of the organisation {r.status_code} {r.text[:200]}")
+BOB = Bo.get(B + "/api/state").json()["me"]["id"]
+check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:readonly"]}).ok, "setup: bob in the office group Read-only")
+check([x["name"] for gr in groups(Bo, "rcmeals", f"org:{ORG}") for x in gr["items"]] == ["Bistro Nord"], "#4895: an office group with 'view' reads the entertainment receipts")
+check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:staff"]}).ok, "setup: bob in the office group Staff (own only)")
+check(groups(Bo, "rcmeals", f"org:{ORG}") == [], "#4895: level 'own': not alice's meal")
+check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:readonly"]}).ok, "setup: Read-only again")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "guest"}).ok, "setup: bob becomes a guest (keeps his group)")
+check(groups(Bo, "rcmeals", f"org:{ORG}") == [] and groups(Bo, "rcoffice", f"org:{ORG}") == [] and rc_of(top(Bo, f"org:{ORG}")) is None,
+      "#4895 (review F1): a guest with an office group reads nothing of the office")
 
 # ================================================================== the trash
 check(Fr.delete(B + f"/api/budget/entries/{ENT}").ok, "setup: the budget entry into the trash")
