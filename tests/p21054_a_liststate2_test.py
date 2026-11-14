@@ -91,19 +91,22 @@ I2 = ins[0][0] if ins else None
 check(I2 and row(I2)[:2] == ("archived", 1), f"an INSERT naming archived=1 (an older row) gets 'archived' {I2 and row(I2)}")
 
 # ---------------------------------------------------------------- the way back: the trigger of a version before, then this one again
+# 2.1140.0 (#6051): lists.archived is BOOLEAN since 2.1118.0 (#5952, core/colbool.py) - the row's JSON says 'true' / 'false';
+# a version before that runs on this database reads it the same way, so the stage-1 trigger here takes 'false' as not archived
+# too (with '0' / '' only it marked every restored project 'archived' and the way forward again started from a wrong marker)
 OLD = """CREATE OR REPLACE FUNCTION kalmido_list_state() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   j JSONB := to_jsonb(NEW);
 BEGIN
   IF NOT j ? 'state' THEN RETURN NEW; END IF;
-  NEW.state := CASE WHEN COALESCE(j->>'deleted_at', '') <> '' THEN 'trash' WHEN COALESCE(j->>'archived', '0') NOT IN ('0', '') THEN 'archived' ELSE 'live' END;
+  NEW.state := CASE WHEN COALESCE(j->>'deleted_at', '') <> '' THEN 'trash' WHEN COALESCE(j->>'archived', '0') NOT IN ('0', '', 'false') THEN 'archived' ELSE 'live' END;
   RETURN NEW;
 END $$;"""
 P3 = plist(Fr, "Example Old Workshop")
 Fr.patch(B + f"/api/lists/{P3}", json={"archived": True})
 # the suite's own session (the app's account may not create functions): the trigger function as a version before has it
 dbxm.connect(os.path.join(kt.DATA, "tasks.db")).executescript(OLD + "\n")
-check("NOT IN ('0', '') THEN 'archived' ELSE 'live' END;\n  RETURN NEW" in (dbx("SELECT prosrc FROM pg_proc WHERE proname='kalmido_list_state'") or [[""]])[0][0],
+check("NOT IN ('0', '', 'false') THEN 'archived' ELSE 'live' END;\n  RETURN NEW" in (dbx("SELECT prosrc FROM pg_proc WHERE proname='kalmido_list_state'") or [[""]])[0][0],
       "setup: the trigger of stage 1 back (a version before)")
 check(row(P3)[:2] == ("archived", 1), f"a row this version archived reads archived for the version before {row(P3)}")
 dbx("UPDATE lists SET archived=false, archived_at=NULL WHERE id=?", (P3,))

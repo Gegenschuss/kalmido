@@ -2484,6 +2484,12 @@ def umz_run(uid, iid, opts):
                   "warnings": run.warnings()}  # 2.448.0 (#3765): key + values, umz_view translates; 2.531.0 (#4317) F4: the must ones first
         if run.stopped == "quota":
             result["stopped"] = [N_("Your storage is full: some files were left out, everything else came over. The import can be undone.")]
+        # 2.1140.0 (#6060): the upload goes BEFORE the state says done / stopped - the finally below removed it only after, so a
+        # client that read "done" could still find the file (a slow CI runner: p273_b_api "the upload is gone after the run")
+        try:
+            os.remove(os.path.join(_dir(uid, iid), "upload.bin"))
+        except OSError:
+            pass
         _set(uid, iid, state="stopped" if run.stopped else "done", result=result, progress=None)
         print(f"account import of user {uid}: {run.stats.get('tasks', 0)} tasks", flush=True)
     except UmzBad as e:

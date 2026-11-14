@@ -34,7 +34,7 @@ const py = code => execFileSync('docker', ['exec', CT, 'python', '-c', code], {e
 const addSub = (name, color, events) => +py(`import json
 from kalmido.core.db import connect
 c = connect()
-c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(1,'ics',?,?,1,'x','ok','2026-01-01T00:00:00Z')", (${JSON.stringify(name)}, ${JSON.stringify(color)}))
+c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(1,'ics',?,?,TRUE,'x','ok','2026-01-01T00:00:00Z')", (${JSON.stringify(name)}, ${JSON.stringify(color)}))
 sid = c.execute('SELECT MAX(id) FROM cal_subs').fetchone()[0]
 for t, d0, d1, allday, st, en in json.loads(${JSON.stringify(JSON.stringify(events))}):
     c.execute('INSERT INTO cal_events(sub_id,uid,title,all_day,start,"end",d0,d1) VALUES(?,?,?,?,?,?,?,?)', (sid, t, t, allday, st, en, d0, d1))

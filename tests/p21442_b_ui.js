@@ -112,7 +112,11 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   check(pop && pop.querySelector('.evdraftb'), 'setup: the popover says Draft + Confirm');
   click(w, pop?.querySelector('[data-evp="apok"]'));
   check(!d.querySelector('#pop .apdraftact, #pop .evdraftb'), '#1811: Draft + Confirm leave the popover at once (also its exit picture)');
-  click(w, chip);  // opened again while the confirm is still on its way
+  // 2.1140.0 (#6058): the calendar draws itself again right after the confirm (the chip the first tap used is gone from the
+  // page) - tap the chip that is shown now, as a person does
+  const chip2 = await until(() => [...d.querySelectorAll('#view [data-cev]')].find(x => x.isConnected && /Shoot day draft/.test(x.textContent)));
+  check(w.eval(`AP_EVPEND.has(${ev.id})`), 'setup: the confirm is still on its way when the chip is tapped again');
+  click(w, chip2);  // opened again while the confirm is still on its way
   const pop2 = await until(() => d.querySelector('#pop:not(.hidden) .evpop [data-evp="edit"]') && d.querySelector('#pop'));
   check(pop2 && !pop2.querySelector('.evdraftb, [data-evp="apok"]'), '#1811: the popover opened again meanwhile shows no Draft ' + (pop2?.textContent || '').slice(0, 120));
   check(await until(async () => (await call('GET', `/api/events/${ev.id}`)).status === 'confirmed'), '#1811: confirmed on the server');
