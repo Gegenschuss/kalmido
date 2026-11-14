@@ -58,7 +58,7 @@ from flask import g, jsonify, request
 from ..core.access import Denied
 from ..core.config import app, COOKIE
 from ..core.i18n import N_, tr
-from ..core.db import body, connect, db, err, gset, gsetting, iso, now_utc
+from ..core.db import body, connect, db, err, fresh_within, gset, gsetting, iso, now_utc  # 2.1139.0 (#6028): fresh_within
 from ..accounts.login import pend_set, pend_take, seal, unseal, wa_auth_options
 from ..accounts.session import _token_hash
 from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
@@ -68,7 +68,7 @@ from .hosting import hosted
 from ..notify.alerts import _clamp_int, _env_int, aa_now  # 2.662.0 (#4587): + _clamp_int
 from .backup import BK_DIR, BK_STORE, bk_instance, bk_list, bk_passphrase, bk_test_gate, need_backups
 from .backup import BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.662.0 (#4587)
-from ..core.pg import ts_canon, write_lock  # 2.662.0 (#4587); 2.1115.0 (#5951): ts_canon
+from ..core.pg import write_lock  # 2.662.0 (#4587)
 from . import bkstore as bks  # 2.432.0 (#3584)
 
 BKO_TYPES = ("s3", "webdav", "sftp")
@@ -899,7 +899,7 @@ def stepup_need(c, b, proxy_ok=False):
     tok = request.cookies.get(COOKIE) if g.auth_via == "session" else None
     if tok and step != "fresh":
         r = c.execute("SELECT stepup_at, stepup_for FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
-        if r and r[1] == "su" and ts_canon(r[0]) >= iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN)):  # 2.1115.0 (#5951): NULL reads as empty
+        if r and r[1] == "su" and fresh_within(r[0], RCK_FRESH_MIN):  # 2.1139.0 (#6028): a point in time; NULL / no time = not fresh
             return None
     if step != "fresh" and not (isinstance(b.get("password"), str) and b["password"]):  # the client asks, then sends it again
         return jsonify(error=tr("Confirm with your password"), need=step), 403
