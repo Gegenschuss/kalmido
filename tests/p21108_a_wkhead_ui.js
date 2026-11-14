@@ -64,7 +64,7 @@ const MODS = 'wiki,comments';
     check(a.pmenu && a.back && /Wiki/.test(a.crumbs) && /2D/.test(a.crumbs) && !/Color Management/.test(a.crumbs), 'phone: the page head has back, the path and one "…" ' + JSON.stringify(a));
     check(a.gap !== null && a.gap < 90, 'phone: the text starts right under the page head ' + JSON.stringify(a));
     const it = await items(ev);
-    check(it.includes('Rename…') && it.includes('Export as ZIP') && it[it.length - 1] === 'Delete', 'phone: the one "…" holds the page\'s and the head bar\'s entries, Delete last ' + JSON.stringify(it));
+    check(it.includes('Rename…') && it.includes('Export as ZIP') && it[it.length - 1] === 'Move to the trash' /* 2.1168.0 (#6092): the trash's word */, 'phone: the one "…" holds the page\'s and the head bar\'s entries, Move to the trash last ' + JSON.stringify(it));
     check(await ev(`document.querySelector('#wk-md').textContent.includes('First line of the text.')`) && (await call('GET', `/api/wiki/pages/${DUP}`)).body.startsWith('# color  management'), 'phone: the text keeps its heading (only the view hides it)');
     // ---- a first heading that differs stays
     await nav(B + `#wiki/${OWN}`);

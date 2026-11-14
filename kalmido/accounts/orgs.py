@@ -5,7 +5,7 @@ import re
 
 from flask import g, has_request_context, jsonify, request
 
-from ..core.objhooks import obj_settle, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objhooks import OBJ, obj_node_take, obj_settle, person_revoked  # 2.1168.0 (#4782): + OBJ, obj_node_take; 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.objfollow import ofl_drop  # 2.981.0 (#5286)
 from ..core.objseen import osn_drop  # 2.981.0 (#5286)
 from ..core.config import app, OFFICE_DIR
@@ -528,6 +528,7 @@ def obj_org_set(c, table, obj_id, v, kind):
     oid = clean_org_id(c, v, me())
     if (oid or None) == (r["org_id"] or None):
         return False
+    _obj_shares_lock(c, table, obj_id)  # 2.1168.0 (#4782, Fable review F1): checked and dropped below on one state
     for uid in _obj_sharers(c, table, obj_id):
         p = ws_fit_problem(c, oid, uid, kind)
         if p:
@@ -541,6 +542,7 @@ def obj_org_set(c, table, obj_id, v, kind):
     from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
     org_out(c, r["org_id"], oid, "book" if table == "books" else "calendar",
             c.execute(f"SELECT name FROM {qi(table, _OBJ_ORG_TABLES)} WHERE id=?", (obj_id,)).fetchone()[0])
+    _obj_expired_drop(c, table, obj_id, oid, kind, r["org_id"])  # 2.1168.0 (#4782, review N2 of 2.566.0): after every check
     c.execute(f"UPDATE {qi(table, _OBJ_ORG_TABLES)} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
 
@@ -555,10 +557,44 @@ def _obj_sharers(c, table, obj_id):
         n = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref, int(obj_id))).fetchone()
         if n is None:  # 2.924.0 (#5069): no node = shared with nobody (the old member rows are gone)
             return []
-        rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? ORDER BY id", (n[0],)).fetchall()
+        # 2.1168.0 (#4782, review N2 of 2.566.0): a share run out counts for nobody (the read layer ignores it): it stops no move
+        rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? AND (expires_at IS NULL OR expires_at>?) "
+                         "ORDER BY id", (n[0], iso(now_utc()))).fetchall()
     if any(r["group_id"] for r in rows):
         raise Denied(409, tr("Shared with a group: remove that share before the workspace changes"))
     return sorted({r["user_id"] or r["agent_id"] for r in rows if r["user_id"] or r["agent_id"]})
+
+
+def _obj_shares_lock(c, table, obj_id):
+    """2.1168.0 (#4782, Fable review F1): lock every share row on the reference node of calendar / address book obj_id for the
+    move: a renewal of a run-out share (files_share_patch) between the check (_obj_sharers) and the drop (_obj_expired_drop)
+    would else land in the new workspace unchecked. A renewal waits for the move's commit (and finds its row gone) or the
+    move waits and reads the renewed, live row (409)."""
+    ref = {"ev_cals": "evcal", "books": "address_book"}[table]
+    with system_ctx(c):  # structure, as _obj_sharers
+        c.execute("SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
+                  "ORDER BY s.id FOR UPDATE OF s", (ref, int(obj_id))).fetchall()
+
+
+def _obj_expired_drop(c, table, obj_id, oid, kind, old_oid):
+    """2.1168.0 (#4782, review N2 of 2.566.0): the shares run out on the reference node of calendar / address book obj_id that
+    would not fit workspace oid (a group, a person / agent ws_fit_problem refuses) go with its move: they stop it no more
+    (_obj_sharers), and left on the node they would be a finding of the nightly boundary check (accounts/tenancy.py
+    cal_person / book_person count every row) and could be renewed past the rule. The caller checked the owner.
+    Fable review F2: through the core's step (core/objhooks.obj_node_take = obj_node_unshare, reason "move"): logged in the node's history like every
+    other take-back, kind as the nightly repair names it (core/objects.py _boundary_share); a restore from obj_revoked checks
+    the workspace again (obj_share_restore)."""
+    ref = {"ev_cals": "evcal", "books": "address_book"}[table]
+    with system_ctx(c):  # structure, as _obj_sharers
+        n = c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref, int(obj_id))).fetchone()
+        if n is None:
+            return
+        rows = c.execute("SELECT id, user_id, agent_id, group_id FROM fs_shares WHERE node_id=? AND expires_at IS NOT NULL "
+                         "AND expires_at<=? ORDER BY id", (n["id"], iso(now_utc()))).fetchall()
+        for r in rows:
+            who = r["user_id"] or r["agent_id"]
+            if r["group_id"] or (who and ws_fit_problem(c, oid, who, kind)):
+                obj_node_take(c, me(), n, r["id"], kind=OBJ[ref]["kind"] if ref in OBJ else None, ref_id=int(obj_id), org=old_oid, reason="move")
 
 
 def clean_org_id(c, v, uid):

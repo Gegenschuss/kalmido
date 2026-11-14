@@ -228,7 +228,8 @@ speak(Fr, "de")
 st = Fr.get(B + f"/api/account/import/{IID}").json()
 w = " | ".join(x["text"] for x in (st.get("result") or {}).get("warnings") or [])
 check("Diese Bereiche bleiben" in w and "Umfragen (1)" in w, f"#3808: the warning written under French, read in German {w}")
-check("Pages de connaissances" not in w and "Ein Eintrag konnte nicht übernommen werden: Wissensseiten" in w, f"#3808: the area of a row warning is a key too, read in German {w}")
+# 2.1168.0 (#6091): the area reads "Wissen" (French "Savoir")
+check("Savoir" not in w and "Ein Eintrag konnte nicht übernommen werden: Wissen" in w, f"#3808: the area of a row warning is a key too, read in German {w}")
 imp = Fr.get(B + "/api/imports").json()["imports"][0]["counts"]
 check({"what": "Umfragen", "count": 1} in imp.get("not_taken", []), f"#3808: the import's record in German too {imp}")
 

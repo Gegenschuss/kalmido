@@ -33,6 +33,7 @@ USER_GONE = []  # 2.972.0 (#5272): f(c, uid) before account uid goes (accounts/u
 # 2.1076.0 (#5271, review): the area relations of the links' core (core/objlinks.py olnk_rel registers only these; the boundary
 # check accounts/tenancy.py leaves them to their area's own checks) -- one list, read without importing the links' core
 OLNK_AREA_RELS = ("made", "device", "contact", "answers", "reply")
+UNSHARE = []  # 2.1168.0 (#4782, Fable review F2): core/objects.obj_node_unshare for accounts/orgs.py without an upward import
 GONE = {}  # review 2.578 F2: kind -> table of an area's kind outside OBJ whose rows in obj_revoked / obj_history / obj_undo go
 #            with its objects when an account goes (contacts: contacts/ctfolder.py, cascade over their book)
 
@@ -134,3 +135,11 @@ def obj_rows_drop(c, kind, rid):
             n += c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid))).rowcount
         ug_gc(c, gids)
     return n
+
+
+def obj_node_take(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="unshare"):
+    """2.1168.0 (#4782, Fable review F2): take share sid of reference node n back the core's way (core/objects.obj_node_unshare:
+    obj_revoked + the node's history) from the layer accounts (accounts/orgs.py _obj_expired_drop)."""
+    for f in UNSHARE:
+        return f(c, uid, n, sid, kind=kind, ref_id=ref_id, org=org, reason=reason)
+    raise RuntimeError("core/objects.py not loaded")

@@ -54,7 +54,8 @@ areas = [a["area"] for a in j.get("areas", [])]
 check(r.ok and j.get("lang") == "de" and areas == ["files", "agents", "office", "tasks", "calendar", "wiki", "sheets", "team", "budget", "lists", "sharing"], f"GET /api/help: 2.1090.0 (#5900): the eleven areas in order ({r.status_code} {areas})")
 titles = {a["area"]: a["title"] for a in j.get("areas", [])}
 check(titles == {"files": "Dateien", "agents": "Agenten", "office": "Büro", "tasks": "Aufgaben", "calendar": "Kalender",
-                    "wiki": "Wissensseiten", "sheets": "Tabellen", "team": "Team-Chat", "budget": "Budget", "lists": "Projekte", "sharing": "Teilen"}, f"the areas in the sidebar's words: {titles}")
+                    "wiki": "Wissen",  # 2.1168.0 (#6091)
+                    "sheets": "Tabellen", "team": "Team-Chat", "budget": "Budget", "lists": "Projekte", "sharing": "Teilen"}, f"the areas in the sidebar's words: {titles}")
 files = next((a for a in j.get("areas", []) if a["area"] == "files"), {"sections": []})
 # 2.1090.0 (#5899): show = the section's named places in order (a list; one <!-- show: --> line per step)
 SCAN_SHOW = ["settings.open", "settings.integrations", "files.scan-inbox"]
@@ -104,7 +105,7 @@ def web_search(s, q):
 for q, want in (("Scan-Eingang einrichten", USCAN), ("Scan", USCAN), ("scan inbox", USCAN),
                 ("Kontoauszug", "office#how-to-record-a-payment"), ("Rechnung", "office#how-to-turn-a-quotation-into-an-invoice"),
                 ("wiederkehrende Aufgabe", "tasks#how-to-make-a-task-repeat"), ("Kalender abonnieren", "calendar#how-to-subscribe-to-another-calendar"),
-                ("Wissensseite", "wiki#how-to-write-a-knowledge-page"), ("Einkaufsliste", "home#how-to-make-a-shopping-list")):  # 2.1090.0 (#5900): the new areas
+                ("Seite unter Wissen", "wiki#how-to-write-a-knowledge-page"), ("Einkaufsliste", "home#how-to-make-a-shopping-list")):  # 2.1090.0 (#5900): the new areas; 2.1168.0 (#6091): the German title says "Seite unter Wissen"
     hits = web_search(A, q)
     keys = [h["key"] for h in hits] if isinstance(hits, list) else hits
     check(isinstance(keys, list) and want in keys[:2], f"search {q!r}: {want} among the first two ({keys})")

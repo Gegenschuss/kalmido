@@ -39,3 +39,31 @@
   .ctmodal .ctfcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3rem;align-items:start}
   .ctmodal .ctfcol{min-width:0}
 }
+/* 2.1168.0 (#6118): the phone's bar is ONE row - search, Filter (contacts.js ct_filtBtn, with the number of active filters),
+   New (its sign only) and More; group and address book stand in a second row only while Filter is open; Select is in More */
+.ctfbtn{display:none;position:relative}
+.ctfbtn .ctfn{position:absolute;top:.125rem;right:.125rem;min-width:1rem;height:1rem;padding:0 .25rem;border-radius:.5rem;background:var(--accent);color:var(--on-accent,#fff);font-size:var(--fs-xs);line-height:1rem;text-align:center}
+@media (max-width:767px){
+  .ctview > .ctbar{flex-wrap:wrap}
+  .ctview > .ctbar .ctsearch{flex:1 1 6rem;order:-1}
+  .ctview > .ctbar .ctfbtn{display:inline-flex;order:-1}
+  .ctview > .ctbar > .spacer,.ctview > .ctbar > [data-ct="pick"]{display:none}
+  .ctview > .ctbar > [data-ct="new"],.ctview > .ctbar > [data-ct="menu"]{order:-1}
+  .ctview > .ctbar > [data-ct="new"] .cdl{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .ctview > .ctbar > [data-ct="new"]{min-width:2.75rem;justify-content:center}
+  .ctview > .ctbar > select{display:none;flex:1 1 40%;min-width:0}
+  .ctview.ctfopen > .ctbar > select{display:block}
+}
+/* 2.1168.0 (#6118): the card's head on a narrow card (phone, narrow content, measured on the card itself): back, picture,
+   Edit and More in one row, the name with position and company below over the full width (it was five lines beside the
+   picture); the card never scrolls sideways (long addresses / mails wrap) */
+.ctcols > .ctcard[data-ck]{container:ctcard/inline-size;overflow-x:hidden}
+.ctcard[data-ck] .ctly,.ctcard[data-ck] .ctf > *{min-width:0}
+.ctcard[data-ck] .ctf a,.ctcard[data-ck] .ctf span{overflow-wrap:anywhere}
+@container ctcard (max-width:36rem){
+  .ctcard[data-ck] .cthead{flex-wrap:wrap;row-gap:.5rem}
+  .ctcard[data-ck] .cthead .cthn{order:5;flex:1 0 100%}
+  .ctcard[data-ck] .cthead .ctacts{flex:none;margin-left:auto;justify-content:flex-end}
+}
+/* 2.1168.0 (#6117): on a computer a long name is not cut: it wraps onto a second line of its row (the list measures each row) */
+@media (min-width:768px){ .ctview:not(.msclients) .ctlist .ctn b{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2} }

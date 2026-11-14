@@ -86,7 +86,7 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   d.querySelector('#view [data-hvback]').click();
   const areaNames = () => [...d.querySelectorAll('#view .hvarea h3')].map(x => x.textContent);
   check(await until(() => areaNames().length === 11), `2.1090.0 (#5900): eleven areas; "Alle Hilfethemen": the list (${areaNames()})`);
-  check(areaNames().join() === 'Dateien,Agenten,Büro,Aufgaben,Kalender,Wissensseiten,Tabellen,Team-Chat,Budget,Projekte,Teilen', `the areas in the sidebar's words: ${areaNames()}`);
+  check(areaNames().join() === 'Dateien,Agenten,Büro,Aufgaben,Kalender,Wissen,Tabellen,Team-Chat,Budget,Projekte,Teilen', `the areas in the sidebar's words: ${areaNames()}`);
   const pay = [...d.querySelectorAll('#view .hvtopic')].find(x => x.textContent === 'Eine Zahlung erfassen');
   check(pay, 'the topic "Eine Zahlung erfassen" is listed');
   pay.click();
@@ -96,11 +96,11 @@ const USCAN = 'files#how-to-set-up-a-scan-inbox';
   check(await until(() => areaNames().length === 11 && !d.querySelector('#view .hvsec')), `the browser's Back returns to the list (${w.location.hash})`);
 
   // 2.1090.0 (#5900): a topic of a new area opens in German with its steps and a "Zeig mir" (wiki.new)
-  const wk = [...d.querySelectorAll('#view .hvtopic')].find(x => x.textContent === 'Eine Wissensseite schreiben');
-  check(wk, 'the topic "Eine Wissensseite schreiben" is listed');
+  const wk = [...d.querySelectorAll('#view .hvtopic')].find(x => x.textContent === 'Eine Seite unter Wissen schreiben');
+  check(wk, 'the topic "Eine Seite unter Wissen schreiben" is listed');
   wk.click();
-  check(await until(() => h2() === 'Eine Wissensseite schreiben'), 'the wiki topic opens');
-  check(/Wissensseiten/.test(d.querySelector('#view .hvsec')?.textContent || '') && /Neue Seite/.test(d.querySelector('#view .hvsec')?.textContent || ''), 'its steps name the German labels (Wissensseiten, Neue Seite)');
+  check(await until(() => h2() === 'Eine Seite unter Wissen schreiben'), 'the wiki topic opens');
+  check(/\bWissen\b/.test(d.querySelector('#view .hvsec')?.textContent || '') && /Neue Seite/.test(d.querySelector('#view .hvsec')?.textContent || ''), 'its steps name the German labels (Wissen, Neue Seite)'  /* 2.1168.0 (#6091) */);
   w.history.back();
   check(await until(() => areaNames().length === 11 && !d.querySelector('#view .hvsec')), 'Back returns to the list');
 

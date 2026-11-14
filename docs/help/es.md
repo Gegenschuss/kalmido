@@ -166,7 +166,7 @@ nunca tu contraseña de Kalmido.
 <!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
 ## Escribir una página de conocimiento
 
-1. Abre **Páginas de conocimiento** en la barra lateral y pulsa **Nueva página**.
+1. Abre **Conocimiento** en la barra lateral y pulsa **Nueva página**.
 2. Escribe el nombre de la página en **Nombre**. Una `/` crea carpetas: «Procesos/Lista» queda en la carpeta *Procesos*.
 3. Escribe el texto. Con `[[` enlazas otra página.
 

@@ -559,6 +559,15 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   obj_nodes_follow`); a private calendar / book handed to the heir of a deleted account takes its node into the heir's tree
   (`admin/purgeshare.py`; people who reached a book through a folder of the deleted person get a share of the node). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
   person or agent who does not fit the new workspace, or a group's share, is a 409.
+- 2.1168.0 (#4782, review N2 / N3 of 2.566.0): only a live share stops a workspace move; one that ran out stops nothing
+  (`_obj_sharers`), and the ones of them that would not fit the new workspace go with the move (`_obj_expired_drop`), so the
+  nightly boundary check finds none. When an organisation is deleted for good (`accounts/orgretain.py odl_dismantle`) the
+  nodes do not follow: `fs_org_purge` deletes the organisation's tree first, the calendars' and books' reference nodes and
+  their shares with it, and the objects then stay with their owners, private and shared with nobody (the revocation
+  `person_revoked(..., 'retire')` finds no share left, nothing can be restored). Following (`obj_nodes_follow`) is the
+  way of a retirement and of an owner leaving without an heir only. Every change of owner (`orgretain upg_rest`,
+  `org_leave`, `contacts/orgbooks.py obk_hand_on`, `admin/purgeshare.py`) drops the new owner's own share on the node
+  (`obj_share_gone`).
 - The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
   (2.947.0, #5367: `obj_trash` with its events as children, restore `POST /api/evcals/<id>/restore`, purged by the core's
   run). Events are no kind of their

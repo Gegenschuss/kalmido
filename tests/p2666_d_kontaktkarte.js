@@ -60,7 +60,10 @@ async function foldAndHide(w, d, k, h, ck) {
   check(['details', 'note', 'tasks'].every(k => foldBtn(d, k)?.getAttribute('aria-expanded') === 'true'), '#3624: details, note, tasks open by default');
   check(/petra@example\.com/.test(d.querySelector('#view .ctcard .ctfields')?.textContent || '') && /Erste Notiz/.test(d.querySelector('#view .ctcard .ctnote')?.textContent || '')
     && d.querySelector('#view .ctcard .lyb[data-lyk="tasks"] .ctsec'), '#3624: the contents stay where they were');
-  check(!!d.querySelector('#view .ctcard [data-act="ly-custom"][data-lyv="contacts"]'), '#3624: the card has "Arrange blocks…"');
+  // 2.1168.0 (#6118): "Arrange blocks…" moved from its own row into the card's More menu
+  d.querySelector('#view .ctcard [data-ct="cmenu"]').click();
+  check(await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Arrange blocks/.test(b.textContent))) && !d.querySelector('#view .ctcard [data-act="ly-custom"]'), '#3624: the card has "Arrange blocks…" (in More)');
+  w.closePop?.();
   check(w.eval(`LY.contacts.key`) === 'view_contacts', '#3624: the arrangement is stored as view_contacts');
 
   // ================= fold closed, hide: kept per person, alike for every contact

@@ -84,7 +84,7 @@ async function wkof_on(sp) {
   if (j.e2e) { toast(tr('This workspace is encrypted: it has no files, its texts are offline already')); return; }
   const est = await navigator.storage?.estimate?.().catch(() => null), free = est && est.quota ? Math.max(0, est.quota - (est.usage || 0)) : null;
   if (free !== null && j.bytes > free * 0.9) {  // a margin: the database stores a bit more than the files
-    await askConfirm(tr('Not enough space on this device'), tr('The files of this workspace need {0}, only {1} are free on this device.', fmtSize(j.bytes), fmtSize(free)), {ok: tr('OK')});
+    await wk_info(tr('Not enough space on this device'), esc(tr('The files of this workspace need {0}, only {1} are free on this device.', fmtSize(j.bytes), fmtSize(free))));  // 2.1168.0 (#6092): OK alone
     return;
   }
   const ok = await askConfirm(tr('Keep this workspace offline?'), tr('{0} files, {1}. Free on this device: {2}.', j.files.length, fmtSize(j.bytes), free === null ? tr('unknown') : fmtSize(free)), {ok: tr('Keep offline')});

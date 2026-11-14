@@ -120,7 +120,8 @@ const dragFiles = (w, el, type = 'dragover') => { const e = new w.Event(type, {b
     return JSON.stringify([...document.querySelectorAll('#view .ablist .abrow[data-abid]')].map(x => ({id: +x.dataset.abid, name: R(x.querySelector('.abname')), res: R(x.querySelector('[data-ab="restore"]')), pur: R(x.querySelector('[data-ab="purge"]')),
       badges: R(x.querySelector('.abbadges')), resLab: x.querySelector('[data-ab="restore"]')?.getAttribute('aria-label') || '', vw: innerWidth}))); })()`;
   const over = (a, b) => !!a && !!b && a.w > 0 && b.w > 0 && a.l < b.r - .5 && b.l < a.r - .5 && a.t < b.b - .5 && b.t < a.b - .5;
-  const BAR = `(() => { const b = document.querySelector('#ab-sbar'); if (!b) return null; return JSON.stringify({vw: innerWidth, btn: [...b.querySelectorAll('.mbb')].map(x => { const r = x.getBoundingClientRect(), l = x.querySelector('.mbl'), ls = l && getComputedStyle(l);
+  // 2.1168.0 (#6118): the bar's hidden "..." (multisel.js ms_fit, shown only when words do not fit) and what went into it are no buttons of the row
+  const BAR = `(() => { const b = document.querySelector('#ab-sbar'); if (!b) return null; return JSON.stringify({vw: innerWidth, btn: [...b.querySelectorAll('.mbb:not([hidden])')].map(x => { const r = x.getBoundingClientRect(), l = x.querySelector('.mbl'), ls = l && getComputedStyle(l);
       return {k: x.dataset.absel, l: r.left, r: r.right, aria: x.getAttribute('aria-label') || '', shown: !!l && ls.display !== 'none' && l.getBoundingClientRect().width > 0, cut: !!l && ls.display !== 'none' && l.scrollWidth > l.clientWidth + 1}; }),
       names: [...document.querySelectorAll('#view .ablist .abrow[data-abid] .abname')].map(n => ({w: n.getBoundingClientRect().width, whole: n.scrollWidth <= n.clientWidth + 1}))}); })()`;
   for (const [wd, ht, tag] of [[360, 740, 'p360'], [820, 1180, 't820']]) {

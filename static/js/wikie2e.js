@@ -757,9 +757,9 @@ function wkeLockHtml(sp, page) {
   if (s.mine === false && s.mode === 'on') return `<div class="wkelock"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Encrypted in the browser'))}</b><span class="muted">${esc(tr('Key pending – an admin of the organisation releases it'))}</span></div></div></div>`;
   if (!wkeReady(sp)) {
     if (s.mode !== 'on' && !page && !WKE.locked[sp]) return '';  // a switch is running: the pages not converted yet stay readable
-    return `<div class="wkelock"><button type="button" class="lnph lnopen" data-wke="unlock" data-sp="${esc(sp)}">${ic('lock')}<div><b>${esc(tr('Locked'))}</b><span class="muted">${esc(tr('The pages of this workspace are encrypted in the browser. Unlock to read them.'))}</span></div></button></div>`;
+    return `<div class="wkelock"><button type="button" class="lnph lnopen" data-wke="unlock" data-sp="${esc(sp)}">${ic('lock')}<div><b>${esc(tr('Locked|wiki'))}</b><span class="muted">${esc(tr('The pages of this workspace are encrypted in the browser. Unlock to read them.'))}</span></div></button></div>`;
   }
-  if (page) return `<div class="wkelock"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Locked'))}</b><span class="muted">${esc(tr('This page cannot be opened with your key.'))}</span></div></div></div>`;
+  if (page) return `<div class="wkelock"><div class="lnph">${ic('lock')}<div><b>${esc(tr('Locked|wiki'))}</b><span class="muted">${esc(tr('This page cannot be opened with your key.'))}</span></div></div></div>`;
   return '';
 }
 // the lines above the tree: a running switch, people waiting for the key, a key change after someone left

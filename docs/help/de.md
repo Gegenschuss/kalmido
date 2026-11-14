@@ -187,9 +187,9 @@ Was dann passiert: Deine Termine und Aufgaben mit Datum erscheinen im Kalender d
 Richtungen. Nimm dort das App-Passwort, nie dein Kalmido-Passwort.
 
 <!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
-## Eine Wissensseite schreiben
+## Eine Seite unter Wissen schreiben
 
-1. Öffne in der Seitenleiste **Wissensseiten** und tippe auf **Neue Seite**.
+1. Öffne in der Seitenleiste **Wissen** und tippe auf **Neue Seite**.
 2. Gib den Namen der Seite bei **Name** ein. Ein `/` macht Ordner: „Abläufe/Checkliste“ landet im Ordner *Abläufe*.
 3. Schreibe den Text. Mit `[[` verlinkst du eine andere Seite.
 
@@ -207,13 +207,13 @@ Was dann passiert: Die Person liest diese Seite (oder den ganzen Ordner mit *Ord
 Seiten; der Link öffnet eine schlichte Seite ohne Anmeldung. **Ausschalten** beendet einen Link sofort.
 
 <!-- help: wiki#how-to-bring-back-an-earlier-version-of-a-page src=f736215a16 -->
-## Eine frühere Fassung einer Seite zurückholen
+## Eine frühere Version einer Seite zurückholen
 
 1. Öffne die Seite, öffne ihr Menü (⋯) und wähle **Verlauf**.
-2. Wähle in der Liste eine Fassung: Kalmido zeigt, was sich vom aktuellen Text unterscheidet.
+2. Wähle in der Liste eine Version: Kalmido zeigt, was sich vom aktuellen Text unterscheidet.
 3. Tippe auf **Wiederherstellen**.
 
-Was dann passiert: Der alte Text wird als neue Fassung wieder zum aktuellen, es geht also nichts verloren; das
+Was dann passiert: Der alte Text wird als neue Version wieder zum aktuellen, es geht also nichts verloren; das
 Zurückholen lässt sich rückgängig machen.
 
 <!-- help: sheets#how-to-make-a-table-with-a-formula src=b8056fbeac -->

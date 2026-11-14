@@ -4514,6 +4514,7 @@ button.lkchip:hover{border-color:var(--accent)}
 }
 .cthead{display:flex;align-items:center;gap:.75rem}
 .cthn{min-width:0;flex:1}
+.cthn h3:focus:not(:focus-visible){outline:none}  /* 2.1168.0 (#6117): the name takes the focus when the card opens (contacts.js ct_focName) */
 .cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}  /* 2.217.0 A (#2794): two lines, break inside a word only as last resort */
 .cthead .ctacts{display:flex;gap:.375rem;flex:none;align-items:center}
 @media (max-width:599px){ .cthead{flex-wrap:wrap} .cthead .ctacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.217.0 A (#2794): the name gets the width, actions drop to a second row */
@@ -6212,6 +6213,7 @@ body.fab-on #view .hpadd{padding-right:var(--fab-safe)}  /* 2.1111.0 (#5963): th
 .mselbar .mbb.danger{color:var(--danger)}
 .mselbar .mbb .mbl{white-space:nowrap}
 .mselbar .mbx{flex:none}
+.mselbar .mbb[hidden]{display:none}  /* 2.1168.0 (#6118): the buttons multisel.js ms_fit put into "…" (and "…" while all fit) */
 @media (max-width:767px){ .mselbar{left:.625rem;right:.625rem;transform:none;justify-content:space-between;gap:0;padding:.25rem .375rem} .mselbar .mcount{padding:0 .25rem;font-size:var(--fs-xs)} .mselbar .mbb{flex:1 1 0;min-width:3.25rem} }
 .ctpicking .ctlistw{padding-bottom:5rem}
 .ctrow .ctchk{width:1.25rem;height:1.25rem;border:1.5px solid var(--line2);border-radius:.375rem;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--bg)}
@@ -8012,8 +8014,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 @media (max-width:767px){
   .mselbar{flex-wrap:wrap;overflow-x:hidden;row-gap:.125rem}
   .mselbar .mcount{flex:1 0 100%;padding:.25rem .375rem 0}
-  .mselbar .mbb{min-width:2.75rem;max-width:100%}
-  .mselbar .mbb .mbl{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .mselbar .mbb{min-width:2.75rem;max-width:100%;flex:1 0 auto}  /* 2.1168.0 (#6118): the whole word (no ellipsis); what does not fit goes into "…" (multisel.js ms_fit) */
   .ctpicking .ctlistw{padding-bottom:6.5rem}
 }
 /* 2.83.0 C (#1427) themes, header strips of lists and folders, small moments (listhead.js) */

@@ -79,7 +79,7 @@ async function ctRoute(id) {
   if (fo !== CT.folder || (r.ctb && String(r.ctb) !== String(CT.book))) { CT.folder = fo; if (r.ctb) CT.book = String(r.ctb); CT.items = null; CT.loading = false; }
   if (typeof ctf_load === 'function') ctf_load();
   if (CT.items === null && !CT.loading) ctLoad();
-  if (id) await ctOpen(id); else if (isMobile()) { CT.sel = null; CT.card = null; ctDraw(); }
+  if (id) await ct_openFoc(id); else if (lsd_one()) { CT.sel = null; CT.card = null; ctDraw(); }
 }
 async function ctOpen(id) {
   if (id < 0) return;  // 2.559.0 (#4660): a contact still being created (ct_saveOpt) opens once it is there
@@ -106,18 +106,33 @@ function viewContacts() {
   ct_prune();  // 2.46.4 (#1732): also after a live update
   const books = (S.books || []).filter(b => wsObjIn(b));  // 2.30.0 (#1036): the address books of the shown workspace
   const items = CT.items === null ? null : CT.items.filter(c => !ctBook(c.book_id) || wsObjIn(ctBook(c.book_id)));
-  const mob = isMobile(), showCard = CT.card && (!mob || CT.sel);
+  const mob = lsd_one(), showCard = CT.card && (!mob || CT.sel);  // 2.1168.0 (#6117): lsd_one() (render.js) = a phone or a content area too narrow for list + card
   const bar = `<div class="ctbar"><div class="ctsearch">${ic('search', 's')}<input id="ct-q" type="search" value="${esc(CT.q)}" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off" enterkeyhint="search"></div>
     ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}<option value="${CTX_MANAGE}">${tr('Manage groups…')}</option></select>` : ''}
     ${books.length > 1 ? `<select id="ct-book" aria-label="${esc(tr('Address book'))}"><option value="">${tr('All address books')}</option>${books.map(b => `<option value="${b.id}" ${String(b.id) === String(CT.book) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
-    <span class="spacer"></span>${books.some(ctWrite) ? `<button class="iconbtn ${CT.pick ? 'on' : ''}" data-ct="pick" aria-pressed="${!!CT.pick}" aria-label="${esc(tr(CT.pick ? 'End selection' : 'Select'))}" title="${esc(tr(CT.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}<button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
+    ${/*html-ok*/ ct_filtBtn(books)}<span class="spacer"></span>${books.some(ctWrite) ? `<button class="iconbtn ${CT.pick ? 'on' : ''}" data-ct="pick" aria-pressed="${!!CT.pick}" aria-label="${esc(tr(CT.pick ? 'End selection' : 'Select'))}" title="${esc(tr(CT.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}<button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
     ${!books.length || books.some(ctWrite) ? `<input type="file" id="ct-impfile" accept="${CT_IMP_ACCEPT}" multiple hidden>` : ''}<button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${trh('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   const fbar = typeof ctf_barHtml === 'function' && !(mob && showCard) ? ctf_barHtml() : '';  // 2.351.0 B (#2749): the folder filter
-  return CT.html = `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols lsd2 lsdfill">${mob && showCard ? '' : `<div class="ctlistw lsdl" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Select a contact')}</div>`}</div></div>`;
+  return CT.html = `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''} ${CT.fOpen ? 'ctfopen' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols lsd2 lsdfill">${mob && showCard ? '' : `<div class="ctlistw lsdl" data-vlsc>${/*html-ok*/ ct18_show(items) ? ct18_hintHtml() : ''}${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Select a contact')}</div>`}</div></div>`;
+}
+// 2.1168.0 (#6118): the phone's bar is one row (search, Filter, New, More): group and address book wait behind Filter
+// (contacts.css), its number = the active filters
+function ct_filtBtn(books) {
+  if (!CT.groups.length && books.length < 2) return '';
+  const n = (CT.group ? 1 : 0) + (CT.book && books.length > 1 ? 1 : 0), lab = n ? tr('Filter: {0} active', n) : tr('Filter');
+  return `<button type="button" class="iconbtn ctfbtn ${n ? 'on' : ''}" data-ct="filt" aria-expanded="${CT.fOpen ? 'true' : 'false'}" aria-label="${esc(lab)}" title="${esc(lab)}">${ic('filter', 's')}${n ? `<span class="ctfn" aria-hidden="true">${/*html-ok*/ n}</span>` : ''}</button>`;
+}
+// 2.1168.0 (#6118): the office hint stands in the list column (never above a card): with an empty list, otherwise once - the
+// first visit after it was never seen (ct18Seen); it stays for that visit, Hide (x) ends it for good
+function ct18_show(items) {
+  if (items && !items.length && !CT.q && !CT.group && !CT.book && !CT.folder) return true;
+  if (CT.h18 === undefined) CT.h18 = !LS.get('ct18Seen');
+  if (CT.h18 && !LS.get('ct18Seen') && ct18_hintHtml()) LS.set('ct18Seen', 1);
+  return CT.h18;
 }
 // 2.364.0 B (#3018): Office & finance off: a line above the contacts that turns it on right here (instead of Settings >
 // Modules > Areas > Parts); everyone but a child switches their own modules (without an organisation they are their own admin)
@@ -208,6 +223,8 @@ function ctRows(items, row) {
   if (!vl_begin(items.length)) return items.map(c => row(c, '')).join('');
   return vl_seg('ct', items, (c, i) => row(c, ` data-vlg="${c.id}" aria-setsize="${items.length}" aria-posinset="${i + 1}"`), false, 'li');
 }
+// 2.1168.0 (#6118): above the card's blocks only the switch of saved arrangements (when there are any); Arrange blocks… is in More
+function ct_lyBar() { const v = typeof lyv_btn === 'function' ? lyv_btn('contacts') : ''; return v ? `<div class="lybar"><span class="spacer"></span>${/*html-ok*/ v}</div>` : ''; }
 function ctCardHtml(c) {
   const b = ctBook(c.book_id), w = c.role ? c.role === 'owner' || c.role === 'edit' : ctWrite(b);  // 2.351.0 B (#2749): also through a folder
   const it = (k, icon, href) => (c[k] || []).map(x => `<div class="ctf">${ic(icon, 's')}<span class="ctfl muted">${esc(ctTypeWord(k, x))}</span>${href(x)}</div>`).join('');
@@ -216,9 +233,9 @@ function ctCardHtml(c) {
   const kinds = Object.fromEntries(CT_LINK);
   const hist0 = ctk_histHtml(c), hist = CTK.items.length ? hist0 : '';  // starts the load of a newly opened card
   return `<article class="ctcard" aria-labelledby="ct-h" data-ck="${c.id}">
-    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
+    <div class="cthead">${lsd_one() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h" tabindex="-1">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
       <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('Read-only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
-    <div class="ctly">${S.ly.view === 'contacts' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('contacts')}</div>`}${lyHtml('contacts', ct_foldAll(c, {  // 2.666.0 D (#3624): the card's sections are blocks of the view builder
+    <div class="ctly">${/*html-ok*/ S.ly.view === 'contacts' ? '' : ct_lyBar()}${lyHtml('contacts', ct_foldAll(c, {  // 2.666.0 D (#3624): the card's sections are blocks of the view builder
       details: `<div class="ctfields">
       ${it('phones', 'phone', x => `<a href="tel:${esc(x.value.replace(/[^\d+]/g, ''))}">${esc(x.value)}</a>`)}
       ${it('emails', 'at', x => `<a href="mailto:${esc(x.value)}">${esc(x.value)}</a>`)}
@@ -348,17 +365,18 @@ document.addEventListener('click', async e => {
   const o = e.target.closest('[data-ctopen]');
   if (o && (CT.pick || (ms_modClick(e) && !isMobile() && bk_canPick()))) { e.preventDefault(); if (!ms_lpRecent(bk_lpS)) bk_click(+o.dataset.ctopen, e.shiftKey); return; }  // 2.46.1 (#1554): the selection mode; 2.47.3 (#1733): Shift- / Cmd-click
   if (o && ms_lpRecent(bk_lpS)) { e.preventDefault(); return; }  // the click that ends a long press
-  if (o) { e.preventDefault(); if (isMobile()) go('contacts/' + o.dataset.ctopen); else ctOpen(+o.dataset.ctopen); return; }
+  if (o) { e.preventDefault(); if (lsd_one()) go('contacts/' + o.dataset.ctopen); else ct_openFoc(+o.dataset.ctopen); return; }
   const hm = e.target.closest('[data-ctkmail]');  // 2.119.1 B (#2083): a mail of the card's history
   if (hm) { if (typeof hbm_open === 'function') hbm_open(+hm.dataset.ctkmail); return; }
   if (e.target.closest('[data-ctkmore]') && CTK.card && !CTK.loading) { ctk_histLoad(CTK.card, CTK.items.length); return; }
   const tk = e.target.closest('[data-cttask]');
   if (tk) { e.preventDefault(); const id = +tk.dataset.cttask; if (taskById(id)) openDetail(id); else go('t/' + id); return; }
   const gp = e.target.closest('[data-ctgroup]');
-  if (gp) { CT.group = gp.dataset.ctgroup; CT.sel = null; CT.card = null; if (isMobile()) go('contacts'); ctLoad(); return; }
+  if (gp) { CT.group = gp.dataset.ctgroup; CT.sel = null; CT.card = null; if (lsd_one()) go('contacts'); ctLoad(); return; }
   const b = e.target.closest('#view [data-ct]'); if (!b) return;
   const k = b.dataset.ct;
   if (k === 'pick') { CT.pick = CT.pick ? null : new Set(); ctDraw(); return; }
+  if (k === 'filt') { CT.fOpen = !CT.fOpen; ctDraw(); if (CT.fOpen) $('#view #ct-group, #view #ct-book')?.focus({preventScroll: true}); return; }  // 2.1168.0 (#6118)
   if (k === 'tback') { if (!f8d_viewBack('ctt')) ctt_close(); return; }  // 2.272.0 E1 (#3038); 2.963.0 (#5233): the ‹ = Back
   if (k === 'tempty') { ctt_act('call'); return; }
   if (k === 'fold') {  // 2.666.0 D (#3624): fold a block of the card open / closed (kept per person)
@@ -369,7 +387,8 @@ document.addEventListener('click', async e => {
   else if (k === 'edit' && CT.card) ctEditor(CT.card);
   else if (k === 'back') { CT.sel = null; CT.card = null; navUp('contacts'); }  // 2.743.0 (#5235)
   else if (k === 'menu') {
-    menu(b, [{label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
+    menu(b, [isMobile() && (S.books || []).filter(x => wsObjIn(x)).some(ctWrite) && !CT.pick && {label: tr('Select'), icon: 'select', fn: () => { CT.pick = new Set(); ctDraw(); }},  // 2.1168.0 (#6118): the phone's bar has no select button
+      {label: tr('Address books…'), icon: 'folder', fn: ctBooksModal},
       {label: tr('Trash'), icon: 'trash', fn: () => { CT.trash = {}; CT.pick = null; f8d_viewStep('ctt', ctt_close); ctDraw(); }},  // 2.272.0 E1 (#3038); 2.963.0 (#5233): a step of the page
       {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport()},
       {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(null, 'csv')},  // 2.119.1 A (#2080): Outlook, Google, a spreadsheet
@@ -385,7 +404,8 @@ document.addEventListener('click', async e => {
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
       typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
       ctk_clientItem(c, ctBook(c.book_id)),  // 2.119.1 B (#2082): create a client from the contact / open its client
-      ...(typeof ctf_cardItems === 'function' ? ctf_cardItems(c) : [])]);  // 2.351.0 B (#2749): into a folder, share it there
+      ...(typeof ctf_cardItems === 'function' ? ctf_cardItems(c) : []),  // 2.351.0 B (#2749): into a folder, share it there
+      typeof lyOpen === 'function' && S.ly.view !== 'contacts' && {label: tr('Arrange blocks…'), icon: 'sliders', fn: () => lyOpen('contacts', true)}]);  // 2.1168.0 (#6118): was its own row above the blocks
   }
 });
 
@@ -416,7 +436,7 @@ function bk_click(id, shift) {  // 2.47.3 (#1733): Shift-click ticks the rows be
 function bk_start(id) { CT.pick = new Set(); bk_toggle(id); if (!CT.pick.size) ctDraw(); }
 function bk_end() { CT.pick = null; CT.pickAll = null; ctDraw(); }
 function bk_barHtml() {
-  return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']]);
+  return ms_barHtml('ct-sbar', 'ctb', CT.pick.size, tr('Tap contacts'), [['all', 'all', bk_allOn() ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')], ['move', 'folder', tr('Move')], ['merge', 'collapse', tr('Merge'), '', 2], ['del', 'trash', tr('Delete'), 'danger']], {words: true});  // 2.1168.0 (#6118): whole words, the rest in "..."
 }
 // every contact of the current search / group / address book (also the pages the list has not loaded yet): fetched as pages
 async function bk_matching() {
@@ -513,13 +533,27 @@ async function bk_move(ids, b) {
 kb_on('view:contacts', 'Escape', () => {  // 2.630.0 (#4510): key registry (keys.js): the view's Esc, after an open menu / dialog and before the detail
   if (!(CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; bk_end();
 });
+// 2.1168.0 (#6117): the keyboard in list and card - the arrow keys (Home / End) walk through the list (from the search field
+// down into it), the card's name takes the focus when it opens; Esc closes the card at any width (render.js lsd_esc)
+const ct_kbFree = () => S.route.mod === 'contacts' && !CT.trash && !$('.modal, .lightbox') && !!$('#pop')?.classList.contains('hidden');
+function ct_kbWalk(e) {
+  const t = e.target, rows = $$('#view .ctlist .ctrow[data-ctopen]'), cur = t?.closest?.('.ctrow[data-ctopen]');
+  if (!ct_kbFree() || !rows.length || !(cur || t?.id === 'ct-q')) return false;
+  if (!cur && e.key !== 'ArrowDown') return false;  // the search field keeps its own Up / Home / End
+  const i = cur ? rows.indexOf(cur) : -1, to = {ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: rows.length - 1}[e.key];
+  const r = rows[Math.max(0, Math.min(rows.length - 1, to ?? i))]; if (!r) return false;
+  r.focus({preventScroll: true}); r.scrollIntoView({block: 'nearest'});  // sprung-ok: the arrow key the person pressed brings its row into sight
+}
+for (const k of ['ArrowDown', 'ArrowUp', 'Home', 'End']) kb_on('view:contacts', k, ct_kbWalk);
+const ct_focName = () => { if (S.route.mod === 'contacts') $('#view #ct-h')?.focus({preventScroll: true}); };
+async function ct_openFoc(id) { await ctOpen(id); if (CT.sel === id && CT.card) ct_focName(); }
 // 2.607.0 (#4612): a long press (phone) / a right click (computer) on a row opens its menu: the name, "Select" (starts the
 // selection with it), Open, favourite, Delete; while the selection runs a long press ticks the row (the click after it does nothing)
 function bk_rowMenu(r) {
   const id = +r.dataset.ctopen, c = (CT.items || []).find(x => x.id === id); if (!c || CT.trash) return false;
   const w = ctWrite(ctBook(c.book_id));
   menu(r, [...cm_selHead(c.fn, bk_canPick() ? () => bk_start(id) : null),
-    {label: tr('Open'), icon: 'eye', fn: () => { if (isMobile()) go('contacts/' + id); else ctOpen(id); }},
+    {label: tr('Open'), icon: 'eye', fn: () => { if (lsd_one()) go('contacts/' + id); else ct_openFoc(id); }},
     ...fv2_menuRow('r:contact:' + id),
     w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => ct_delAsk(c)}].filter(Boolean));
   return true;
@@ -638,7 +672,7 @@ async function ctEditor(c, cf, draft) {  // draft: 2.576.0 (#4764) the input of 
     try {
       const r = await ct_saveOpt(c, body, dlg && (() => dlg.save(body).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; })));
       toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.4 C (#2378)
-      if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
+      if (S.route.mod === 'contacts' && lsd_one() && !c) go('contacts/' + r.id);
     } catch (e) {  // api() showed it; 2.565.0 (#4705): saved elsewhere meanwhile: the dialog again with the current contact + what was typed
       if (e?.cf) { const x = e.cf; ctEditor({...x.cur, ...x.mine}, x); toast(tr('Changed by someone else in the meantime')); }
       // 2.576.0 (#4764): another error (no connection, a server error, a rejected value): the dialog comes back with what was
@@ -673,7 +707,7 @@ async function ct_saveOpt(c, body, req) {  // req: 2.565.0 (#4705) the dialog's 
 async function ct_delAsk(c) {
   if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
   // 2.559.0 (#4660): gone at once (ct_delOpt), no GET /api/state; an error brings it back
-  if (isMobile()) go('contacts');
+  if (lsd_one()) go('contacts');
   try { await ct_delOpt(c); } catch { return; }
   toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } ctLoad(); });
 }
@@ -702,7 +736,7 @@ async function ctx_dupAsk(body, md) {
   $('[data-ctm2="save"]', md).textContent = tr('Create anyway');
   if (!md.dataset.ctxl) md.addEventListener('click', e => {
     const o = e.target.closest('[data-ctxdup]'); if (!o) return;
-    md.remove(); if (S.route.mod === 'contacts' && isMobile()) go('contacts/' + o.dataset.ctxdup); else if (S.route.mod === 'contacts') ctOpen(+o.dataset.ctxdup); else go('contacts/' + o.dataset.ctxdup);
+    md.remove(); if (S.route.mod === 'contacts' && lsd_one()) go('contacts/' + o.dataset.ctxdup); else if (S.route.mod === 'contacts') ctOpen(+o.dataset.ctxdup); else go('contacts/' + o.dataset.ctxdup);
   });
   md.dataset.ctxl = '1';
   announce(tr('There is already a contact like this:'));
@@ -1074,7 +1108,7 @@ async function ctm_merge(ids) {
     run: async (target, pick) => {
       const j = await rawFetch('POST', '/api/contacts/merge', body(target, pick));
       let run = j.run_id;
-      const show = async () => { await load().catch(() => {}); ctLoad(); if (isMobile()) go('contacts/' + target); else ctOpen(target); };
+      const show = async () => { await load().catch(() => {}); ctLoad(); if (lsd_one()) go('contacts/' + target); else ctOpen(target); };
       bk_end(); show();
       ms_hist(trn('{0} contact merged', '{0} contacts merged', recs.length), tr('Contacts merged'),
         async () => { await api('POST', `/api/contacts/merges/${run}/undo`); await show(); },

@@ -101,7 +101,7 @@ function ms_clView() {
     return hbm_hubView();
   }
   if (MSC.items === null && !MSC.loading) setTimeout(ms_clLoad, 0);
-  const id = S.route.client || null, mob = isMobile();
+  const id = S.route.client || null, mob = lsd_one();  // 2.1168.0 (#6117): a phone or a content area too narrow for list + card (render.js)
   if (id && (!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);
   if (id && MSC.invFor !== id && !MSC.invLoading) MSC.inv = null;  // 2.369.0 A (#3200): another client
   if (id && MSC.inv === null && !MSC.invLoading && typeof officeOn === 'function' && officeOn()) setTimeout(ms_clInvLoad, 0);
@@ -147,7 +147,7 @@ function ms_clCard(c) {
   const inv = (MSC.inv || []).filter(x => x.client_id === c.id && x.open > 0 && !['draft', 'cancelled'].includes(x.status));
   const ks = (c.contacts || []).filter(k => k.name);
   return `<article class="ctcard msclcard" aria-labelledby="mscl-h" data-ck="${c.id}">
-    <div class="cthead">${isMobile() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(cdn_label(c))}</h3>${cdn_label(c) !== c.name ? `<small class="muted cdnlegal">${esc(c.name)}</small>` : ''}<div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
+    <div class="cthead">${lsd_one() ? `<button class="iconbtn" data-mscl="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ms_clAv(c, true)}<div class="cthn"><h3 id="mscl-h">${esc(cdn_label(c))}</h3>${cdn_label(c) !== c.name ? `<small class="muted cdnlegal">${esc(c.name)}</small>` : ''}<div class="mstags">${ms_tag('client')}${c.archived ? `<span class="rotag">${tr('Archived')}</span>` : ''}${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}</div></div>
       <span class="ctacts"><button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button><button class="iconbtn" data-mscl="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="mscly msclstats cldetail">${S.ly.view === 'clients' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('clients')}</div>`}${lyHtml('clients', ms_clFoldAll(c, ks, inv, {  // 2.55.0 (#1067): the card's sections are blocks of the view builder
       details: `<div class="ctfields">
@@ -192,7 +192,7 @@ function ms_clBar() {
   const shown = ms_clShown(), allOn = n && shown.every(c => MSC.pick.has(c.id));
   return ms_barHtml('ct-sbar', 'clb', n, tr('Tap clients'), [['all', 'all', allOn ? tr('Select none') : tr('All')], ['edit', 'edit', tr('Edit')],
     ['arch', allArch ? 'undo' : 'archive', allArch ? tr('Restore') : tr('Archive')], ['merge', 'collapse', tr('Merge'), '', 2],
-    ...(ofm_can(sel[0]?.org_id ?? null) ? [['move', 'brief', tr('Move to another workspace…')]] : []), ['del', 'trash', tr('Delete'), 'danger']]);  // 2.97.0 C (#2049)  // 2.66.0 (#1835): merge from two clients on (min 2)
+    ...(ofm_can(sel[0]?.org_id ?? null) ? [['move', 'brief', tr('Move to another workspace…')]] : []), ['del', 'trash', tr('Delete'), 'danger']], {words: true});  // 2.1168.0 (#6118): whole words like the contacts; 2.97.0 C (#2049)  // 2.66.0 (#1835): merge from two clients on (min 2)
 }
 function ms_clClick(id, shift) {
   if (!MSC.pick) { MSC.pick = new Set(); MSC.last = null; }

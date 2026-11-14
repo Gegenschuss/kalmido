@@ -91,7 +91,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await nav(B + '?w=1440#contacts');
     check(await until(`!!S.booted && !!document.querySelector('#view .ctrow[data-ctopen]') && !document.querySelector('#view').classList.contains('lsdw')`), '1440: the contacts show, no wide pair');
     { const p = await until(PAIR('#view .ctview .lsd2'));
-      check(p && p.cols === 2 && Math.abs(p.lw - 15 * p.rem) <= 2, '1440: the contact list is the narrow --w-leiste column of .lsd2 ' + JSON.stringify(p)); }
+      check(p && p.cols === 2 && p.lw > 15 * p.rem + 2 && p.lw <= 26 * p.rem + 2, '1440: the contact list is the left column of .lsd2, wider than --w-leiste (at most 26rem) ' + JSON.stringify(p)); }  // 2.1168.0 (#6117): was the narrow 15rem
     await nav(B + '?w=1440#office/receipts');
     check(await until(`document.querySelectorAll('#view [data-rcl="rc"]').length === 2`), '1440: the receipts show');
     await ev(`(() => { document.querySelector('#view [data-rcl="rc"][data-id="${RC[1]}"]').click(); return 1; })()`);

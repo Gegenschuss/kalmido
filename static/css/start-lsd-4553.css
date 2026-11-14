@@ -27,6 +27,13 @@ body.rcldock #view.lsdw .lsd2.lsdone{display:grid}
 #view.lsdw > .ofwrap:has(.lsd2:not(.lsdone)),body.rcldock #view.lsdw > .ofwrap{max-width:none}
 #view.lsdw .dash.office:has(.lsd2:not(.lsdone)),body.rcldock #view.lsdw .dash.office{max-width:none}  /* 2.571.0 (#4740): the office page (.dash, app.css) kept the pair at --w-seite = 96rem inside the wider .ofwrap */
 @media (max-width:767px){ .lsd2{grid-template-columns:1fr} }
+/* 2.1168.0 (#6117): the pair by the room of the CONTENT area, not the window: render.js lsd_sync gives #view the class lsdnar
+   below LSD_PAIR_REM (43rem: the list's 14rem, the gap and a readable detail of 28rem) - then one column as on a phone (the
+   views ask lsd_one() and draw the list or the detail). Between that and 100rem the list of contacts / clients grows with the
+   area (about a third, up to 26rem) so names are not cut; the detail keeps the rest. Another list beside a detail (#6140)
+   takes the same rule: put it into .lsd2 (.lsdl / .lsdr) and draw one of the two while lsd_one() is true. */
+#view.lsdnar .lsd2{grid-template-columns:minmax(0,1fr)}
+@media (min-width:768px){ #view:not(.lsdw,.lsdnar) .lsd2.lsdfill{grid-template-columns:clamp(var(--w-leiste-min),34%,26rem) minmax(0,1fr)} }
 
 /* receipts (office_receipts.js rcl_dock): the receipt's dialog stands in the right column of the pair (its box is placed
    over that column by rcl_dockSync), without the dark backdrop, so the list stays visible and clickable */
