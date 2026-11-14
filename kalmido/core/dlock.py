@@ -96,7 +96,7 @@ def _dl_person_wkf(c, uid):
     if cache is not None and uid in cache:
         return cache[uid]
     out = set()
-    with system_ctx(c):
+    with system_ctx(c):  # ids only: the share rows of this one account, whoever asks (the Share dialog names other people)
         for r in c.execute("SELECT excl FROM fs_shares WHERE user_id=? AND excl IS NOT NULL", (int(uid),)):
             out.update(dl_excl_parse(r[0]))
     out = frozenset(out)
