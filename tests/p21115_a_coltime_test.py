@@ -187,5 +187,19 @@ check("a_at IS NOT NULL" in idx and "b_at IS NOT NULL" in idx and "''" not in id
 check("6028: zz6028k: one ALTER for 2 columns failed, column by column" in err and "5951: zz6028k.e_at stays TEXT" in err,
       f"#6028: the log names the fallback and the column that stays {err[-600:]}")
 
+# ---- 2.1139.0 (#6028): core/db.py fresh_within (the step-up checks): a point in time, anything else is not fresh
+fw, _e = py("""
+from datetime import datetime, timedelta, timezone
+from kalmido.core.db import fresh_within, now_utc
+n = now_utc()
+cases = {'none': None, 'empty': '', 'blank': '   ', 'zzz': 'zzz', 'num': 5, 'z': (n - timedelta(minutes=1)).isoformat().replace('+00:00', 'Z'),
+         'naive': (n - timedelta(minutes=1)).replace(tzinfo=None), 'old': (n - timedelta(minutes=11)).isoformat(),
+         'ahead': (n + timedelta(minutes=1)).isoformat(), 'future': '9999-12-31T00:00:00+00:00',
+         'zone': (n - timedelta(minutes=1)).astimezone(timezone(timedelta(hours=2))).isoformat()}
+print(json.dumps({k: fresh_within(v, 10) for k, v in cases.items()}))
+""")
+check(fw == {"none": False, "empty": False, "blank": False, "zzz": False, "num": False, "z": True, "naive": True, "old": False,
+             "ahead": True, "future": False, "zone": True}, f"#6028: fresh_within reads points in time, the rest is not fresh {fw}")
+
 print(f"p21115_a_coltime: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -103,18 +103,23 @@ def parse_iso(s):
     return datetime.fromisoformat(s)
 
 
+FRESH_AHEAD_MIN = 2  # 2.1139.0 (#6028): a clock a little ahead (another worker) still counts
+
+
 def fresh_within(v, minutes):
     """2.1139.0 (#6028): the point in time v (ISO text of any form - Z, an offset, none = UTC - or a datetime, as a TEXT or a
     TIMESTAMPTZ column gives it) lies at most `minutes` minutes back; None, '' and anything unreadable are NOT fresh. For the
     step-up / re-sign-in checks (accounts/oidc.py reauth_fresh, admin/offsite.py stepup_need, core/orgcrypt.py _rck_fresh):
-    a text compare there let a value that is no time ('zzz', a damaged row) count as fresh."""
+    a text compare there let a value that is no time ('zzz', a damaged row) count as fresh. A point more than FRESH_AHEAD_MIN
+    minutes in the future (a damaged row, 9999-12-31) is not fresh either (Fable review 2.1139, F1); the writers use now_utc too."""
     if v is None or v == "":
         return False
     try:
         d = v if isinstance(v, datetime) else datetime.fromisoformat(str(v).strip().replace("Z", "+00:00"))
         if d.tzinfo is None:
             d = d.replace(tzinfo=timezone.utc)
-        return d >= now_utc() - timedelta(minutes=minutes)
+        now = now_utc()
+        return now - timedelta(minutes=minutes) <= d <= now + timedelta(minutes=FRESH_AHEAD_MIN)
     except (ValueError, TypeError, OverflowError):
         return False
 
