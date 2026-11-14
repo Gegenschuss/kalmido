@@ -67,7 +67,7 @@ const wk_hitHtml = (p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('n
 const wk_hitName = (p, i) => i < 30 && typeof wks_nameHtml === 'function' ? wks_nameHtml(p, WK.q) : `<span>${esc(p.path)}</span>`;
 function wk_allHitsHtml(q, cls = '') {
   const v = wk_allHits(q), wait = wk_spaces().some(s => !WK.idx[s]?.pages && !WK.idx[s]?.err);
-  return `<nav id="wk-res" class="${cls}" aria-label="${esc(tr('Pages'))}">${v.length ? `<ul class="wktree">${v.map(wk_hitHtml).join('')}</ul>` : wait ? '' : `<div class="empty">${tr('No page matches.')}</div>`}${wait ? `<div class="muted mhint">${tr('Loading…')}</div>` : ''}${typeof wks_html === 'function' ? wks_html('', WK.q, v.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>`;
+  return `<nav id="wk-res" class="${cls}" aria-label="${esc(tr('Pages'))}">${/*html-ok*/ v.length ? `<ul class="wktree">${v.map(wk_hitHtml).join('')}</ul>` : wait ? '' : wk_noHit()}${wait ? `<div class="muted mhint">${tr('Loading…')}</div>` : ''}${typeof wks_html === 'function' ? wks_html('', WK.q, v.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>`;
 }
 const wk_base = p => p.split('/').pop();
 const wk_isTpl = p => /^(templates|vorlagen)\//i.test(p);
@@ -75,13 +75,30 @@ const wk_e2e = sp => typeof wkeOn === 'function' && wkeOn(sp);  // 2.64.3 B (#18
 // 2.376 (#3292): the index or a page arrived: drawn at once while one types into the search (the field keeps its focus, its
 // own input draws the same way); other fields being edited hold the redraw as before (viewSafeRender)
 const wk_redraw = () => document.activeElement?.id === 'wk-q' ? renderView() : viewSafeRender();
+// 2.1167.0 (#6088): loading, failed, nothing here - the shared blocks (render.js emptyState / errorState / loadingHtml /
+// noAccessState, core.js errText) like the lists (#5440, #5444) and the calendar (#5461), no grey lines of the wiki's own
+const wk_noHit = () => emptyState({icon: 'search', title: tr('No page matches.'), size: 'sec'});
+const wk_emptyDir = () => emptyState({icon: 'folder', title: tr('This folder is empty'), size: 'sec'});
+const wk_idxStateHtml = (sp, d) => d?.err ? errorState({title: d.err, size: 'sec', retry: () => wk_load(sp, true)}) : loadingHtml('sec');
+// an empty space: the way to its first page where one may write there
+const wk_noPagesHtml = (sp, d) => emptyState({icon: 'book', title: tr('No pages yet.'), sub: sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.'),
+  action: d?.mayWrite !== false && !wk_locked(sp) ? `<div class="eacts"><button type="button" class="btn pri" data-wk="new">${ic('plus', 's')} ${esc(tr('Create the first page'))}</button></div>` : ''});
+// the open page while it loads, when it failed (Try again) or is not there (the lock block); both with a way back (a phone has
+// no list beside the page)
+function wk_pgStateHtml(id, sp) {
+  if (WK.pgErr && WK.pgLost === id) return wk_lostHtml();
+  if (!WK.pgErr) return loadingHtml('big');
+  const back = `<a href="#${esc(wk_home(sp))}" class="btn" data-navup>${ic('back', 's')} ${esc(tr('Back to the pages'))}</a>`;
+  if (WK.pgErrSt === 404) return noAccessState({title: WK.pgErr, sub: tr('It may have been deleted, or it is not shared with you.'), action: `<div class="eacts">${/*html-ok*/ back/* built above with esc() */}</div>`});
+  return errorState({title: WK.pgErr, sub: WK.pgErrSt === 'off' ? '' : undefined, retry: () => { WK.pgErr = ''; WK.pgErrFor = null; renderView(); }, action: back});
+}
 async function wk_load(sp, force) {
   const d = WK.idx[sp] || (WK.idx[sp] = {});
   if (WK.busy['i' + sp] || (!force && d.pages && d.v === S.v)) return;
   WK.busy['i' + sp] = true;
   const v0 = S.v, mk0 = d.mk;  // 2.519.0 (#3715): what this answer is for - a change marked while it was on its way (wk_after) is not lost
   try { let j = await wko_sync(sp); if (typeof wkeIndex === 'function') j = await wkeIndex(sp, j); d.pages = j.pages; d.folders = j.folders || []; d.root = j.root || null; d.mayWrite = j.may_write; d.style = j.style || ''; d.may_style = !!j.may_style; d.err = ''; d.off = j._off || ''; d.more = !!j.more; }  // 2.64.3 B (#1817): texts of an encrypted space open here; 2.169.0 (#2671): from the offline copy when offline
-  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; if ([403, 404].includes(e.status) && typeof wkeForget === 'function') wkeForget(sp); }  // 2.64.3 E (#1817): no access any more
+  catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : errText(e, tr('The knowledge pages could not be loaded')); d.pages = d.pages || null; if ([403, 404].includes(e.status) && typeof wkeForget === 'function') wkeForget(sp); }  // 2.64.3 E (#1817): no access any more; 2.1167.0 (#6088): what failed first
   finally { d.v = d.mk !== mk0 ? -1 : v0; WK.busy['i' + sp] = false; }  // 2.519.0 (#3715): an older answer no longer counts as the newest
   if (d.v !== S.v && d.mk !== mk0) return wk_load(sp, true);  // 2.519.0 (#3715): marked while loading - load once more (it draws then)
   if (S.route.mod === 'wiki') wk_redraw();
@@ -108,7 +125,8 @@ async function wk_loadPage(id, force) {
     if (!WKO.cf[id]) await wko_cfLoad(p.space).catch(() => {});  // 2.527.0 (#4304 A18): a page opened directly shows its waiting draft too
   }
   catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgLost = e.data?.code === 'wiki_unreadable' ? id : null;  // 2.139.0 C (#2386): the message names the way out, deleting stays possible
-    WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
+    WK.pgErrSt = e.status === 404 ? 404 : e instanceof Offline ? 'off' : 0;  // 2.1167.0 (#6088): which state block (wk_pgStateHtml)
+    WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : WK.pgLost === id ? e.message : errText(e, tr('The page could not be loaded')); if (WK.pg?.id === id) WK.pg = null; }
   finally { WK.busy['p' + id] = false; }
   if (S.route.mod === 'wiki') wk_redraw();
   if (S.route.mod === 'wiki' && isMobile()) renderTop();  // 2.1108.0 (#5965): the head bar names the loaded page
@@ -199,11 +217,11 @@ function viewWiki() {
     ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}" data-navup>${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
     <div class="ntbar"><div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
       <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && vis.length) : ''}</div>
-    ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${op && typeof wkoffBar === 'function' ? wkoffBar(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? wk_recentHtml() : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
+    ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${op && typeof wkoffBar === 'function' ? wkoffBar(sp) : ''}${/*html-ok*/ all && q ? wk_allHitsHtml(q) : all && !op ? wk_recentHtml() : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${/*html-ok*/ typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? wk_idxStateHtml(sp, d)
       : vis.length ? (q ? `<ul class="wktree">${vis.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : wk_treeHtml(wk_treeOf(sp), cur, vis.length > 30))  // 2.200.0 A (#2747): with the folders
-      : q ? `<div class="empty">${tr('No page matches.')}</div>` : symEmpty('book', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${wk_selBar(sp)}`}${!q && (!all || op) && typeof wkt_sideHtml === 'function' ? wkt_sideHtml(sp) : ''}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js); 2.371 (#3150): + the tags
+      : q ? wk_noHit() : wk_noPagesHtml(sp, d)}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${wk_selBar(sp)}`}${!q && (!all || op) && typeof wkt_sideHtml === 'function' ? wkt_sideHtml(sp) : ''}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js); 2.371 (#3150): + the tags
   const tagv = !id && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op);  // 2.371 (#3150): a tag's pages
-  const main = tagv ? `<article class="ntedit wkpage wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</article>` : id ? `<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article>` : '';
+  const main = tagv ? `<article class="ntedit wkpage wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</article>` : id ? `<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${/*html-ok*/ cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : wk_pgStateHtml(id, sp)}</article>` : '';
   if (mob) wk_scrollAfter(id, !!d?.pages);
   return `<div class="ntwrap wkwrap${id ? (typeof pgw_cls === 'function' ? pgw_cls('wiki', id) : '') : ''}">${wst}<div class="ntview ${id || tagv ? 'open' : ''}"${id ? ' data-pw="1"' : ''}>${mob && (id || tagv) ? '' : side}${main}</div></div>`;  // 2.599.0 (#4808): the page's width (chat.js pgw_*), data-pw = reports it to #top
 }
@@ -266,7 +284,7 @@ function wk_nodeInfo(nid) {  // a node of a loaded space: {sp, folder | page}
 async function wk_nodeMove(nid, b) {  // b = {parent_id?, before?, after?} -> the file store's order route; the paths follow on the server
   const x = wk_nodeInfo(nid); if (!x) return;
   await wk_flush();
-  try { await rawFetch('POST', `/api/files/nodes/${nid}/order`, b); } catch (e) { toast(e.message); return; }
+  try { await rawFetch('POST', `/api/files/nodes/${nid}/order`, b); } catch (e) { toast(errText(e, tr('The new order could not be saved'))); return; }  // 2.1167.0 (#6088): what failed first (core.js errText), here and below
   wk_after(x.sp);
   if ('parent_id' in b) {
     const back = x.parent;
@@ -280,7 +298,7 @@ async function wk_newFolder(sp, parent) {
   if (parent == null && S.route.mod === 'wiki' && S.route.wdir) parent = wk_node(wk_treeOf(sp), S.route.wdir)?.fid || null;  // the open folder
   const name = await askPrompt(tr('New folder'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 150}});
   if (!name || !name.trim()) return;
-  let r; try { r = await rawFetch('POST', '/api/wiki/folders', {space: sp, name: name.trim(), ...(parent && parent !== d.root ? {parent_id: parent} : {})}); } catch (e) { toast(e.message); return; }
+  let r; try { r = await rawFetch('POST', '/api/wiki/folders', {space: sp, name: name.trim(), ...(parent && parent !== d.root ? {parent_id: parent} : {})}); } catch (e) { toast(errText(e, tr('The folder could not be created'))); return; }
   wk_after(sp);
   const f = r.folder;
   histToast(tr('Folder “{0}” created', f.name), histAdd({label: tr('New folder “{0}”', f.name), ids: [], snaps: [], lids: [], wsp: sp,
@@ -297,14 +315,14 @@ async function wk_fRename(sp, f) {
     if (dir.toLowerCase() === l || dir.toLowerCase().startsWith(l + '/')) go(wk_dirGo(up + b + dir.slice(l.length), sp));
   };
   const ren = async (nm, was) => { const r = await rawFetch('PATCH', `/api/files/nodes/${f.id}`, {name: nm}); follow(was, r?.name || nm); wk_after(sp); };
-  try { await ren(name.trim(), f.name); } catch (e) { toast(e.message); return; }
+  try { await ren(name.trim(), f.name); } catch (e) { toast(errText(e, tr('The folder could not be renamed'))); return; }
   histToast(tr('Renamed'), histAdd({label: tr('Renamed {0}', qn(f.name)), ids: [], snaps: [], lids: [], wsp: sp,
     undo: async () => { await ren(f.name, name.trim()); return {skipped: []}; }, redo: async () => { await ren(name.trim(), f.name); return {skipped: []}; },
     post: dir => dir === 'undo' ? follow(name.trim(), f.name) : follow(f.name, name.trim())}));  // 2.979.0 (#5667): a step the server took back: the open folder follows its name
 }
 async function wk_fTrash(sp, f) {
   await wk_flush();
-  try { await rawFetch('DELETE', `/api/files/nodes/${f.id}`); } catch (e) { toast(e.message); return; }
+  try { await rawFetch('DELETE', `/api/files/nodes/${f.id}`); } catch (e) { toast(errText(e, tr('The folder could not be deleted'))); return; }
   if (S.route.mod === 'wiki' && S.route.wdir && (S.route.wdir + '/').toLowerCase().startsWith(f.path.toLowerCase() + '/')) go(wk_home(sp));
   wk_after(sp);
   histToast(tr('“{0}” moved to the trash', f.name), histAdd({label: tr('Delete “{0}”', f.name), ids: [], snaps: [], lids: [], wsp: sp,
@@ -365,7 +383,7 @@ function wk_selMove(anchor) {
     const done = [], mv = (id, par) => rawFetch('POST', `/api/files/nodes/${id}/order`, {parent_id: par});
     for (const x of xs) {
       if (x.parent === to) continue;
-      try { await mv(x.id, to); done.push(x); } catch (e) { toast(e.message); break; }
+      try { await mv(x.id, to); done.push(x); } catch (e) { toast(errText(e, tr('Not everything could be moved'))); break; }
     }
     wk_selEnd(); wk_after(sp);
     if (!done.length) return;
@@ -384,7 +402,7 @@ async function wk_selTrash() {  // pages through the knowledge trash (wk_delete'
   try {
     if (pids.length) await rawFetch('POST', '/api/wiki/trash', {ids: pids});
     if (fids.length) kept = (await rawFetch('POST', '/api/files/trash', {ids: fids})).kept || [];
-  } catch (e) { toast(e.message); wk_selEnd(); wk_after(sp); return; }
+  } catch (e) { toast(errText(e, tr('Not everything could be moved to the trash'))); wk_selEnd(); wk_after(sp); return; }
   if (S.route.wid && pids.includes(S.route.wid)) go(wk_home(sp));
   wk_selEnd(); wk_after(sp);
   const step = async back => {
@@ -448,8 +466,8 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   const bar = `<div class="wkbar">${sel}<div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
     ${S.me?.kid || !op ? '' : `${!id && WK.idx[wk_cur()]?.mayWrite !== false ? '<input type="file" id="wk-zip-file" accept=".zip,application/zip" hidden>' : ''}<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${d && typeof wkoffBar === 'function' ? wkoffBar(sp) : ''}`;  // 2.637.0 (#4745): wkoffBar; 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
-  const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
-  if (id && !hits) return `<div class="ntwrap wkwrap wkdesk wkpgo${(typeof pgw_cls === 'function' ? pgw_cls('wiki', id) : '')}">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" data-pw="1" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
+  const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : wk_noHit())(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
+  if (id && !hits) return `<div class="ntwrap wkwrap wkdesk wkpgo${(typeof pgw_cls === 'function' ? pgw_cls('wiki', id) : '')}">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" data-pw="1" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${/*html-ok*/ cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : wk_pgStateHtml(id, sp)}</article></div>`;
   if (!hits && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op)) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</section></div>`;  // 2.371 (#3150): a tag's pages
   if (all && !op && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder zlefull" aria-label="${esc(tr('Workspaces'))}"><div class="nthead"><div class="wktitle"><h2>${esc(tr('All workspaces'))}</h2></div></div>${wk_recentHtml()}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</section></div>`;  // 2.769.0 (#5352): "Recently edited"  // 2.200.0 B (#2747): + Shared with me (a guest's start)
   const dir = S.route.wdir || '', parts = dir.split('/').filter(Boolean), n = d?.pages ? wk_node(wk_treeOf(sp), dir) : null;
@@ -458,15 +476,15 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   let body;
   if (hits) body = hits;
   else if (typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp)) body = wkeLockHtml(sp);
-  else if (!d?.pages) body = `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`;
-  else if (!pages.length) body = symEmpty('book', tr('No pages yet.'), sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.'));
-  else if (!n) body = `<div class="empty">${tr('This folder is empty')}</div>`;  // 2.200.0 A (#2747): an empty folder has its node (wk_tree)
+  else if (!d?.pages) body = wk_idxStateHtml(sp, d);  // 2.1167.0 (#6088)
+  else if (!pages.length) body = wk_noPagesHtml(sp, d);
+  else if (!n) body = wk_emptyDir();  // 2.200.0 A (#2747): an empty folder has its node (wk_tree)
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
     const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${/*html-ok*/ wk_dirIcon(k, 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
       + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
-    body = (n.page && parts.length ? wk_dirPageHtml(n.page) : '') + (rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : n.page && parts.length ? '' : `<div class="empty">${tr('This folder is empty')}</div>`);
+    body = (n.page && parts.length ? wk_dirPageHtml(n.page) : '') + (rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : n.page && parts.length ? '' : wk_emptyDir());
   }
   if (!hits) body = `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${body}</nav>${wk_selBar(sp)}`;
   return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder" aria-label="${esc(tr('Folder'))}">${hits ? '' : head}${body}${!parts.length && !hits && typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</section></div>`;
@@ -557,7 +575,7 @@ function wk_pageHtml(p) {
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${/*html-ok*/ wk_bodyStrip(p.body).trim() ? wk_dupTitle(wk_render(p), p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
     ${wka_html(p, may, edit)}${wko_cfHtml(p)}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
-    <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
+    <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"${WK.unsaved === p.id ? ` class="wkunsaved">${/*html-ok*/ wk_unsavedHtml()}` : '>'}</span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
 }
 // 2.1108.0 (#5965): a first heading that only repeats the page's title (a SilverBullet import starts with "# Title") is hidden
 // in the drawn page; the text, the editor and the export keep it. Compared without case and spaces.
@@ -696,7 +714,7 @@ const WKA_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,application/pdf,image/*
 document.addEventListener('change', e => { const t = e.target; if (t.id === 'wka-file' && t.files?.length) { if (WK.pg) wka_add(WK.pg, [...t.files]); t.value = ''; } });
 async function wka_add(p, fl) {
   const fd = new FormData(); fl.forEach(f => fd.append('file', f));
-  let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(e.message); return; }
+  let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(errText(e, tr('The file could not be attached'))); return; }
   const files = (r.files || []).map(f => f.id);
   wk_after(p.space);
   const e = histAdd({label: tr('Attach files'), ids: [], snaps: [], lids: [], wsp: p.space,
@@ -705,7 +723,7 @@ async function wka_add(p, fl) {
   histToast(tr('{0} files attached', files.length), e);
 }
 async function wka_del(p, f) {
-  try { await rawFetch('DELETE', '/api/wiki/files/' + f.id); } catch (e) { toast(e.message); return; }
+  try { await rawFetch('DELETE', '/api/wiki/files/' + f.id); } catch (e) { toast(errText(e, tr('The file could not be deleted'))); return; }
   wk_after(p.space);
   const e = histAdd({label: tr('Deleted {0}', qn(f.name)), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [], files: [f.id]}); wk_after(p.space); return {skipped: r.files_skipped?.length ? [f.name] : []}; },
@@ -789,7 +807,7 @@ async function wk_flush(hide) {
   } catch (e) {
     if (e.status === 409 && e.data?.page) { wk_conflict(p, e.data.page, patch); return; }
     if (e instanceof Offline) { await wko_queue(p, patch); return; }
-    WK.dirty = true; toast(e.message);
+    WK.dirty = true; if (e.message !== 'auth') { toast(errText(e, tr('The page could not be saved'))); wk_unsaved(p.id); }  // 2.1167.0 (#6088): what failed first, and the footer keeps it
     if (e.message !== 'auth' && e.status >= 400 && e.status < 500) await wko_draft(p, patch.body, e.message).catch(() => {});  // 2.527.0 (#4304 A18)
   }
 }
@@ -800,13 +818,17 @@ async function wko_draft(p, body, why) {
   WKO.cf[p.id] = {k: 'x:' + p.id, id: p.id, sp: p.space, mine, why, at: new Date().toISOString()};
   await wko_put(WKO.cf[p.id]);
 }
-function wk_savedHint(t) { const s = $('#wk-saved'); if (s) { s.textContent = t; setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 2500); } }
+function wk_savedHint(t) { WK.unsaved = 0; const s = $('#wk-saved'); if (s) { s.classList.remove('wkunsaved'); s.textContent = t; setTimeout(() => { if (s.isConnected && !s.classList.contains('wkunsaved')) s.textContent = ''; }, 2500); } }  // 2.1167.0 (#6088): a later "Not saved" stays
+// 2.1167.0 (#6088): a save that failed: "Not saved" stays in the footer (with Try again) until a save of the page works - before,
+// the toast went after a few seconds and the page looked saved. The page drawn again shows it too (wk_unsavedHtml)
+const wk_unsavedHtml = () => `${esc(tr('Not saved'))} · <button type="button" class="linkbtn" data-wk="resave">${esc(tr('Try again'))}</button>`;
+function wk_unsaved(id) { WK.unsaved = id; const s = $('#wk-saved'); if (s) { s.classList.add('wkunsaved'); s.innerHTML = wk_unsavedHtml(); } }
 // true = settled (mine saved or theirs taken), false = mine could not be saved, null = closed without a choice (as before: theirs shown)
 async function wk_conflict(mine, theirs, patch) {
   let took = false;
   const keep = await askDialog({after: md => md.querySelector('[data-cd="no"]')?.addEventListener('click', () => { took = true; }), title: tr('Changed in the meantime by {0}', theirs.updated_by_name || '?'), html: `<p>${tr('Keep your version or take theirs?')}</p><div class="ntdiff"><div><b>${tr('Yours')}</b><pre>${esc(patch.body)}</pre></div><div><b>${tr('Theirs')}</b><pre>${esc(theirs.body)}</pre></div></div>`, ok: tr('Keep mine'), cancel: tr('Take theirs')});
   let ok = true;
-  if (keep) { try { Object.assign(mine, await wkeApi('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at}, mine.space)); } catch (e) { toast(e.message); ok = false; } }
+  if (keep) { try { Object.assign(mine, await wkeApi('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at}, mine.space)); } catch (e) { toast(errText(e, tr('The page could not be saved'))); ok = false; } }
   else { Object.assign(mine, theirs); if (!took) ok = null; }
   renderView();
   return ok;
@@ -826,7 +848,7 @@ async function wk_new(path0 = '', dir = '', spx = '') {  // 2.210 B (#2757): dir
   const path = path0 || await askDialog({title: tr('New page'), html: ssel + tsel, input: {value: pre, placeholder: tr('Name, folders with / (e.g. Processes/Checklist)'), max: 500}, ok: tr('Create')});
   if (!path || !path.trim()) return;
   const tpl = +WK.tplPick || 0, sp = ask && wk_spaces().includes(WK.spPick) ? WK.spPick : sp0;
-  let r; try { r = await wk_mk(sp, path.trim(), tpl); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): name check + template here; 2.371.2 (#3151): the template's placeholders
+  let r; try { r = await wk_mk(sp, path.trim(), tpl); } catch (e) { toast(errText(e, tr('The page could not be created'))); return; }  // 2.64.3 B (#1817): name check + template here; 2.371.2 (#3151): the template's placeholders
   wk_made(sp, r);
 }
 function wk_made(sp, r) {  // the new page opens for writing, one undo step
@@ -887,7 +909,7 @@ async function wk_day(sp, day = today()) {
   const path = 'journal/' + day, had = wk_byPath(sp, path);
   if (had) { if (S.route.wid !== had.id) go('wiki/' + had.id); return; }
   if (d.mayWrite === false) { toast(tr('This page does not exist or you cannot see it.')); return; }
-  let r; try { r = await wk_mk(sp, path, wk_dayTpl(sp)?.id || 0); } catch (e) { toast(e.message); wk_after(sp); return; }
+  let r; try { r = await wk_mk(sp, path, wk_dayTpl(sp)?.id || 0); } catch (e) { toast(errText(e, tr('The page could not be created'))); wk_after(sp); return; }
   wk_made(sp, r);
 }
 // 2.384.0 (#1958): minutes of a meeting, no module of their own -- "Minutes" in an event's popover (calevents.js) makes a
@@ -926,7 +948,7 @@ async function wk_minutes(o) {
   const base = `${tr('Minutes|folder')}/${o.day} ${wk_meetName(o.title) || tr('(no title)')}`;
   let path = base; for (let i = 2; wk_byPath(sp, path); i++) path = `${base} (${i})`;
   const t = wk_meetTpl(sp);
-  let r; try { r = await wk_mk(sp, path, 0, wk_meetText(t ? await wk_tplText(sp, t.id) : null, o, path)); } catch (e) { toast(e.message); wk_after(sp); return; }
+  let r; try { r = await wk_mk(sp, path, 0, wk_meetText(t ? await wk_tplText(sp, t.id) : null, o, path)); } catch (e) { toast(errText(e, tr('The page could not be created'))); wk_after(sp); return; }
   wk_made(sp, r);
 }
 function wk_dayBar(p) {
@@ -950,7 +972,7 @@ async function wk_rename(p) {
   if (!np || np.trim() === p.path) return;
   const old = p.path;
   const ren = async (path) => { const r = wk_e2e(p.space) ? await wkeRename(p, path) : await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {path}); if (WK.pg?.id === p.id) Object.assign(WK.pg, r); wk_after(p.space); return r; };  // 2.64.3 B (#1817): links renamed here
-  let r; try { r = await ren(np.trim()); } catch (e) { toast(e.message); return; }
+  let r; try { r = await ren(np.trim()); } catch (e) { toast(errText(e, tr('The page could not be renamed'))); return; }
   const e = histAdd({label: tr('Renamed {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { await ren(old); return {skipped: []}; }, redo: async () => { await ren(r.path); return {skipped: []}; }});
   histToast(r.relinked ? trn('Renamed, {0} link changed', 'Renamed, {0} links changed', r.relinked) : tr('Renamed'), e);
@@ -961,7 +983,7 @@ async function wk_moveFolder(p) {  // the folder of the page (and everything und
   const to = await askPrompt(tr('Rename folder'), from, {input: {max: 500}, ok: tr('Rename')});
   if (!to || !to.trim() || to.trim() === from) return;
   const mv = async (a, b) => { const r = wk_e2e(p.space) ? await wkeMove(p.space, a, b) : await rawFetch('POST', '/api/wiki/move', {space: p.space, from: a, to: b}); wk_after(p.space); return r; };  // 2.64.3 B (#1817): one PATCH per page
-  let r; try { r = await mv(from, to.trim()); } catch (e) { toast(e.message); return; }
+  let r; try { r = await mv(from, to.trim()); } catch (e) { toast(errText(e, tr('The page could not be moved'))); return; }
   const nf = to.trim().split('/').filter(Boolean).join('/');
   const e = histAdd({label: tr('Renamed {0}', qn(from)), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { await mv(nf, from); return {skipped: []}; }, redo: async () => { await mv(from, nf); return {skipped: []}; }});
@@ -969,30 +991,30 @@ async function wk_moveFolder(p) {  // the folder of the page (and everything und
 }
 async function wk_delete(p) {
   await wk_flush();
-  try { await rawFetch('DELETE', '/api/wiki/pages/' + p.id); } catch (e) { toast(e.message); return; }
+  try { await rawFetch('DELETE', '/api/wiki/pages/' + p.id); } catch (e) { toast(errText(e, tr('The page could not be deleted'))); return; }
   WK.pg = null; wk_after(p.space); go(wk_home(p.space));  // 2.198.0 A (#2743)
   const e = histAdd({label: tr('Deleted {0}', qn(wk_base(p.path))), ids: [], snaps: [], lids: [], wsp: p.space,
     undo: async () => { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [p.id]}); wk_after(p.space); return {skipped: r.skipped?.length ? [p.path] : []}; },
     redo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [p.id]}); wk_after(p.space); return {skipped: []}; }});
   histToast(tr('Page {0} deleted', qn(wk_base(p.path))), e);
 }
-function wk_export() { if (wk_e2e(wk_cur())) { wkeExport(wk_cur()).catch(e => toast(e.message)); return; }  // 2.64.3 B (#1817): the ZIP is made in the browser
+function wk_export() { if (wk_e2e(wk_cur())) { wkeExport(wk_cur()).catch(e => toast(errText(e, tr('The export could not be made')))); return; }  // 2.64.3 B (#1817): the ZIP is made in the browser
   const a = document.createElement('a'); a.href = '/api/wiki/export?space=' + encodeURIComponent(wk_cur()); a.download = 'wiki.zip'; document.body.append(a); a.click(); a.remove(); }
 // 2.143.0 B (#2211): the trash of the space -- restore a page, delete one for good, empty it (server: wiki/pages.py wiki_purge)
 async function wk_trashDlg(sp = wk_cur()) {
-  const md = modal(`<h3>${tr('Trash')} · ${esc(wk_spaceName(sp))}</h3><div class="wktrash"><div class="muted mhint">${tr('Loading…')}</div></div>
+  const md = modal(`<h3>${tr('Trash')} · ${esc(wk_spaceName(sp))}</h3><div class="wktrash">${/*html-ok*/ loadingHtml('sec')}</div>
     <div class="foot"><button type="button" class="btn danger hidden" data-wkt="empty">${ic('trash', 's')} ${tr('Empty trash')}</button><span class="spacer"></span><button type="button" class="btn" data-wkt="close">${tr('Close')}</button></div>`);
   md.classList.add('wktrashdlg');
   let pages = [];
   const draw = async () => {
     const box = $('.wktrash', md);
-    let j; try { j = await rawFetch('GET', '/api/wiki/trash?space=' + encodeURIComponent(sp)); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message)}</div>`; return; }
+    let j; try { j = await rawFetch('GET', '/api/wiki/trash?space=' + encodeURIComponent(sp)); } catch (e) { box.innerHTML = errorState({title: e instanceof Offline ? tr('Knowledge pages are only available online.') : errText(e, tr('The trash could not be loaded')), size: 'sec', retry: () => { box.innerHTML = loadingHtml('sec'); draw(); }}); return; }  // 2.1167.0 (#6088)
     pages = j.pages || [];
     if (wk_e2e(sp) && typeof wkeOpen === 'function') { const ks = await wkeKeys(sp).catch(() => null); for (const p of pages) if (!await wkeOpen(sp, p, ks).catch(() => false)) p.path = ''; }
     $('[data-wkt="empty"]', md).classList.toggle('hidden', !pages.length || j.may_empty === false);  // 2.306.0 D3 (#2875): an organisation's admins
     box.innerHTML = (pages.length ? `<div class="members">${pages.map(p => `<div class="mrow wktrow" data-wktid="${p.id}"><span class="n"><b>${p.path ? esc(p.path) : `<span class="muted">${tr('Encrypted page')}</span>`}</b><small class="muted">${esc([tr('Moved to the trash on {0}', fmtWhen(p.deleted_at)), p.files ? trn('{0} file', '{0} files', p.files) + ' · ' + fmtBytes(p.size) : ''].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb"><button type="button" class="btn sm" data-wkt="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-wkt="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')}</div>`
-      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Pages in the trash are deleted permanently after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
+      : emptyState({icon: 'trash', title: tr('Trash is empty.'), size: 'sec'})) + `<div class="shint">${esc(trashNote(tr('Pages in the trash are deleted permanently after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
   };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-wkt]'); if (!b) return;
@@ -1010,7 +1032,7 @@ async function wk_trashDlg(sp = wk_cur()) {
         await rawFetch('POST', '/api/wiki/purge', {space: sp, all: true});
       }
       wk_after(sp); await draw();
-    } catch (x) { toast(x.message); } finally { b.disabled = false; }
+    } catch (x) { toast(errText(x, k === 'restore' ? tr('The page could not be restored') : k === 'empty' ? tr('The trash could not be emptied') : tr('The page could not be deleted'))); } finally { b.disabled = false; }
   });
   await draw();
 }
@@ -1031,7 +1053,7 @@ async function wk_importFile(f) {
   if (!to) return;
   if (to === 'private') sp = 'private';
   if (!wk_e2e(sp)) { wki_start(sp, f); return; }  // 2.177.0 (#2685): in pieces with progress, unpacked in the background (wkimport.js)
-  let r; try { r = await wki_e2e(sp, f); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
+  let r; try { r = await wki_e2e(sp, f); } catch (e) { toast(errText(e, tr('The ZIP file could not be imported'))); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
   if (r) wka_done(sp, r);
 }
 // the end of an import: the report, one Undo step (2.177.0 #2685: also from wkimport.js when the server finished)
@@ -1090,6 +1112,7 @@ document.addEventListener('click', async e => {
   else if (k === 'today') wk_day(wk_open() || wk_cur());  // 2.371.2 (#3151)
   else if (k === 'newfolder') wk_newFolder(wk_open() || wk_cur());  // 2.200.0 A (#2747)
   else if (k === 'rmenu') { e.preventDefault(); menu(a, wk_nodeItems(+a.dataset.nid, a)); }
+  else if (k === 'resave' && p) { WK.dirty = true; await wk_flush(); }  // 2.1167.0 (#6088): "Not saved · Try again"
   else if (k === 'lostdel') { const id = WK.pgLost; if (id) await wk_delete(wk_pages(wk_cur()).find(x => x.id === id) || {id, path: '', space: wk_cur()}); }  // 2.139.0 C (#2386)
   else if (k === 'create') { e.preventDefault(); if (WK.idx[p?.space || wk_cur()]?.mayWrite !== false) wk_new(a.dataset.path); }
   else if (k === 'close' || k === 'home') { e.preventDefault(); await wk_flush(); WK.edit = false; navUp(k === 'close' && p && wk_dirOf(p.path) && typeof sbb_on === 'function' && sbb_on() ? wk_dirGo(wk_dirOf(p.path), p.space) : p ? wk_home(p.space) : 'wiki'); }  // 2.198.0 A (#2743): under "All" into the page's space  // 2.152.3 B (#2620): a computer: back to the page's folder
@@ -1230,7 +1253,7 @@ async function wk_smvMove(p, folder) {
         if (!lk) return await req(to, d, false);
         if (wk_e2e(from) && !wk_e2e(smv_ws(to)) && !await askConfirm(tr('Move to another workspace'), tr('The pages are no longer end-to-end encrypted in the target.'), {ok: tr('Move'), danger: true})) return null;
         return await wkr_run(from, smv_ws(to), plan(d));
-      } catch (e) { toast(e.message); throw e; }
+      } catch (e) { toast(errText(e, tr('Not everything could be moved'))); throw e; }
     }});
   if (!r || !r.moved) return;
   const to = r.space, oldDest = (folder ? fpath : p.path).split('/').slice(0, -1).join('/'), moved = r.moved;

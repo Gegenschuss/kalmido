@@ -90,12 +90,12 @@ function wki_draw(j) {
 }
 // non-locked spaces: the size first, then the pieces
 async function wki_start(sp, file, replace = false) {
-  try { await wki_limits(); } catch (e) { toast(e.message); return; }
+  try { await wki_limits(); } catch (e) { toast(errText(e, tr('The import could not be started'))); return; }  // 2.1167.0 (#6088): what failed first
   if (WKI.cur && ['upload', 'running'].includes(WKI.cur.state)) { toast(tr('An import is already running')); return; }
   if (file.size > WKI.lim.max_mb * WKI_MB) { wki_tooBig(file, WKI.lim.max_mb); return; }
   let j;
   try { j = await rawFetch('POST', '/api/wiki/import/upload', {size: file.size, name: file.name, space: sp, replace}); }
-  catch (e) { if (!e.shown) toast(e.message); return; }
+  catch (e) { if (!e.shown) toast(errText(e, tr('The import could not be started'))); return; }
   const id = j.id, chunk = j.chunk; let off = 0, fails = 0;
   const pause = async ms => { await new Promise(res => setTimeout(res, ms)); return WKI.up === id; };
   WKI.up = id; WKI.cur = {id, state: 'upload', size: file.size, received: 0, space: sp};
