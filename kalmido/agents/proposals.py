@@ -51,6 +51,7 @@ from ..api.showme import shw_clean  # 2.1086.0 (#5860)
 from ..agents.jobchat import JCD_KINDS, jcb_post  # 2.369.5 (#2517): pulled up from functions; 2.739.0 (#5216): jcb_post
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
+from ..agents.chat import chat_is_final  # 2.1130.0 (#6057): only a finished answer / question is a chat push (chat=1)
 from ..agents.chatnews import acn_news  # 2.1039.0 (#5804 #5805)
 from ..accounts.orgs import ws_apply_default, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import list_other_agent, list_archived  # 2.369.5 (#2517): pulled up from functions
@@ -1602,6 +1603,8 @@ def v1_agent_chat_post(uid):
         snippet = re.sub(r"\s+", " ", text)[:280]
         ch = json.loads(r["choices"]) if r["choices"] else {}
         wsm = {"ws": "limit"} if lim or ch.get("approval") or ch.get("permission") else {}  # 2.236.0 B (#2909)
+        if chat_is_final(r):  # 2.1130.0 (#6057): the in-app pop-up says it while the app is visible (sw.js leaves the push out)
+            wsm["chat"] = True
         # 2.35.0 (#1103): an approval request pushes as "Approval needed" (row approval of the notification settings, on by
         # default: a direct question to the person; the list ceiling of its task applies); off = the plain chat push
         if ch.get("approval") and notif_ok(c, uid, s, "approval", "push", _chat_task_lid(c, r["task_id"])) \

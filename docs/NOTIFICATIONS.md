@@ -44,6 +44,15 @@ Besides reminders, focus end, habit reminders and the daily digest, Kalmido push
 assignments and completions in shared projects (see *Comments and activity*; off with the *Collaboration* module), and
 the time tracking reminders (timer still running, stopped automatically). Every kind goes over your channel.
 
+**In-app pop-up** (2.1130.0): while Kalmido is open, a new chat message of another person (team chat, a direct message,
+a thread you take part in) or a finished answer / question of an agent shows as a small card at the top edge, wherever
+you are: picture, sender, project, first line. A tap opens the chat; it goes by itself after a few seconds, the x, Esc or
+a swipe sideways close it earlier; several messages in quick succession become one card. Not for the chat that is open,
+not for your own messages, not for an agent's progress lines, and no bell entry (the bell stays "waiting for you").
+While the app is visible with the pop-up on, this device shows no extra system notification for those chat pushes (other
+devices and other pushes are unchanged). Switch: *Settings > Notifications > In the app > Pop-up for new messages*, per
+device, on by default.
+
 **How urgent** (*Settings > Notifications*): *Normal* (ntfy 3), *Loud* (ntfy 4, the default) or *Urgent* (ntfy 5), used by both
 channels (ntfy priority; Web Push: *High* and *Urgent* are sent with `Urgency: high`, *Urgent* notifications also stay
 on screen until you dismiss them). Two kinds never go out below *High*, even when you choose *Normal*: reminders of

@@ -141,6 +141,7 @@ Connected agents: the agent API, proposals, quotas, locks, schedules, chat and t
 - `kalmido/agents/lyprop.py` (`lyp`) - Agents propose how a view is arranged
 - `kalmido/agents/mcpremote.py` (`mcpr`) - The hosted MCP access -- an MCP client (a chat app's connector, an editor)
 - `kalmido/agents/meetprop.py` (`mtg`) - A meeting becomes tasks -- the guided flow of the proposal kind "
+- `kalmido/agents/msgpop.py` - the in-app pop-up for new chat messages (static/js/msgpop.js)
 - `kalmido/agents/objprop.py` (`objp`) - An agent's change of a core object as a PROPOSAL a person accepts (proposal kind 'obj_patch')
 - `kalmido/agents/propkinds2.py` (`pk2`) - Two more kinds of agent proposals (see agents/proposals.py for the mechanism)
 - `kalmido/agents/proposals.py` (`prop`) - Agent proposals, validation helpers, requests from people to agents
@@ -996,6 +997,7 @@ The start-up module.
 - `static/js/minewait.js` (`mw`) - The view "Waiting for me" (#mine_wait)
 - `static/js/miniwin.js` (`mw`) - A list in its own small browser window
 - `static/js/move.js` (`umz`) - (kalmido/admin/acctexport.py: start, state polled while it runs, download, delete)
+- `static/js/msgpop.js` - the pop-up for new chat messages: one card at the top edge, a tap opens the chat (2.1130.0, #6057)
 - `static/js/msvview.js` (`msvv`) - Several Kalmido servers in one app, the merged view
 - `static/js/multiedit.js` (`me`) - Editing several selected tasks at once in the task panel
 - `static/js/multilist.js` (`ml`) - A task in several lists without a copy

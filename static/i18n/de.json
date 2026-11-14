@@ -18545,5 +18545,8 @@
   "The heading {0} is there more than once: rename one or change the whole text": "Die Überschrift {0} gibt es mehrmals: eine umbenennen oder den ganzen Text ändern",
   "The notes are encrypted: only the app can change them": "Die Notizen sind verschlüsselt: nur die App kann sie ändern",
   "The description is encrypted: only the app can change it": "Die Beschreibung ist verschlüsselt: nur die App kann sie ändern",
-  "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie."
+  "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie.",
+  "{0} new message from {1}": ["{0} neue Nachricht von {1}", "{0} neue Nachrichten von {1}"],
+  "Pop-up for new messages": "Popup bei neuen Nachrichten",
+  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Eine neue Nachricht von einem Menschen oder eine fertige Antwort eines Agenten erscheint kurz am oberen Rand, egal wo du in Kalmido bist. Nur auf diesem Gerät; solange die App offen ist, kommt dafür hier kein zusätzlicher Push."
 }

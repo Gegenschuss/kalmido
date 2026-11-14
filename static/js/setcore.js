@@ -126,6 +126,7 @@ function swMessage(e) {
     if (location.hash !== u.hash) location.hash = u.hash; else route();
   }
   if (d.type === 'refresh') load().then(render).catch(() => {});
+  if (d.type === 'msgpop?') mp_swAsk(e);  // 2.1130.0 (#6057): the pop-up says the chat push (liveparts.js)
 }
 const SET_SECS = [['account', 'user', N_('Account')], ['org', 'building', N_('Organisation')], ['biz', 'receipt', N_('Company & office')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['nav', 'menu', N_('Navigation')], ['modules', 'grid', N_('Modules')],  // 2.418.0 (#3560): nav
   ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['docs', 'file', N_('Documents|settings')], ['access', 'key', N_('Access|settings')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'grid', N_('Server|settings')], ['help', 'help', N_('Help')]];
