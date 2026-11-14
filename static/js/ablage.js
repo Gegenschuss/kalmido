@@ -232,7 +232,7 @@ const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'pr
 // 2.1148.0 (#4895): "Receipts" below the tree = references: a receipt opens in its own area (it stays there, no copy). The
 // server names the area's address (office/..., budget/<list>/<month>); under "All workspaces" the office's address carries the space
 const AB_RCX = ['receipts', 'rcoffice', 'rcmeals', 'rcbudget'];
-const ab_rcGo = (o, sp) => /^office\//.test(o || '') && wsCur() === 'all' && sp ? 'office/s/' + sp + '/' + o.slice(7) : o;
+const ab_rcGo = (o, sp) => /^office\//.test(o || '') && ab_all() && sp ? 'office/s/' + sp + '/' + o.slice(7) : o;
 const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read-only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read-only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read-only'))}">${ic('lock', 's')}</span></span></div>`;
 function ab_collHtml(d, sp) {
   const rcPart = d && d.key !== 'receipts' && AB_RCX.includes(d.key);  // 2.1148.0 (#4895): a part of Receipts: Space / Receipts / Office
@@ -252,8 +252,8 @@ function ab_rcxHtml(d, sp) {
   const note = `<p class="muted abhint abcollnote">${esc(tr('Receipts stay in their area. Open one to view, change or book it there.'))}</p>`;
   if (!d.groups?.length) return note + `<div class="empty abempty">${ic('receipt')}<span>${tr('No receipts here yet')}</span></div>`;
   const meta = f => [ab_when(f.created_at), f.amount ? curMoney(f.amount, f.currency || (S.settings.time_currency ?? '€')) : '', f.sub].filter(Boolean).join(' · ');
-  const row = f => `<div class="abrow abrcx" role="listitem"><button type="button" class="abopen" data-go="${esc(ab_rcGo(f.open, sp))}">${f.kind === 'meal' ? ic('meal') : ab_icon({kind: 'file', mime: f.mime})}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc(meta(f))}</span></span></button><span class="abmeta muted">${esc(meta(f))}</span>${ic('right', 's abrcgo')}</div>`;
-  const grp = g => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(ab_rcGo(g.open, sp))}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${g.items.map(row).join('')}</div></section>`;
+  const row = f => `<div class="abrow abrcx" role="listitem"><button type="button" class="abopen" data-go="${esc(ab_rcGo(f.open, sp))}">${/*html-ok*/ f.kind === 'meal' ? ic('meal') : ab_icon({kind: 'file', mime: f.mime}) /* icons only */}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc(meta(f))}</span></span></button><span class="abmeta muted">${esc(meta(f))}</span>${ic('right', 's abrcgo')}</div>`;
+  const grp = g => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(ab_rcGo(g.open, sp))}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${/*html-ok*/ g.items.map(row).join('') /* row(): escaped above */}</div></section>`;
   return note + d.groups.map(grp).join('') + (d.more ? `<p class="muted abhint">${tr('Only the first {0} files are shown.', 500)}</p>` : '');
 }
 function ab_collOpen(f) {  // like a search hit of a project file (filetext.js ftxtOpenLf): PDF viewer, picture in a new tab, else download

@@ -28,7 +28,7 @@ from flask import g
 from ..accounts.orgroles import office_allowed
 from ..accounts.orgs import org_role
 from ..accounts.wsareas import wsa_org_off
-from ..core.access import list_role, list_state_sql, vis_sql
+from ..core.access import list_role, list_state_sql, live_sql, vis_sql
 from ..core.db import usettings
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields
@@ -103,7 +103,7 @@ def _office(c, uid, oid, limit):
     day = "COALESCE(NULLIF(d.doc_date, ''), NULLIF(CAST(r.paid_at AS text), ''))"
     rows = c.execute(f"""SELECT r.node_id, d.amount, d.currency, d.ws, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r
                          JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id
-                         WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL"""
+                         WHERE d.ws=? AND n.kind='file' AND {live_sql('n')}"""
                      + (" AND COALESCE(n.created_by, n.owner_id)=?" if own else "")
                      + f" ORDER BY {day} DESC NULLS LAST, r.node_id DESC LIMIT {_cap(limit)}",
                      (ws,) + ((own,) if own else ())).fetchall()
@@ -133,7 +133,7 @@ def _meals(c, uid, oid, limit):
     if not acc:
         return []
     off, own = acc
-    rows = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=? AND deleted_at IS NULL ORDER BY date DESC, id DESC "
+    rows = c.execute(f"SELECT {bw_cols(c)} FROM office_meals WHERE org_id=? AND {live_sql()} ORDER BY date DESC, id DESC "
                      f"LIMIT {_cap(limit) if own is None else 5000}", (off,)).fetchall()
     if own is not None:
         rows = bw_own_rows(c, off, rows, own)  # entered by the person or with the person as host (office/meals.py bw_rows)
@@ -176,7 +176,7 @@ def _budget(c, uid, oid, limit):
         return []
     q = ",".join("?" * len(lists))
     files = c.execute(f"""SELECT f.id, f.entry_id, f.list_id, f.name, f.mime, f.size FROM budget_files f JOIN budget_entries e ON e.id=f.entry_id
-                          WHERE f.list_id IN ({q}) AND e.list_id=f.list_id AND e.deleted_at IS NULL ORDER BY e.day DESC, f.id DESC
+                          WHERE f.list_id IN ({q}) AND e.list_id=f.list_id AND {live_sql('e')} ORDER BY e.day DESC, f.id DESC
                           LIMIT {_cap(limit)}""", list(lists)).fetchall()
     if not files:
         return []
