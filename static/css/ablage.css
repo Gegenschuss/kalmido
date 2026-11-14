@@ -48,7 +48,6 @@
 /* 2.429.0 (#3580): a collection "From <area>": its files grouped by their object (page, project, folder) */
 .abcollg{margin-top:1rem}
 .abcollh{margin:0 0 .25rem;font-size:var(--fs-b);font-weight:600;color:var(--muted)}
-.abrcx .abrcgo{flex:none;margin-right:.5rem;color:var(--muted)}  /* 2.1148.0 (#4895): a receipt opens in its area */
 .abcollnote{margin-top:0}
 .abvers,.ablog{display:flex;flex-direction:column;gap:.125rem;max-height:16rem;overflow:auto}
 .abvrow,.ablrow{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:0 .25rem;border-bottom:1px solid var(--line)}
