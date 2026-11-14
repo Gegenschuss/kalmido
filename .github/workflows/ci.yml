@@ -35,10 +35,13 @@ on:
 permissions:
   contents: read
 
-# landings on main replace each other; 2.556 (#4388): the own group of the "[release]" cut commit (2.321, #1368) is gone - the
-# trunk has no such commit any more
+# landings on main replace each other; 2.556 (#4388): the own group of the "[release]" cut commit (2.321, #1368) is gone.
+# #6061 (14.11.2026): the train's release push (head commit "X.Y.Z: Live-Zug (...)", VERSION changed = full stage) gets its own
+# group per run again, like schedule / workflow_dispatch: since the merge queue lands on main every 10-30 minutes, a later
+# push on main cancelled the 2+ hour full run and no train went live. Every other push on main still replaces the one before.
+# The value is quoted: ": " inside a plain YAML scalar is a mapping.
 concurrency:
-  group: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('ci-{0}-{1}', github.event_name, github.run_id) || format('ci-{0}', github.ref) }}
+  group: "${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('ci-{0}-{1}', github.event_name, github.run_id) || (github.event_name == 'push' && contains(github.event.head_commit.message, ': Live-Zug (')) && format('ci-zug-{0}', github.run_id) || format('ci-{0}', github.ref) }}"
   cancel-in-progress: true
 
 # 2.179 (#2691): one wave. GitHub runs about 20 jobs of the account at once. "plan" cuts the shards from the suite times of the
