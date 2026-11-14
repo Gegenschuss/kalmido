@@ -4,7 +4,8 @@ branch hotfix/X.Y.Z beside main. Without a server (CI Lint):
 - ci.yml runs on pushes to hotfix/** (besides main) and its concurrency group hangs on github.ref (a hotfix push and a
   push on main never cancel each other); the suite times are still read from main only;
 - tests/stages.py gives a push on a hotfix branch the full stage (a push on main keeps the push stage);
-- 2.513.0 (#4354): "a tag below the newest keeps latest where it is" now lives in promote.yml (tests/p2513_promote_test.py)."""
+- 2.513.0 (#4354): "a tag below the newest keeps latest where it is" now lives in promote.yml (tests/p2513_promote_test.py);
+- #6063: a push on main the merge queue made (a merge_group run for the same commit) = stage "none", no test shards."""
 import os
 import re
 import subprocess
@@ -65,7 +66,7 @@ check("--branch hotfix" not in ci, "no suite times from hotfix branches")
 
 
 def ci_base(env):
-    keep = {k: os.environ.get(k) for k in ("GITHUB_EVENT_NAME", "GITHUB_REF", "CI_BEFORE", "CI_MESSAGE", "CI_INPUT_STAGE")}
+    keep = {k: os.environ.get(k) for k in ("GITHUB_EVENT_NAME", "GITHUB_REF", "CI_BEFORE", "CI_MESSAGE", "CI_INPUT_STAGE", "CI_QUEUE_RUN")}
     try:
         for k in keep:
             os.environ.pop(k, None)
@@ -86,6 +87,40 @@ st, why, base = ci_base({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/
 check(st is None and "hotfix" not in why, "push on main keeps the push stage (%s, %s)" % (st, why))
 st, why, _ = ci_base({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/hotfixes", "CI_BEFORE": head or "1" * 40})
 check(st is None, "a branch 'hotfixes' is no hotfix branch (%s)" % st)
+
+# #6063 (decision 14.11.2026): a push on main the merge queue made (ci.yml finds a merge_group run for the same head SHA and
+# sets CI_QUEUE_RUN) runs no test shards = stage "none"; the train's release push, nightly and by-hand runs stay full
+qpush = {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/main", "CI_BEFORE": head or "1" * 40, "CI_QUEUE_RUN": "43560000001",
+         "CI_MESSAGE": "#5951 #5967: suites follow the package (job/4412)"}
+st, why, base = ci_base(qpush)
+check(st == "none" and "43560000001" in why and base is None, "a push from the merge queue = stage none (%s, %s)" % (st, why))
+st, why, _ = ci_base(dict(qpush, CI_QUEUE_RUN=""))
+check(st is None, "a push on main without a merge_group run keeps the push stage (%s, %s)" % (st, why))
+st, why, _ = ci_base(dict(qpush, CI_MESSAGE=zug))
+check(st != "none", "the train's release push never gets stage none (%s, %s)" % (st, why))
+st, why, _ = ci_base(dict(qpush, CI_MESSAGE="#1: fix [full]"))
+check(st == "full", "[full] in the message wins over the queue (%s)" % st)
+st, why, _ = ci_base(dict(qpush, GITHUB_REF="refs/heads/hotfix/2.1.1"))
+check(st == "full", "a hotfix push stays full (%s)" % st)
+st, why, _ = ci_base(dict(qpush, GITHUB_EVENT_NAME="schedule"))
+check(st == "full", "the nightly run stays full (%s)" % st)
+st, why, _ = ci_base(dict(qpush, GITHUB_EVENT_NAME="workflow_dispatch"))
+check(st == "full", "a run by hand stays full (%s)" % st)
+env = dict(os.environ, **qpush)
+env.pop("CI_INPUT_STAGE", None)
+out = subprocess.run([sys.executable, os.path.join(N, "stages.py"), "--ci"], capture_output=True, text=True, env=env, cwd=R).stdout
+check("stage=none" in out.splitlines(), "stages.py --ci prints stage=none for a queue push (%s)" % out.strip()[:200])
+check("event=merge_group&head_sha=$GITHUB_SHA" in ci and "export CI_QUEUE_RUN" in ci,
+      "ci.yml plan looks up the merge_group run of the pushed commit")
+check('[ "$stage" = none ] || stage=full' in ci, "ci.yml plan keeps the stage none")
+tj = re.search(r"^  tests:\n(.*?)^  [a-z-]+:\n", ci, re.M | re.S)
+check(tj is not None and "    if: needs.plan.outputs.stage != 'none'" in tj.group(1), "the shard job is skipped for stage none")
+td = re.search(r"^  tests-done:\n(.*?)^  [a-z-]+:\n", ci, re.M | re.S)
+check(td is not None and "needs: [plan, tests]" in td.group(1) and 'outputs.stage }}" = none ]; then exit 0' in td.group(1),
+      "the overall test check is green for stage none (shards skipped on purpose)")
+for step in ("- name: Suite times", "id: plan"):
+    i = ci.find(step)
+    check(i > 0 and "if: steps.stage.outputs.stage != 'none'" in ci[i:i + 400], "plan step skipped for stage none: %s" % step)
 
 rel = read(".github", "workflows", "release.yml")
 check("${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}" in rel, "the version image tag stays")
