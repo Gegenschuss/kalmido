@@ -21,6 +21,7 @@ from xml.sax.saxutils import escape as _xesc
 from flask import request, send_file
 
 from ..core.config import app, ATT_DIR
+from ..core.access import live_sql
 from ..core.i18n import tr
 from ..core.errors import BadInput
 from ..accounts.session import me
@@ -220,7 +221,7 @@ def wkd_images(c, page, blocks):
         m = WKD_FILE_RE.match(b[1])
         if not m:
             continue
-        f = c.execute("SELECT * FROM wiki_files WHERE id=? AND page_id=? AND deleted_at IS NULL", (int(m.group(1)), page["id"])).fetchone()
+        f = c.execute(f"SELECT * FROM wiki_files WHERE id=? AND page_id=? AND {live_sql()}", (int(m.group(1)), page["id"])).fetchone()
         if not f or not str(f["mime"] or "").startswith("image/") or "svg" in str(f["mime"]):
             continue
         if (up_marks(c, "wiki", [f["id"]]).get(f["id"]) or {}).get("scan") == "infected":  # as wka_get (sc_guard): never opened
