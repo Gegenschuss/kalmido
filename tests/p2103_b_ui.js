@@ -30,7 +30,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   (await until(() => d.querySelector('#side [data-absp="trash"]'))).click();  // 2.152.3 (#2621): a computer: the trash is in the panel
   const note = await until(() => d.querySelector('#view .abtrashdays'));
   // 2.223.3 (#2877): the deletion runs are off on the test server: the note says the trash keeps instead of a period
-  check(note && /stay in the trash until the deletion runs of the server are switched on/.test(note.textContent), 'Trash: the note that the trash keeps ' + (note?.textContent || ''));
+  // 2.1163.0 (#6112): the trash note without server words
+  check(note && /stay in the trash for now: emptying it automatically is not switched on/.test(note.textContent), 'Trash: the note that the trash keeps ' + (note?.textContent || ''));
   w.close();
 
   // ================= #2172 Settings > Users > Backups

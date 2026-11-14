@@ -115,7 +115,7 @@ function rc_alsoHtml(doc) {
   const ar = doc?.area; if (!ar || ar.area !== 'office') return '';
   const b = (go, name) => `<button type="button" class="linkbtn" data-rcgo="${esc(go)}">${esc(name)}</button>`;
   const ls = [S.route.mod !== 'office' && officeOn() ? b('office/receipts', tr('Office') + ' › ' + tr('Receipts')) : '',
-    doc.parent_id && S.route.mod !== 'ablage' && ab_on() ? b('ablage/' + doc.parent_id, tr('File store')) : ''].filter(Boolean);
+    doc.parent_id && S.route.mod !== 'ablage' && ab_on() ? b('ablage/' + doc.parent_id, tr('Files')) : ''].filter(Boolean);
   return ls.length ? `<p class="muted rc-also">${ic('link', 's')} ${tr('Also in {0}', ls.join(' · '))}</p>` : '';
 }
 // "Wrong area" of a document the general input sorted (in the office: back to the private space, and the other way round)

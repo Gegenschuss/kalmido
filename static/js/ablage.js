@@ -110,7 +110,7 @@ function viewAblage() {
   const tree = r.nid && d ? [...(d.crumbs || []).map((c, i) => ({id: c.id, name: c.name, lvl: i + 1, on: c.id === r.nid})),
     ...d.items.filter(n => n.kind === 'folder').map(n => ({id: n.id, name: n.name, lvl: (d.crumbs || []).length + 1, sub: true}))] : [];
   const treeHtml = tree.map(t => `<button type="button" class="abspace abtree ${t.on ? 'on' : ''}" style="--ablvl:${Math.min(t.lvl, 6)}" data-go="ablage/${t.id}" data-abdrop="${t.id}" ${t.on ? 'aria-current="page"' : ''}>${ic('folder', 's')}<span>${esc(t.name)}</span></button>`).join('');
-  const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${ab_docBtns(true)}</nav>`;  // 2.353.0 D (#2759): + the saved filters; 2.752.0 (#4887): All documents, To review
+  const spaces = `<nav class="abspaces" aria-label="${esc(tr('Files'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${ab_docBtns(true)}</nav>`;  // 2.353.0 D (#2759): + the saved filters; 2.752.0 (#4887): All documents, To review
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : ab_spWrite(sp);  // 2.1162.0 (#6108): + the role in the organisation
   // 2.752.0 (#4887): a folder with recognition shows the documents' view (abdocs.js abd_foldHtml: their bar, the documents' cards,
@@ -338,7 +338,7 @@ function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'text') { textView({url: ab_url(n, true), name: n.name, size: n.size, md: false, ext: 'txt'}); return; }
   if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
-  if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
+  if (upLocked(n)) { toast(tr('Blocked: malware was found in this file ({0})', n.up.sig || '?'));  /* 2.1163.0 (#6112): Locked = encrypted folders only */ return; }  // 2.61.0 (#1818)
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser
   // 2.750.0 (#5228): a recognised document (n.doc) opens the document view in the list as in the cards (abdocs.js), leafing
   // through the folder's documents - before, the list opened the plain PDF viewer while the documents' module was not loaded yet
@@ -393,7 +393,7 @@ async function ab_upload(files, target) {
   for (const f of files) fd.append('file', f, f.name);
   if (target) fd.append('parent_id', String(target)); else fd.append('space', ab_curSpace());
   const old = new Set((AB.data?.items || []).map(x => x.id));
-  toast(trn('Uploading {0} file…', 'Uploading {0} files…', files.length));
+  if (typeof upWanted !== 'function' || !upWanted(fd)) toast(trn('Uploading {0} file…', 'Uploading {0} files…', files.length));  // 2.1163.0 (#6112): a big upload has its bar (upbar.js) - one message, not two
   let j; try { j = await api('POST', '/api/files/upload', fd); } catch { return; }
   ab_reload();
   const created = (j.items || []).filter(x => !old.has(x.id) && x.version <= 1), ver = (j.items || []).length - created.length;
@@ -528,7 +528,7 @@ function ab_versHtml(n) {
 function ab_logHtml(n) {
   if (!n.log) return '';
   const log = n.log.map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(fmtTimeAt(new Date(x.at)))}</small></div>`).join('');
-  return `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>`;
+  return `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every change, and every access of an agent, is listed here.') /* 2.1163.0 (#6112) */}</p>`;
 }
 // which viewer a version opens in ('' = none, it downloads)
 function ab_verKind(n, v) {
@@ -584,7 +584,7 @@ async function ab_details(id) {
   const shares = n.role === 'owner' ? [...(n.shares || []), ...(n.inherited || [])] : [];
   const md = modal(`<div class="lhdr"><h3>${ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="muted abpath">${esc((n.crumbs || []).map(c => c.name).join(' / '))}</div>
-    <div class="abfacts">${n.kind !== 'folder' ? `<span>${fmtSize(n.size || 0)}</span>` : ''}<span>${esc(tr('Changed {0}', ab_when(n.updated_at)))}</span>${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}<span>${esc(ab_role(n.role))}</span></div>
+    <div class="abfacts">${n.kind !== 'folder' ? `<span>${fmtSize(n.size || 0)}</span>` : ''}<span>${esc(tr('Changed {0}', ab_when(n.updated_at)))}</span>${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}${n.owner && n.role === 'owner' ? '' /* 2.1163.0 (#6112): not "Owner: Anna  Owner" */ : `<span>${esc(ab_role(n.role))}</span>`}</div>
     ${typeof dt_abDetails === 'function' ? dt_abDetails(n) : ''}
     ${n.kind === 'link' ? `<div class="shint keep">${ic('link', 's')} ${esc(tr('A link to a file of a task or project. Whoever opens it needs access to the original.'))}</div>` : ''}
     ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button></div>` : ''}
@@ -795,8 +795,8 @@ function ab_selBar(trash) {
   if (trash) return ab_trashBar();  // 2.589.0 (#4875)
   const xs = ab_selVals(), n = xs.length, docs = xs.some(x => x.isdoc), more = docs || smv_can(xs[0]?.org_id || null);
   const w = !n || xs.some(x => ab_canWrite(x.role));  // 2.1162.0 (#6108): nothing chosen the person may change = no Move / Trash
-  return ms_barHtml('ab-sbar', 'absel', n, tr('Tap files'), [['all', 'all', n && n >= ab_selTotal() ? tr('Select none') : tr('All')],
-    ...w ? [['move', 'arrow', tr('Move')]] : [], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ...w ? [['trash', 'trash', isMobile() ? tr('Trash') : tr('Move to the trash'), 'danger']] : []  /* a phone: the short word (its question says it all) */, ...more ? [['more', 'dots', tr('More')]] : []]);
+  return ms_barHtml('ab-sbar', 'absel', n, tr('Select files'), [['all', 'all', n && n >= ab_selTotal() ? tr('Select none') : tr('All')],
+    ...w ? [['move', 'arrow', tr('Move')]] : [], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ...w ? [['trash', 'trash', tr('Move to the trash'), 'danger']] : []  /* 2.1163.0 (#6112): one word everywhere; a narrow phone shows the symbol (multisel.js ms4) */, ...more ? [['more', 'dots', tr('More')]] : []]);
 }
 // a tap while choosing / Ctrl- or Cmd-click / the box: one row or card; Shift: the range from the last one (the anchor stays)
 function ab_selPick(id, shift) {
@@ -985,7 +985,7 @@ async function abm_trash(ns, o = {}) {
   if (!ids.length) return null;
   const post = async url => { for (let i = 0; i < ids.length; i += 500) { try { await api('POST', url, {ids: ids.slice(i, i + 500)}); } catch { /* shown */ } } ab_relist(); return {}; };
   const what = ok.length === 1 ? tr('“{0}” moved to the trash', ok[0].name) : trn('{0} item moved to the trash', '{0} items moved to the trash', ok.length);
-  offerUndo([what, fs_keptText(kept), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: ok.length === 1 ? tr('Delete “{0}”', ok[0].name) : tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
+  offerUndo([what, fs_keptText(kept), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: ok.length === 1 ? tr('Move “{0}” to the trash', ok[0].name) /* 2.1163.0 (#6112) */ : tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
     undo: () => post('/api/files/restore'), redo: () => post('/api/files/trash')}));
   return ids;
 }
@@ -994,7 +994,7 @@ async function abm_trash(ns, o = {}) {
 const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_selTools(d)}<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button></div>` : '';
 function ab_trashBar() {
   const ns = ab_selVals(), all = (AB.data?.items || []).length;
-  const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
+  const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Select files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
     ['restore', 'undo', tr('Restore')], ['purge', 'trash', tr('Delete permanently'), 'danger']]);
   return ns.length && !ns.some(n => n.role === 'owner') ? h.replace(/(data-absel="purge")/, '$1 disabled') : h;
 }

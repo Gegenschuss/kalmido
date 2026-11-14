@@ -37,7 +37,8 @@ const sql = (q, args = []) => execFileSync('python3', [path.join(__dirname, 'dbx
   await until(() => w.eval('S.route.key') === 'trash' && (w.eval('S.extra || []')).length === 2 && d.querySelector('#view .ttphint'));
   const hint = d.querySelector('#view .ttphint');
   // 2.223.3 (#2877): the test server runs with the deletion runs off: the hint says nothing is deleted, no row counts down
-  check(j.purge_on === false && hint && /stay in the trash until the deletion runs of the server are switched on/.test(hint.textContent), '#2877: the hint says the trash keeps: ' + (hint ? hint.textContent : 'none'));
+  // 2.1163.0 (#6112): the trash note without server words
+  check(j.purge_on === false && hint && /stay in the trash for now: emptying it automatically is not switched on/.test(hint.textContent), '#2877: the hint says the trash keeps: ' + (hint ? hint.textContent : 'none'));
   check(!d.querySelector('#view .ttpleft'), '#2877: no days left per row while nothing is deleted');
   // with the runs on (purge_on from the server) the period and the days left as before
   w.eval('S.trashPurge = true; S.hist.purge_on = true; render()');

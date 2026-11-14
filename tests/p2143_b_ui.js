@@ -75,7 +75,8 @@ const SECRET = 'ui-test-secret-value-42', DAVPW = 'ui-test-dav-password-17';
   const dlg = await until(() => d.querySelectorAll('.wktrashdlg .wktrow').length === 2 && d.querySelector('.wktrashdlg'));
   check(!!dlg, 'the dialog lists both trashed pages');
   // 2.223.3 (#2877): the deletion runs are off on the test server: no period, the dialog says the trash keeps
-  check(dlg && /Old notes/.test(dlg.textContent) && /stay in the trash until the deletion runs of the server are switched on/.test(dlg.textContent), 'page name and the note that the trash keeps');
+  // 2.1163.0 (#6112): the trash note without server words
+  check(dlg && /Old notes/.test(dlg.textContent) && /stay in the trash for now: emptying it automatically is not switched on/.test(dlg.textContent), 'page name and the note that the trash keeps');
   check(dlg && !dlg.querySelector('[data-wkt="empty"]').classList.contains('hidden'), '"Empty trash" shows with pages');
   click(w, dlg.querySelector(`[data-wktid="${P2.id}"] [data-wkt="restore"]`));
   check(await until(() => d.querySelectorAll('.wktrashdlg .wktrow').length === 1), 'Restore: the row leaves the list');

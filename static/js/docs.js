@@ -231,7 +231,7 @@ function dc_headHtml(fold) {
   const seg = fold || (typeof sbb_on === 'function' && sbb_on()) ? '' : `<div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}" class="${DC.f.review ? '' : 'on'}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}" class="${DC.f.review ? 'on' : ''}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>`;
   const add = !fold ? (!dc_upOk() ? '' /* 2.1162.0 (#6108) */ : `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`)
-    : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span></button><input type="file" id="ab-file" multiple hidden>
+    : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Upload'))}">${ic('upload', 's')} <span>${tr('Upload')}</span></button><input type="file" id="ab-file" multiple hidden>
       <button type="button" class="btn sm" data-ab="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>` : '';
   return `
     <div class="dc-bar">
@@ -279,7 +279,7 @@ function dc_card(d, o = {}) {
   const big = d.file || d.thumb_l ? dc_thumbUrl(d, true) : '';  // 2.583.0 (#4812): the sharp preview of big cards (tilesize.js)
   const thumb = d.thumb ? (typeof ts_img === 'function' ? ts_img(dc_thumbUrl(d), big) : `<img src="${esc(dc_thumbUrl(d))}" alt="" loading="lazy">`) : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
-  const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
+  const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || tr('Archive no.') /* 2.1163.0 (#6112) */} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
   const on = AB.selOn && AB.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last; 2.768.0 (#4888): the area's one selection
   return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(dc_title(d))}">
@@ -626,7 +626,7 @@ function dc_mdDraw(md) { if (md && DC.doc && typeof dcv_draw === 'function') dcv
 // 2.591.0 B (#4863): a code on the document carries an archive number another document has already (docs/web.py asn_taken_view)
 function dc_asnTakenHtml(d) {
   const t = d.asn_taken; if (!t || d.asn) return '';
-  const no = `${DC.set?.asn_prefix || 'ASN'} ${+t.asn}`, o = t.doc;
+  const no = `${DC.set?.asn_prefix || tr('Archive no.') /* 2.1163.0 (#6112) */} ${+t.asn}`, o = t.doc;
   const who = !o ? esc(tr('a document you cannot open')) : o.trash ? `<b>${esc(o.name)}</b> ${esc(tr('(in the trash)'))}` : `<a href="#docs/${+o.id}">${esc(o.name)}</a>`;
   return `<p class="dc-asnt muted" role="note">${ic('info', 's')} ${esc(tr('Archive number {0} found, already used by', no))} ${who}</p>`;
 }

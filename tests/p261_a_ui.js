@@ -72,7 +72,8 @@ const PNG = (() => { const w = 24, ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0)
     const j = JSON.stringify(d);
     check(d.notes === 'Unchecked', `${tag}: #1818: "Unchecked" on the text file ` + j);
     check(d.photo === 'Unchecked', `${tag}: #1818: "Unchecked" over the image ` + j);
-    check(d.bad.includes('Locked') && d.badLock && !d.badLink, `${tag}: #1818: the infected file is a locked tile without a link ` + j);
+    // 2.1163.0 (#6112): malware is "Blocked" ("Locked" only for encrypted folders)
+    check(d.bad.includes('Blocked') && d.badLock && !d.badLink, `${tag}: #1818: the infected file is a locked tile without a link ` + j);
     check(d.badDel, `${tag}: #1818: the locked file keeps its remove button ` + j);
     await shot(`p261a-task-${w}-${theme}.png`);
     const t = await ev(`(() => { document.querySelector('.atts .att.scnlock .scnmark').click(); return new Promise(r => setTimeout(() => r(document.querySelector('#toast:not(.hidden)')?.textContent || ''), 300)); })()`);
@@ -82,7 +83,8 @@ const PNG = (() => { const w = 24, ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0)
     await shot(`p261a-toast-${w}-${theme}.png`);
     await o.nav(B + 'static/icon.svg'); await o.nav(B + '#ablage'); await ready(ev, '.abrow');
     const a = await ev(`(() => { const r = document.querySelector('.abrow[data-abid="${NID}"]'); return {mark: r?.querySelector('.scnmark.scnbad')?.textContent || ''}; })()`);
-    check(a.mark.includes('Locked'), `${tag}: #1818: the Ablage row shows the lock ` + JSON.stringify(a));
+    // 2.1163.0 (#6112): "Blocked"
+    check(a.mark.includes('Blocked'), `${tag}: #1818: the Ablage row shows the lock ` + JSON.stringify(a));
     await shot(`p261a-ablage-${w}-${theme}.png`);
   };
   await firefox(async o => { await run(o, 1440, 'light'); await run(o, 1440, 'dark'); }, false);

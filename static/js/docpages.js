@@ -243,7 +243,7 @@ async function dpg_save() {
   const name = d.name, was = r?.was;
   dpg_reset(); dpg_draw();
   dpg_after(id);
-  const msg = tr('Saved as version {0} with {1} pages - the original stays as version {2}', r.version, r.pages, was);
+  const msg = tr('Saved as version {0} with {1} - the original stays as version {2}', r.version, trn('{0} page', '{0} pages', r.pages), was);  // 2.1163.0 (#6112): 1 page
   if (!was || !r?.version) { toast(msg); return; }
   // review F1: each step names the version it expects on top (st.cur, from the answer of the step before) - a newer version
   // from elsewhere (another device, another person) is never skipped: 409, a calm hint, the step dropped
@@ -394,6 +394,6 @@ async function dpm_run() {
   if (typeof ab_relist === 'function') ab_relist();
   if (typeof ab_selDraw === 'function') ab_selDraw();
   dpg_after(xs[0].id);
-  offerUndo(tr('{0} documents merged into “{1}” ({2} pages) - the others are in the trash', xs.length, xs[0].name, r?.pages ?? '?'),
+  offerUndo(tr('{0} documents merged into “{1}” ({2}) - the others are in the trash', xs.length, xs[0].name, r?.pages != null ? trn('{0} page', '{0} pages', r.pages) : '?'),
     histAdd({label: tr('Merge PDFs')}));  // the server's step group (version + trash): one undo for all
 }

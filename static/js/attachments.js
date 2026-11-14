@@ -210,7 +210,7 @@ function attFileA(a) {
 // scnMakers makes them; a further mark (e.g. the text recognition's up.text) pushes its own maker: up => html or ''.
 // A mark is a small label; a tap (or Enter) shows its explanation (no hover needed).
 const scnMark = (icon, label, why, cls = '') => `<span class="scnmark ${cls}" role="button" tabindex="0" data-scnwhy="${esc(why)}" title="${esc(why)}" aria-label="${esc(label + ': ' + why)}">${icon ? ic(icon, 's') : ''}<span>${esc(label)}</span></span>`;
-const scnMakers = [up => up.scan === 'infected' ? scnMark('lock', tr('Locked: malware found'), tr('The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.', up.sig || '?'), 'scnbad')
+const scnMakers = [up => up.scan === 'infected' ? scnMark('lock', tr('Blocked: malware found') /* 2.1163.0 (#6112) */, tr('The virus scanner found {0} in this file. Download and preview are blocked; the file can be deleted.', up.sig || '?'), 'scnbad')
   : up.scan === 'unchecked' ? scnMark('shield', tr('Unchecked'), up.scan_why === 'size' ? tr('Too large for the virus scanner: this file was not checked.') : tr('The virus scanner was not reachable. The check follows automatically.')) : ''];
 const upMarkHtml = up => up ? scnMakers.map(f => f(up) || '').join('') : '';
 const upLocked = a => a?.up?.scan === 'infected';
