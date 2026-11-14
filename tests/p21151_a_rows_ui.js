@@ -61,6 +61,19 @@ const J = JSON.stringify;
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     check(await login2(ev) === 200, 'phone: login');
+    // another view of the same page by its address; a phone's menu sheet closes by a step back in the history (backclose.js),
+    // which would undo a new address set before it lands: close it, wait for that step, then set the address
+    const go = async h => {
+      await ev(`(() => { if (typeof closePop === 'function') closePop(); return 1; })()`);
+      const calm = `document.querySelector('#pop')?.classList.contains('hidden') !== false && (typeof f8d_bk !== 'object' || !f8d_bk.skip && !f8d_bk.queued && !f8d_bk.pushed)`;  // backclose.js: no Back of ours on its way
+      for (let k = 0; k < 3; k++) {
+        await until(calm, {timeout: 3000});
+        await ev(`(() => { location.hash = ${J(h)}; return 1; })()`);
+        if (await until(`location.hash === ${J(h)} && ${calm}`, {timeout: 3000})) return true;
+      }
+      return false;
+    };
+    const dbg = () => ev(`JSON.stringify({h: location.hash, cls: [...document.querySelectorAll('#view [class]')].slice(0, 12).map(e => e.className).join('|'), t: (document.querySelector('#view')?.innerText || '').slice(0, 300)})`);  // what the view showed (a failure's message)
     // a real long press (800 ms, no move) on the middle of sel; the menu's entries
     const hold = async sel => {
       await ev(`(() => { if (typeof closePop === 'function') closePop(); return 1; })()`);
@@ -84,7 +97,7 @@ const J = JSON.stringify;
     check(await pick(ev, 'Select') && await until(`!!document.querySelector('.mselbar') && /1 selected/.test(document.querySelector('.mselbar').textContent)`, {timeout: 5000}), 'phone files: Select starts choosing with the row');
     await ev(`(() => { document.querySelector('.mselbar [data-ab$="close"], .mselbar .mbx')?.click(); return 1; })()`);
     // ---- files "From Knowledge"
-    await nav(B + '#ablage/aus-wiki');
+    await go('#ablage/aus-wiki');
     check(await until(`!!document.querySelector('#view .abcollg .abrow .abname')`, {timeout: 20000}), 'phone From Knowledge: the file row');
     check(await W(ev, '#view .abcollg .abrow a.iconbtn[download]') <= 1, 'phone From Knowledge: the download symbol is hidden');
     m = await hold('#view .abcollg .abrow .abname');
@@ -92,8 +105,8 @@ const J = JSON.stringify;
     await ev(`(() => { closePop(); return 1; })()`);
 
     // ---- knowledge: the folder list
-    await nav(B + '#wiki');
-    check(await until(`!!document.querySelector('#view .wkrow .wkmore')`, {timeout: 20000}), 'phone knowledge: the rows with their "…"');
+    await go('#wiki');
+    check(await until(`!!document.querySelector('#view .wkrow .wkmore')`, {timeout: 20000}), 'phone knowledge: the rows with their "…" ' + await dbg());
     check(await W(ev, '#view .wkrow .wkmore') <= 1, 'phone knowledge: the "…" is hidden');
     const wn = await full(ev, '#view .wkrow .wkitem > span');
     check(wn === true, 'phone knowledge: the name is fully visible ' + wn);
@@ -104,7 +117,7 @@ const J = JSON.stringify;
     check(await ev('location.hash') === h0, 'phone knowledge: the press opened nothing');
     await ev(`(() => { closePop(); return 1; })()`);
     // ---- knowledge: a page's files
-    await nav(B + '#wiki/' + pg.id);
+    await go('#wiki/' + pg.id);
     check(await until(`!!document.querySelector('#view .wkfiles a.wkfile')`, {timeout: 20000}), 'phone page: its file');
     check(await W(ev, '#view .wkfiles li > .iconbtn') <= 1, 'phone page: the file\'s symbols are hidden');
     m = await hold('#view .wkfiles a.wkfile .an');
@@ -112,8 +125,8 @@ const J = JSON.stringify;
     await ev(`(() => { closePop(); return 1; })()`);
 
     // ---- tables
-    await nav(B + '#sheets');
-    check(await until(`!!document.querySelector('#view .shvcard[data-id="${SH}"] .shvct b')`, {timeout: 20000}), 'phone tables: the table');
+    await go('#sheets');
+    check(await until(`!!document.querySelector('#view .shvcard[data-id="${SH}"] .shvct b')`, {timeout: 20000}), 'phone tables: the table ' + SH + ' ' + await dbg());
     check(await W(ev, `#view .shvcard[data-id="${SH}"] [data-shv="cmenu"]`) <= 1 && await W(ev, '#view .shfcard [data-shf="fmenu"]') <= 1, 'phone tables: the "…" of tables and folders are hidden');
     const tn = await full(ev, `#view .shvcard[data-id="${SH}"] .shvct b`);
     check(tn === true, 'phone tables: the name is fully visible ' + tn);
@@ -122,7 +135,7 @@ const J = JSON.stringify;
     check(['Open', 'Rename…', 'Delete'].every(t => m.includes(t)), 'phone tables: a long press opens the menu ' + J(m));
     check(await ev(`location.hash`) === '#sheets', 'phone tables: the press opened nothing');
     check(await pick(ev, 'Open') && await until(`location.hash === '#sheets/${SH}'`, {timeout: 5000}), 'phone tables: Open opens the table');
-    m = await (async () => { await nav(B + '#sheets'); await until(`!!document.querySelector('#view .shfcard .shvct b')`, {timeout: 20000}); return hold('#view .shfcard .shvct b'); })();
+    m = await (async () => { await go('#sheets'); await until(`!!document.querySelector('#view .shfcard .shvct b')`, {timeout: 20000}); return hold('#view .shfcard .shvct b'); })();
     check(m.includes('Rename…'), 'phone tables: a long press on a folder opens its menu ' + J(m));
   }, true);
 
@@ -132,11 +145,12 @@ const J = JSON.stringify;
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); return 1; })()`);
     check(await login2(ev) === 200, 'computer: login');
+    const go = h => ev(`(() => { location.hash = ${J(h)}; return 1; })()`);
     await nav(B + '#ablage/s/private');
     check(await until(`!!document.querySelector('#view .abrow[data-abid="${FILE}"] [data-ab="menu"]')`, {timeout: 20000}) && await W(ev, `#view .abrow[data-abid="${FILE}"] [data-ab="menu"]`) >= 24, 'computer files: the "…" stays');
-    await nav(B + '#wiki/' + pg.id);
+    await go('#wiki/' + pg.id);
     check(await until(`!!document.querySelector('#view .wkfiles li > .iconbtn')`, {timeout: 20000}) && await W(ev, '#view .wkfiles li > .iconbtn') >= 24, 'computer page: the file\'s symbols stay');
-    await nav(B + '#sheets');
+    await go('#sheets');
     check(await until(`!!document.querySelector('#view .shvcard[data-id="${SH}"] [data-shv="cmenu"]')`, {timeout: 20000}) && await W(ev, `#view .shvcard[data-id="${SH}"] [data-shv="cmenu"]`) >= 24, 'computer tables: the "…" stays');
   }, false);
 
