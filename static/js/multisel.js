@@ -176,7 +176,7 @@ function cm_bind(sel, open, pick, keep) {  // 2.571.0 (#4608): keep(e, row) true
     if (ms_lpRecent(st)) { e.preventDefault(); return; }
     if (open(r)) e.preventDefault();
   });
-  window.addEventListener('click', e => { if (ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row
+  window.addEventListener('click', e => { if (e.detail && ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row; 2.1151.0 (#3835): a click of the menu on a hidden button of the row (detail 0) goes through, as in ms_rowMenu
   return st;
 }
 // 2.607.0 (#4612): the top of a row menu opened by a long press / right click where rows can be chosen (like tasks, o.select):
