@@ -7,7 +7,7 @@
 
 const UP_MIN = 1024 * 1024, UP_WAIT = 300;  // no bar for what is done before it could be read
 const upFiles = fd => [...fd.values()].filter(v => v instanceof Blob);
-const upWanted = fd => !/** @type {any} */ (fd).upQuiet && upFiles(fd).reduce((n, f) => n + f.size, 0) >= UP_MIN;
+const upWanted = fd => !/** @type {any} */ (fd).upQuiet && (!!/** @type {any} */ (fd).upBar || upFiles(fd).reduce((n, f) => n + f.size, 0) >= UP_MIN);  // 2.1165.0 (#6114): upBar = the bar for any size (the file store, the documents)
 function upLabel(fd) {
   const fs = upFiles(fd), names = fs.map(f => /** @type {any} */ (f).name).filter(n => n && n !== 'encrypted.kenc');  // an encrypted file has no name to show
   return fs.length > 1 ? tr('Uploading {0} files…', fs.length) : names[0] || tr('Uploading…');
@@ -31,8 +31,16 @@ function upRow(label, cancel) {
     done() { clearTimeout(t); el.remove(); if (!document.querySelector('.upbar')) document.getElementById('upbars')?.remove(); },
   };
 }
+// 2.1165.0 (#6114): a form below UP_MIN that asks for the bar (fd.upBar): the plain fetch with its row (no percent, it is done at
+// once) and Cancel aborting it
+function upFetch(url, opt, fd) {
+  const ac = new AbortController(), row = upRow(upLabel(fd), () => { ac.abort(); toast(tr('Upload cancelled')); });
+  return fetch(url, {...opt, signal: ac.signal}).then(r => { row.done(); return r; },
+    e => { row.done(); throw ac.signal.aborted ? Object.assign(new Error(tr('Upload cancelled')), {cancelled: true, shown: true}) : e; });
+}
 // what fetch(url, opt) does for a form, by XHR (fetch reports no upload progress). The answer offers what rawFetch0 reads of a Response.
 function upSend(url, opt, fd) {
+  if (upFiles(fd).reduce((n, f) => n + f.size, 0) < UP_MIN) return upFetch(url, opt, fd);  // 2.1165.0 (#6114)
   return new Promise((ok, no) => {
     const x = new XMLHttpRequest();
     const row = upRow(upLabel(fd), () => { x.abort(); toast(tr('Upload cancelled')); });
