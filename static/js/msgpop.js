@@ -49,7 +49,7 @@ function mp_show(items) {
   const fresh = (items || []).filter(m => m && !(S.me && m.from === S.me.id) && !mp_isOpen(m));
   if (!fresh.length) return;
   const el = $('#msgpop'), seen = new Set(mp_items.map(m => m.src + m.id));
-  mp_items = [...fresh.filter(m => !seen.has(m.src + m.id)), ...(el ? mp_items : [])].sort((x, y) => (y.at || '').localeCompare(x.at || '') || y.id - x.id);
+  mp_items = [...fresh.filter(m => !seen.has(m.src + m.id)), ...(el ? mp_items : [])].sort((x, y) => (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0) || y.id - x.id);
   if (!mp_items.length) return;
   mp_draw();
 }

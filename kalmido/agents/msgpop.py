@@ -8,43 +8,26 @@ it starts. Nothing is marked read here (unlike GET /api/agents/<id>/chat). Only 
 
 Agent messages: only an answer or a question - a notice line, a job's brief, a job's progress line ("say", the start line)
 never; a job's result / error / question does. Its own messages of the person never (sender 'user')."""
-import re
-
 from flask import jsonify, request
 
 from ..core.config import app
 from ..core.db import db
+from ..core.access import Denied
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..tasks.validation import as_int
 from ..collab.teamchat import tchat_new_for, tchat_rooms
 from ..collab.liste2eguard import le2b_net
 from .core import need_person
-from .chat import chat_asks, JCB_NOT_SQL, _jload
+from .chat import chat_agent_or_org, chat_asks, chat_is_final, JCB_NOT_SQL
 
 MP_MAX = 20  # at most this many messages per source and answer (the app bundles them per sender anyway)
 MP_TEXT = 140  # the first line, cut
-# a job's result / error read from its text when the server has no job_msg (like jcd_kind in static/js/jobchat.js)
-MP_JOB_DONE_RE = re.compile(r"^\s*(?:✅|⚠|⏰|⏹)")
 
 
 def mp_first_line(s):
     s = le2b_net(str(s or "")).strip()
     return (s.split("\n", 1)[0].strip() or s)[:MP_TEXT]
-
-
-def mp_agent_final(r):
-    """A finished answer or a question of an agent, never a step in between: a plain message of the chat; of a job (job_id)
-    its question / result / error (job_msg, else read from the text like jcd_kind) or a message with buttons / an approval."""
-    if not r["job_id"]:
-        return True
-    ch = r["choices"] if isinstance(r["choices"], dict) else _jload(r["choices"])
-    if ch and (ch.get("choices") or ch.get("permission") or ch.get("approval")):
-        return True
-    jm = r["job_msg"] or ""
-    if jm:
-        return jm in ("question", "result", "error")
-    return bool(MP_JOB_DONE_RE.match(r["body"] or ""))
 
 
 def mp_agent_new(c, uid, after):
@@ -55,8 +38,17 @@ def mp_agent_new(c, uid, after):
     rows = c.execute(f"""SELECT * FROM agent_chat WHERE user_id=? AND sender='agent' AND read_at IS NULL AND id>?
                          AND COALESCE(kind,'') IN ('', 'message', 'unshared') AND {JCB_NOT_SQL}
                          ORDER BY id DESC LIMIT ?""", (uid, after, MP_MAX * 3)).fetchall()
+    rows = [r for r in rows if chat_is_final(r)]
+    # review 2.1130.0: only agents the person may still chat with (as GET /api/agents/<id>/chat), not just rows of her own
+    ok = set()
+    for aid in {r["agent_id"] for r in rows}:
+        try:
+            chat_agent_or_org(c, aid)
+            ok.add(aid)
+        except Denied:
+            pass
     out = [{"src": "agent", "id": r["id"], "agent_id": r["agent_id"], "from": r["agent_id"], "text": mp_first_line(r["body"]),
-            "asks": bool(chat_asks(r["body"])), "at": r["created_at"]} for r in rows if mp_agent_final(r)]
+            "asks": bool(chat_asks(r["body"])), "at": r["created_at"]} for r in rows if r["agent_id"] in ok]
     return out[:MP_MAX], max([top, after] + [r["id"] for r in rows])
 
 
@@ -64,15 +56,18 @@ def mp_agent_new(c, uid, after):
 def msgpop_get():
     """?t=<highest team chat message id known> &a=<highest agent chat message id known> -> {t, a, items}: the new messages of
     others for the pop-up, newest first ({src team|agent, id, from, name, avatar, text, room_id, room, kind, thread, enc,
-    file, mention | agent_id, asks}); t / a = what to send next time. Without t / a: only t / a (the window's start)."""
+    file, mention | agent_id, asks; at); t / a = what to send next time. Without t / a: the window's start (the team chat's
+    overlap below the cursor still comes, the app only takes note of it). ?only=team|agent: the side that moved (the other
+    keeps its cursor, nothing of it is read)."""
     need_person(403)
     c = db()
     uid = me()
     first = "t" not in request.args and "a" not in request.args
     t = None if first else as_int(request.args.get("t", 0), "t", 0)
     a = None if first else as_int(request.args.get("a", 0), "a", 0)
-    tm, t2 = tchat_new_for(c, uid, t, MP_MAX)
-    am, a2 = mp_agent_new(c, uid, a)
+    only = request.args.get("only", "") if not first else ""
+    tm, t2 = tchat_new_for(c, uid, t, MP_MAX) if only != "agent" else ([], t)
+    am, a2 = mp_agent_new(c, uid, a) if only != "team" else ([], a)
     rooms = {r["id"]: r for r in tchat_rooms(c, uid, full=True)} if tm else {}
     tm = [m for m in tm if m["room_id"] in rooms]
     ids = sorted({m["user_id"] for m in tm if m["user_id"]} | {m["from"] for m in am})
@@ -86,7 +81,7 @@ def msgpop_get():
                       "avatar": avatar_url(users[m["user_id"]]) if m["user_id"] in users else "",
                       "text": mp_first_line(m["text"]), "room_id": m["room_id"], "kind": r["kind"],
                       "room": "" if r["kind"] == "dm" else le2b_net(r.get("name") or ""), "thread": m["thread"],
-                      "enc": m["enc"], "file": m["file"], "mention": m["mention"]})
+                      "enc": m["enc"], "file": m["file"], "mention": m["mention"], "at": m["at"]})
     for m in am:
         items.append({**m, "name": who(m["from"]), "avatar": avatar_url(users[m["from"]]) if m["from"] in users else ""})
     return jsonify(t=t2, a=a2, items=items)

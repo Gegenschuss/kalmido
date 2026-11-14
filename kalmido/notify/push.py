@@ -451,7 +451,7 @@ def push_reachable_many(c, S):
     return out
 
 
-def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None, nag=None):
+def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None, nag=None, chat=False):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
     from ..collab.liste2eguard import le2b_net
@@ -459,6 +459,8 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
     title, msg = md_plain(title), md_plain(msg)  # 2.40.0 (#1409): no Markdown marks in the push
     p = {"title": (title or APP_NAME)[:200], "body": (msg or "")[:1000], "url": "/#" + hash_ if hash_ else "/",
          "prio": int(prio) if str(prio).isdigit() else 4, "ts": int(time.time() * 1000)}
+    if chat:  # 2.1130.0 (#6057): a chat message the in-app pop-up shows too (sw.js: no system notification while the app is visible)
+        p["chat"] = 1
     if lang:  # 2.367.5 (#2980): the notification's language (sw.js pushOptions)
         p["lang"] = lang
     if tag:
@@ -521,14 +523,15 @@ def quiet_held_tick(c, users, S, LG, now):
 
 
 def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None,
-           scope=None, chn_msg=None, quiet=True, nag=None):
+           scope=None, chn_msg=None, quiet=True, nag=None, chat=False):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
     subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
     2.142.0 A (#2145): kind (reminder | assign | comment | digest | other) also goes to the person's notification channels
     that want it (Slack, Matrix, Telegram, Signal; notify/channels.py); without kind it is guessed from tag / origin.
     2.240.0 B2 (#2867): scope / chn_msg = what the push belongs to / the channels' text (chn_scope, chn_push); web push and ntfy unchanged.
-    2.367 (#2966): quiet=False = not held in the person's quiet hours (quiet_hold)."""
+    2.367 (#2966): quiet=False = not held in the person's quiet hours (quiet_hold).
+    2.1130.0 (#6057): chat=True = a chat message the in-app pop-up shows too (web push payload chat: 1, sw.js)."""
     from ..notify.alerts import aa_count
     if s is None:
         c = connect()
@@ -552,7 +555,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg, nag=nag), "badge": badge_count},  # 2.281.0 B
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg, nag=nag, chat=chat), "badge": badge_count},  # 2.281.0 B
                             prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)

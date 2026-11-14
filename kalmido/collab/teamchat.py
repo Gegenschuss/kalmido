@@ -423,12 +423,17 @@ def tchat_dm_unread(c, uid):
     return sum(x["unread"] for x in tchat_rooms(c, uid, full=False) if x["kind"] in ("dm", "group") and not x["muted"])  # 2.113.1 (#2059): groups like DMs
 
 
+TCHAT_NEW_OVERLAP = 200  # ids below the window's cursor asked again (tchat_new_for): a message stored under an id reserved earlier
+
+
 def tchat_new_for(c, uid, after, limit=20):
-    """2.1130.0 (#6057): the newest unread messages of other people in my conversations with an id above `after` (the in-app
-    pop-up, agents/msgpop.py), newest first: the main conversation of every room I am in (a muted one only when the message
-    @mentions me) and the threads I take part in; my own messages, deleted ones and those below my read marks never. Returns
-    (messages as {id, room_id, thread, user_id, text, enc, file, mention}, the highest message id of my rooms = the next `after`);
-    after None = the first call: no messages, only that id.
+    """2.1130.0 (#6057): the newest unread messages of other people in my conversations (the in-app pop-up, agents/msgpop.py),
+    newest first: the main conversation of every room I am in (a muted one only when the message @mentions me) and the threads
+    I take part in; my own messages, system lines, deleted ones and those below my read marks never. Returns (messages as {id,
+    room_id, thread, user_id, text, enc, file, mention, at}, the highest message id of my rooms = the next `after`).
+    The ask reaches TCHAT_NEW_OVERLAP ids below `after` (review 2.1130.0: a channel with the lock stores a message under an id it
+    reserved before, and a later commit can land below the cursor): the app keeps the ids it knew and shows each once.
+    after None = the first call of a window: the cursor is the newest id now (what the overlap returns the app only takes note of).
     Reads like _tchat_room_counts (the core's obj_seen / obj_follow rows), nothing is written. The caller hides ciphertexts."""
     if not tchat_on(c, uid):
         return [], after or 0
@@ -436,35 +441,37 @@ def tchat_new_for(c, uid, after, limit=20):
     ids = sorted({r["id"] for r in rooms})
     if not ids:
         return [], after or 0
-    muted = {r["id"] for r in rooms if r["muted"]}
-    top = c.execute("SELECT COALESCE(MAX(id),0) FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[]))", (ids,)).fetchone()[0]
-    if after is None:  # the first call of a window: only where it starts, nothing that was there before is new
-        return [], top
-    pat = f"%<@{uid}>%"
+    muted = sorted({r["id"] for r in rooms if r["muted"]})
+    # the newest id of my rooms from the counters per room (tchat_room_sig, kept by a trigger, #4183), not MAX over the messages
+    top = c.execute("SELECT COALESCE(MAX(max_id),0) FROM tchat_room_sig WHERE room_id = ANY(CAST(? AS BIGINT[]))", (ids,)).fetchone()[0]
+    if after is None:
+        after = top
+    low, pat = max(0, after - TCHAT_NEW_OVERLAP), f"%<@{uid}>%"
     rows = c.execute(
         f"""SELECT m.* FROM tchat_msgs m
            LEFT JOIN obj_seen d ON d.kind='tchat' AND d.ref_id=m.room_id AND d.user_id=?
            WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>? AND m.id>COALESCE(d.seen_id,0) AND {live_sql("m")}
-           AND m.thread_of IS NULL AND COALESCE(m.user_id,0)!=?
+           AND m.thread_of IS NULL AND m.user_id IS NOT NULL AND m.user_id!=?
+           AND (NOT m.room_id = ANY(CAST(? AS BIGINT[])) OR m.body ILIKE ?)
            UNION ALL
            SELECT m.* FROM tchat_msgs m
            JOIN obj_follow w ON w.kind='tchat_thread' AND w.ref_id=m.thread_of AND w.user_id=? AND w.mode='watch'
            LEFT JOIN obj_seen t ON t.kind='tchat_thread' AND t.ref_id=m.thread_of AND t.user_id=w.user_id
            WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>? AND m.id>COALESCE(t.seen_id,0) AND {live_sql("m")}
-           AND COALESCE(m.user_id,0)!=?
-           ORDER BY id DESC LIMIT ?""", (uid, ids, after, uid, uid, ids, after, uid, limit * 2)).fetchall()
+           AND m.user_id IS NOT NULL AND m.user_id!=? AND (NOT m.room_id = ANY(CAST(? AS BIGINT[])) OR m.body ILIKE ?)
+           ORDER BY id DESC LIMIT ?""", (uid, ids, low, uid, muted, pat, uid, ids, low, uid, muted, pat, limit)).fetchall()
     out = []
     for m in rows:
-        mention = pat.strip("%") in (m["body"] or "")
-        if m["room_id"] in muted and not mention:
-            continue
         b = tchat_msg_brief(c, m)
+        if b.get("enc") and b["enc"] != "msg":
+            continue  # an encryption notice (switched on / off, a new key) is no message
         first = (m["body"] or "").strip().split("\n", 1)[0] if not m["enc"] else ""  # the first line only (the brief joins them)
         if first:
             b["text"] = comment_plain(c, md_brief(first), user_names(c, [int(x) for x in OCM_MENTION_RE.findall(first)]))[:140] or b["text"]
         out.append({"id": m["id"], "room_id": m["room_id"], "thread": m["thread_of"], "user_id": m["user_id"],
-                    "text": b["text"], "enc": bool(b.get("enc")), "file": bool(b.get("file")), "mention": mention})
-    return out[:limit], max([top, after] + [m["id"] for m in rows])  # a message after the MAX above counts too
+                    "text": b["text"], "enc": bool(b.get("enc")), "file": bool(b.get("file")),
+                    "mention": f"<@{uid}>" in (m["body"] or ""), "at": m["created_at"]})
+    return out, max([top, after] + [m["id"] for m in rows])  # a message after the MAX above counts too
 
 
 def md_brief(text):
@@ -851,7 +858,7 @@ def tchat_notify(c, r, m, mentions, replied=None, only=None):
             tr("Replied to your message: {0}", text, lg=lg) if uid == replied else (text or tr("Sent a file", lg=lg))  # 2.113.1 (#2059): only files
         g.pushes.append((uid, title, msg[:300], f"{PUBLIC_URL}/#msg/t/{r['id']}/{m['id']}" if root else f"{PUBLIC_URL}/#team/{r['id']}",
                          push_prio(s),  # 2.139.0 A (#2127): a thread answer opens its thread
-                         {"scope": tchat_push_scope(r, sender)}))  # 2.240.0 B2 (#2867)
+                         {"scope": tchat_push_scope(r, sender), "chat": True}))  # 2.240.0 B2 (#2867); 2.1130.0 (#6057): chat = the pop-up says it in a visible app
 
 
 def tchat_notify_obj(r):
@@ -938,7 +945,7 @@ def tchat_push_tick(c, users, S, LG):
         lg = LG[uid]
         who = user_names(c, [p["actor"]]).get(p["actor"]) if p["actor"] else None
         notify(uid, tchat_push_title(c, r, uid, who, lg), trn("{0} new message", "{0} new messages", p["held"], lg=lg), push_prio(S[uid]),
-               f"{PUBLIC_URL}/#team/{r['id']}", s=S[uid], kind="other", scope=tchat_push_scope(r, p["actor"]))
+               f"{PUBLIC_URL}/#team/{r['id']}", s=S[uid], kind="other", scope=tchat_push_scope(r, p["actor"]), chat=True)
 
 
 WD_TICKS.append(("chat pushes", tchat_push_tick))

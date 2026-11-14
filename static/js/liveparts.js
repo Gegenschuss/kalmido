@@ -328,33 +328,44 @@ function lzCounts(c) {
 function lzDelta(j) { if (S.lz && j.lzc) for (const [lid, x] of Object.entries(j.lzc)) if (S.lz.pending.has(+lid)) S.lz.counts[lid] = x; }
 
 // 2.1130.0 (#6057): the pop-up for new chat messages (msgpop.js, loaded only when there is one). The poll hands over what it
-// read (the signature t of my own team conversations, the area counters a); when one of them or the agent chat moved, GET /api/msgpop asks
-// for the messages of others above the highest ids this window knows (S.mpop.t / S.mpop.a). The first ask of a window only
-// learns where it starts. While the app is hidden nothing pops up (the push of the device says it); the first ask after
-// that only catches up, so what the push already said never pops up a second time. Not for agents, in a second window or
-// the capture page; off with the switch of this device (Settings > Notifications, LS msgPop).
-S.mpop = {t: null, a: null, sig: null, busy: false, again: false, quiet: false};
+// read (the signature t of my own team conversations, the area counters a); when one of them or the agent chat moved, GET
+// /api/msgpop asks for the messages of others above the highest ids this window knows (S.mpop.t / S.mpop.a; ?only= the side
+// that moved). The team side also returns some ids below its cursor (a message stored under an id reserved earlier): the
+// ids this window knew already (S.mpop.seen) never show twice. The first ask of a window only takes note of what is there.
+// While the app is hidden nothing pops up (the push of the device says it); the first ask after that only catches up, so
+// what the push already said never pops up a second time. Not for agents, in a second window or the capture page; off with
+// the switch of this device (Settings > Notifications, LS msgPop).
+const MP_SEEN_MAX = 500;
+S.mpop = {t: null, a: null, sig: null, moved: new Set(), busy: false, again: false, quiet: false, catching: false, seen: new Set()};
 const mp_on = () => LS.get('msgPop', '1') !== '0' && !!S.booted && !!S.me && S.me.kind !== 'agent' && !(typeof MW_GUARD !== 'undefined' && MW_GUARD) && !S.capturePage;
 function mp_poll(t, a) {
-  const sig = `${t}|${a?.agentchat}`, was = S.mpop.sig; S.mpop.sig = sig;  // t: my own conversations (not every team chat of the server)
-  if (was !== sig || S.mpop.t === null) mp_check();
+  const was = S.mpop.sig, now = [t, a?.agentchat]; S.mpop.sig = now;  // t: my own conversations (not every team chat of the server)
+  if (was && was[0] !== now[0]) S.mpop.moved.add('team');
+  if (was && was[1] !== now[1]) S.mpop.moved.add('agent');
+  if (S.mpop.moved.size || S.mpop.t === null) mp_check();
 }
 function mp_check() {
-  if (!mp_on()) { S.mpop.t = S.mpop.a = null; return; }  // off: the next ask after switching on starts fresh
+  if (!mp_on()) { S.mpop.t = S.mpop.a = null; S.mpop.moved.clear(); return; }  // off: the next ask after switching on starts fresh
   if (S.mpop.busy) { S.mpop.again = true; return; }
-  const first = S.mpop.t === null, quiet = first || S.mpop.quiet || document.hidden;
-  S.mpop.busy = true; S.mpop.quiet = false;
-  rawFetch('GET', '/api/msgpop' + (first ? '' : `?t=${S.mpop.t}&a=${S.mpop.a}`)).then(j => {
+  const first = S.mpop.t === null, quiet = first || S.mpop.quiet || document.hidden, mv = S.mpop.moved;
+  const only = !first && !quiet && mv.size === 1 ? `&only=${[...mv][0]}` : '';
+  S.mpop.busy = true; S.mpop.quiet = false; S.mpop.catching = quiet; S.mpop.moved = new Set();
+  rawFetch('GET', '/api/msgpop' + (first ? '' : `?t=${S.mpop.t}&a=${S.mpop.a}${only}`)).then(j => {
     S.mpop.t = j.t; S.mpop.a = j.a;
-    if (!quiet && j.items?.length && mp_on()) loadModule('msgpop').then(() => mp_show(j.items), () => {});
-  }, () => { /* offline: asked again with the next change */ }).finally(() => {
-    S.mpop.busy = false;
+    const seen = S.mpop.seen, fresh = (j.items || []).filter(m => !seen.has(m.src + m.id));
+    for (const m of fresh) seen.add(m.src + m.id);
+    if (seen.size > MP_SEEN_MAX) S.mpop.seen = new Set([...seen].slice(-MP_SEEN_MAX / 2));
+    if (!quiet && fresh.length && mp_on()) loadModule('msgpop').then(() => mp_show(fresh), () => {});
+  }, () => { for (const k of mv) S.mpop.moved.add(k); if (quiet) S.mpop.quiet = true; /* offline: asked again with the next poll */ }).finally(() => {
+    S.mpop.busy = false; S.mpop.catching = false;
     if (S.mpop.again) { S.mpop.again = false; mp_check(); }
   });
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) S.mpop.quiet = true; });
+// hidden: what comes meanwhile is the push's; back in front: catch up at once (quietly), only then the window tells the service
+// worker that it shows chat messages itself (mp_swAsk) - so no message goes neither as a push nor as a pop-up
+document.addEventListener('visibilitychange', () => { if (document.hidden) S.mpop.quiet = true; else if (S.mpop.quiet) mp_check(); });
 // the service worker asks before it shows a chat push (sw.js): a visible window with the pop-up on says so, the push then stays away
 function mp_swAsk(e) {
   const p = e.ports?.[0]; if (!p) return;
-  p.postMessage({visible: !document.hidden && mp_on()});
+  p.postMessage({visible: !document.hidden && mp_on() && S.mpop.t !== null && !S.mpop.quiet && !S.mpop.catching});
 }

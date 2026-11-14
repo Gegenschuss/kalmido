@@ -358,18 +358,19 @@ async function setBadge(n) {
   if (typeof n !== 'number' || !nav || !nav.setAppBadge) return;
   try { if (n > 0) await nav.setAppBadge(n); else await nav.clearAppBadge(); } catch { /* not supported here */ }
 }
-// 2.1130.0 (#6057): a chat push (a team chat message, a thread answer, an agent's answer / question) while a window of the app
-// is visible with the pop-up on (static/js/msgpop.js; the window answers "msgpop?", liveparts.js mp_swAsk) shows no system
-// notification on this device: the pop-up in the app says it. No answer within MP_ASK_MS = shown as before. WebKit (Safari,
-// the iPhone's Home Screen app) takes a push without a notification as a silent push and may end the subscription: there it
-// is shown silently and closed at once.
-const MP_CHAT_URL = /^\/#(team\/\d+|msg\/t\/\d+\/\d+|agents\/\d+)$/, MP_ASK_MS = 400;
+// 2.1130.0 (#6057): a chat push (the server marks it chat: 1 - a team chat message, a finished answer / question of an agent;
+// never a job's progress line, a budget or approval notice) while a window of the app is in front (visible AND focused, so
+// Chrome never adds its own "updated in the background" line) with the pop-up on (static/js/msgpop.js; the window answers
+// "msgpop?", liveparts.js mp_swAsk) shows no system notification on this device: the pop-up in the app says it. No answer
+// within MP_ASK_MS = shown as before. WebKit (Safari, the iPhone's Home Screen app) takes a push without a notification as a
+// silent push and may end the subscription: there it is shown silently and closed at once.
+const MP_ASK_MS = 400;
 const mpWebkit = () => { const u = self.navigator?.userAgent || ''; return /AppleWebKit/.test(u) && !/Chrome|Chromium|Android/.test(u); };
 async function mpShownInApp(d) {
-  if (!d || !MP_CHAT_URL.test(SAME(d.url || '/'))) return false;
+  if (!d || d.chat !== 1) return false;
   const wins = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
   const ask = w => new Promise(res => {
-    if (w.visibilityState !== 'visible') { res(false); return; }
+    if (w.visibilityState !== 'visible' || w.focused === false) { res(false); return; }
     const ch = new MessageChannel(), t = setTimeout(() => res(false), MP_ASK_MS);
     ch.port1.onmessage = ev => { clearTimeout(t); res(!!ev.data?.visible); };
     try { w.postMessage({type: 'msgpop?'}, [ch.port2]); } catch { clearTimeout(t); res(false); }

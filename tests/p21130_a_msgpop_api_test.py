@@ -41,8 +41,8 @@ ROOM = next(x for x in A.get(B + "/api/team").json()["rooms"] if x.get("list_id"
 Bo.get(B + "/api/team")
 
 
-def pop(s=A, t=None, a=None):
-    q = "" if t is None else f"?t={t}&a={a}"
+def pop(s=A, t=None, a=None, only=""):
+    q = ("" if t is None else f"?t={t}&a={a}") + (f"&only={only}" if only else "")
     r = s.get(B + "/api/msgpop" + q)
     check(r.status_code == 200, f"GET /api/msgpop{q} answers 200 ({r.status_code} {r.text[:200]})")
     return r.json() if r.ok else {"t": t or 0, "a": a or 0, "items": []}
@@ -54,23 +54,24 @@ def say(s, rid, body):
     return r.json()
 
 
-# ---- the first ask: where the window starts, nothing old
-say(Bo, ROOM, "An old message before the window started")
+# ---- the first ask: where the window starts; the unread ones just below it come along (the overlap the app only notes)
+m0 = say(Bo, ROOM, "An old message before the window started")
 j = pop()
-check(j.get("items") == [] and isinstance(j.get("t"), int) and j["t"] > 0 and isinstance(j.get("a"), int),
-      f"first ask: only the start, the old message is not new {j}")
+check(isinstance(j.get("t"), int) and j["t"] >= m0["id"] and isinstance(j.get("a"), int), f"first ask: the cursor is the newest id {j}")
+check([x["id"] for x in j.get("items", [])] == [m0["id"]], f"first ask: the unread message just below the cursor comes (the app only takes note) {j}")
 T, AA = j["t"], j["a"]
 
 # ---- team chat: Bob writes, Alice sees it; Bob does not see his own
 m1 = say(Bo, ROOM, "The van is booked\nsecond line stays out")
 j = pop(A, T, AA)
-it = [x for x in j["items"] if x["src"] == "team"]
+it = [x for x in j["items"] if x["src"] == "team" and x["id"] > T]  # above the cursor = new; below = the overlap the app knew
+check(any(x["id"] == m0["id"] for x in j["items"]), "the overlap below the cursor: the unread old message comes again (a message stored under an id reserved earlier is never lost)")
 check(len(it) == 1 and it[0]["id"] == m1["id"] and it[0]["name"] == "Bob Builder" and it[0]["from"] == BOB,
       f"Bob's new message for Alice, with his name {it}")
 check(it and it[0]["text"] == "The van is booked" and it[0]["room"] == "Shoot Berlin" and it[0]["room_id"] == ROOM and it[0]["kind"] == "list",
       f"the first line and the project's conversation {it}")
 check(j["t"] >= m1["id"], f"t moves to the newest message ({j['t']} >= {m1['id']})")
-check(pop(A, j["t"], j["a"])["items"] == [], "asked again with the new t: nothing new")
+check([x for x in pop(A, j["t"], j["a"])["items"] if x["id"] > j["t"]] == [], "asked again with the new t: nothing above it")
 check(all(x["from"] != BOB for x in pop(Bo, 0, 0)["items"]), "Bob's own messages never show for Bob")
 
 # ---- read = gone
@@ -94,6 +95,8 @@ m5 = say(Bo, DM, "Typo, ignore")
 check(Bo.delete(B + f"/api/team/messages/{m5['id']}").status_code in (200, 204), "Bob deletes a message")
 it = [x for x in pop(A, T, AA)["items"] if x["src"] == "team"]
 check([x["id"] for x in it] == [m4["id"]] and it[0]["kind"] == "dm" and it[0]["room"] == "", f"the direct message shows, without a room name; the deleted one never {it}")
+jo = pop(A, T, AA, only="agent")
+check(not [x for x in jo["items"] if x["src"] == "team"] and jo["t"] == T, f"only=agent: the team side is not read, its cursor stays {jo}")
 
 # ---- agent chat
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"})

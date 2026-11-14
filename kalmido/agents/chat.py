@@ -848,6 +848,26 @@ _CHAT_GC = {"at": 0.0}
 _CHAT_ASK_STRIP = re.compile(r"```.*?```|`[^`\n]*`|https?://\S+", re.S)
 
 
+# 2.1130.0 (#6057): a job's result / error read from its text when the server has no job_msg (like jcd_kind in static/js/jobchat.js)
+CHAT_JOB_DONE_RE = re.compile(r"^\s*(?:✅|⚠|⏰|⏹)")
+
+
+def chat_is_final(r):
+    """2.1130.0 (#6057): an agent's chat row is a finished answer or a question, never a step in between: a plain message of
+    the chat; of a job (job_id) its question / result / error (job_msg, else read from the text like jcd_kind) or a message
+    with buttons / an approval. The in-app pop-up (agents/msgpop.py) shows only these, and only their pushes carry chat=1
+    (the service worker leaves them out while the app is visible)."""
+    if not r["job_id"]:
+        return True
+    ch = r["choices"] if isinstance(r["choices"], dict) else _jload(r["choices"])
+    if ch and (ch.get("choices") or ch.get("permission") or ch.get("approval")):
+        return True
+    jm = r["job_msg"] or ""
+    if jm:
+        return jm in ("question", "result", "error")
+    return bool(CHAT_JOB_DONE_RE.match(r["body"] or ""))
+
+
 def chat_asks(body):
     return "?" in _CHAT_ASK_STRIP.sub(" ", body or "")
 
