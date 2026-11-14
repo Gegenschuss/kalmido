@@ -79,6 +79,8 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     check(mv && moved.every(x => x === L2) && await ev(`!S.multiMode && !S.multi.size`), '#1055: Move > a list moves the selection there and ends it ' + JSON.stringify(moved));
     // the grip drags a row while selecting
     p = await rowAt(0); await hold(p.x, p.y, 700); await sleep(400);
+    // 2.1151.0 (#3835): the long press opens the menu first; its "Select" starts the selection
+    { const q = await ev(`(() => { const r = document.querySelector('#pop:not(.hidden) [data-act="cm-select"]')?.getBoundingClientRect(); return r ? {x: r.left + r.width / 2, y: r.top + r.height / 2} : null; })()`); if (q) { await hold(q.x, q.y, 60); await sleep(400); } }
     const g = await ev(`(() => { const gs = [...document.querySelectorAll('#view .trow .tgrip')]; const a = gs[1].getBoundingClientRect(), b = gs[4].getBoundingClientRect(); return {x: a.x + a.width / 2, y: a.y + a.height / 2, y2: b.y + b.height * .8, id: +gs[1].closest('.trow').dataset.id}; })()`);
     const before = await ev(`JSON.stringify([...document.querySelectorAll('#view .trow')].map(r => +r.dataset.id))`);
     await touch([{type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y + 20), duration: 100}, {type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y2), duration: 300}, {type: 'pointerUp', button: 0}]);
