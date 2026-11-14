@@ -21,6 +21,19 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1142.0] - 2026-11-14
+
+Package 2.1123 (Bündel: Wissen teilen: offene Adress-Freigabe im Dialog an, SQLite-Erbe Rest 1: übrige Zeitspalten (*_at/_on/_).
+
+### Changed
+- #5951: the other old time columns (*_at / *_on / *_until, 221 of them in tasks, lists, team chat, wiki, files, sheets, calendar, contacts, git, hub, office, receipts, documents, agents, accounts and access) are TIMESTAMPTZ or DATE now instead of ISO text. `kalmido/core/coltime.py` lists them per area; `kalmido/core/coltype.py` turns an existing database at its first start (one way): ISO text without a zone is UTC, '' becomes NULL where it meant "none", a used / revoked / ended mark never reopens, unreadable values keep the row "set". Columns that are no point in time (a clock time, a local wall time, a dedupe key, a version name, a switch) stay TEXT with a `coltype-ok` reason; the time lines of `tools/coltypes_baseline.txt` are gone. DATE columns read back as `YYYY-MM-DD` text. API answers give `null` instead of `''` for an unset time in some fields (e.g. `valid_until`, `warranty_until`).
+- #5967: the wiki share dialog shows a share by address the same way whether an account stands behind the address or not: the same keys and values, the sharer's name on both, sealed ids of one form (`e…`, the old `p<n>` / `a<n>` of address shares are refused), and ending an open address share can be undone like a bound one.
+
+### Fixed
+- #5951: deleting an API token no longer fails in the revocation trigger; a session's last-seen time is refreshed when it was empty; the completed-tasks paging, waiting tasks, habit reminders and calendar sync compare times as moments instead of text.
+
+Rebuilt on today's main from the rescued branch of package 2.1115 (job/4375); no new migration id - the turn runs in core/coltype.py at start.
+
 ## [2.1136.0] - 2026-11-14
 
 Package 2.1130 (Bündel: In-App-Popup für neue Chat-Nachrichten von Mensche).
@@ -409,7 +422,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1136.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1142.0...HEAD
+[2.1142.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1142.0
 [2.1136.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1136.0
 [2.1135.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1135.0
 [2.1134.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1134.0
