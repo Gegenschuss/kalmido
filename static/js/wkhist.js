@@ -40,21 +40,21 @@ const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), ico
 async function wkh_dlg(p) {
   await wk_flush();
   /** @type {any} */
-  const md = modal(`<h3>${esc(tr('History'))} · ${esc(wk_base(p.path))}</h3><div class="wkhbody" id="wkh-b"><div class="muted mhint">${tr('Loading…')}</div></div>
+  const md = modal(`<h3>${esc(tr('History'))} · ${esc(wk_base(p.path))}</h3><div class="wkhbody" id="wkh-b">${loadingHtml('sec')}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-wkh="close">${esc(tr('Close'))}</button></div>`);
   md.classList.add('wkhdlg');
   const box = $('#wkh-b', md), may = WK.idx[p.space]?.mayWrite !== false;
   let vs = [], rn = [];  // 2.571.0 (#4766): rn = the page's renames (the core's history)
   const list = () => {
     box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li><button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.agent ? `<span class="muted wkhagent">${esc(tr('Agent'))}</span>` : ''}${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}</button></li>`).join('')}</ul>`
-      : `<div class="muted mhint">${esc(tr('No earlier versions yet.'))}</div>`;
+      : emptyState({icon: 'clock', title: tr('No earlier versions yet.'), size: 'sec'});
     if (rn.length) box.insertAdjacentHTML('beforeend', `<p class="shint">${esc(tr('Renamed'))}</p><ul class="wkhlist">${rn.map(x => `<li class="muted">${ic(x.agent ? 'bot' : 'edit', 's')} ${esc(fmtWhen(x.at))} · ${esc(x.by_name || '')}: ${esc(wk_base(x.from))} → ${esc(wk_base(x.to))}</li>`).join('')}</ul>`);  // 2.571.0 (#4766)
   };
   try {
     const j = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions`);
     if (j.e2e) { box.innerHTML = `<div class="muted mhint">${esc(tr('Workspaces encrypted in the browser keep no history: the server cannot read their texts.'))}</div>`; return; }
     vs = j.versions || []; rn = j.renames || []; list();
-  } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e.message)}</div>`; return; }
+  } catch (e) { box.innerHTML = errorState({title: errText(e, tr('The history could not be loaded')), size: 'sec'}); return; }  // 2.1161.0 (#6088)
   md.addEventListener('click', async e => {
     const a = /** @type {any} */ (e.target).closest('[data-wkh]'); if (!a) return;
     const k = a.dataset.wkh;
@@ -63,8 +63,8 @@ async function wkh_dlg(p) {
     else if (k === 'open') {
       const v = vs.find(x => x.id === +a.dataset.id); if (!v) return;
       f8d_step(md, list);  // 2.962.0 (#5232): the version is a step of Back, the list comes back
-      box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`;
-      let d; try { d = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions/${v.id}`); } catch (er) { box.innerHTML = `<div class="muted mhint">${esc(er.message)}</div>`; return; }
+      box.innerHTML = loadingHtml('sec');
+      let d; try { d = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions/${v.id}`); } catch (er) { box.innerHTML = errorState({title: errText(er, tr('The version could not be loaded')), size: 'sec', action: `<button type="button" class="btn" data-wkh="list">${ic('back', 's')} ${esc(tr('Back'))}</button>`}); return; }  // 2.1161.0 (#6088)
       const cur = WK.pg?.id === p.id ? WK.pg : p;
       box.innerHTML = `<div class="wkhhead"><button type="button" class="iconbtn" data-wkh="list" aria-label="${esc(tr('Back'))}" title="${esc(tr('Back'))}">${ic('back')}</button><div><b>${esc(fmtWhen(d.updated_at))}</b>${d.by_name ? ` · ${esc(d.by_name)}` : ''}${d.path !== cur.path ? `<div class="muted">${esc(d.path)}</div>` : ''}</div><span class="spacer"></span>${may && !v.current ? `<button type="button" class="btn pri" data-wkh="restore" data-id="${v.id}">${ic('undo', 's')}${esc(tr('Restore'))}</button>` : ''}</div>
         <p class="muted">${esc(tr('Compared with the current text: + comes back with Restore, − goes.'))}</p>${wkh_diffHtml(cur.body, d.body)}`;
@@ -78,7 +78,7 @@ async function wkh_restore(p, vid) {
   const before = (WK.pg?.id === p.id ? WK.pg : p).body, sp = p.space;
   const put = r => { if (WK.pg?.id === p.id) Object.assign(WK.pg, r, {backlinks: WK.pg.backlinks}); wk_after(sp); return r; };
   let r; try { r = put(await rawFetch('POST', `/api/wiki/pages/${p.id}/versions/${vid}/restore`, {expect_updated_at: (WK.pg?.id === p.id ? WK.pg : p).updated_at})); }
-  catch (e) { toast(e.status === 409 ? tr('The page was changed in the meantime. Open the history again.') : e.message); if (e.status === 409) wk_after(sp); return false; }
+  catch (e) { toast(e.status === 409 ? tr('The page was changed in the meantime. Open the history again.') : errText(e, tr('The version could not be restored'))); if (e.status === 409) wk_after(sp); return false; }
   // 2.566.0 (#4704): undo / redo against the version the step before left (core.js undoStep): the page saved by someone else
   // since -> "Changed elsewhere, not undone", their text stays
   let ver = r.updated_at || '';
@@ -139,6 +139,7 @@ function wks_html(sp, q, shown) {
   return `<section class="wks" id="wks" aria-live="polite">${wks_inner(s, shown)}</section>`;
 }
 function wks_inner(s, shown) {
+  if (s.err) return errorState({title: s.err, size: 'sec', retry: () => { s.err = ''; wks_load(false); }});  // 2.1161.0 (#6088): a failed text search says so (before: "No page matches.")
   const ids = new Set((shown || []).map(p => p.id)), ps = s.pages.filter(p => !ids.has(p.id) && !(!s.sp && p.space && wk_e2e(p.space)));  // 2.198.0 A (#2743): a locked space's texts are searched in the browser
   if (!ps.length) return '';  // 2.126.2 A (#2363): only name hits = no "Found in the text" section, no "Show more"
   return `<h4 class="muted">${ic('search', 's')}${esc(tr('Found in the text'))}</h4><ul class="wktree">${ps.map(p => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wks_nameHtml(p, s.q)}${s.sp === '' && p.space ? `<small class="muted wkspn">${esc(wk_spaceName(p.space))}</small>` : ''}</a></li>`).join('')}</ul>
@@ -147,7 +148,7 @@ function wks_inner(s, shown) {
 async function wks_load(more) {
   const s = WKH.s; if (!s) return;
   s.busy = true;
-  let j; try { j = await rawFetch('GET', `/api/search?kind=wiki&${s.sp ? `space=${encodeURIComponent(s.sp)}&` : ''}q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch { j = {pages: [], more: false}; }
+  let j; try { j = await rawFetch('GET', `/api/search?kind=wiki&${s.sp ? `space=${encodeURIComponent(s.sp)}&` : ''}q=${encodeURIComponent(s.q)}&limit=30&offset=${more ? s.pages.length : 0}`); } catch (e) { j = {pages: [], more: false}; if (e.message !== 'auth') s.err = errText(e, tr('The search in the texts did not work')); }
   if (WKH.s !== s) return;  // another query meanwhile
   s.pages = more ? [...s.pages, ...(j.pages || [])] : (j.pages || []); s.more = !!j.more; s.busy = false;
   const el = $('#wks'); if (!el) return;
