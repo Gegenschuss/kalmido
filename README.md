@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.1150.0** (2026-11-14):
-- **Files**: "Receipts" below the folder tree lists the receipts of Office, Entertainment and Household as references; they open in their own area.
-- **Phone**: the star above the tab bar can be moved sideways (hold, then slide); each device remembers its place.
-- **Security**: knowledge shares by e-mail address keep the account hidden in more edge cases.
+**2.1155.0** (2026-11-14):
+- **Call sheet**: send it by e-mail with the PDF attached to crew, agency and client, recipients can be left out, always with a preview before sending.
+- **Knowledge**: a page can be downloaded as PDF or Word file from the page menu.
+- **Phone**: list rows are tidy; a long press opens the row menu with every action.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
