@@ -276,12 +276,12 @@ function cs_mailFormHtml(m, st) {
     const xs = m.recipients.filter(x => x.group === g), no = m.without.filter(x => x.group === g);
     if (!xs.length && !no.length) return '';
     return `<fieldset class="csrg"><legend>${tr(label)}</legend>${/*html-ok*/ xs.map(x => cs_rcptHtml(x, st.to.has(x.email))).join('')}
-      ${no.length ? `<p class="muted cshint">${tr('Without an e-mail address: {0}', no.map(x => x.name).join(', '))}</p>` : ''}</fieldset>`;
+      ${no.length ? `<p class="muted cshint">${trh('Without an e-mail address: {0}', no.map(x => x.name).join(', '))}</p>` : ''}</fieldset>`;
   }).join('');
   const none = !m.recipients.length;
   return `<h3>${tr('Send the call sheet')}</h3>
     ${none ? `<p class="muted">${tr('Nobody in the distribution has an e-mail address yet. Add them to the contacts of the crew, the agency or the client.')}</p>` : `<p class="lbl">${tr('Recipients')}</p>${/*html-ok*/ groups}`}
-    ${none && m.without.length ? `<p class="muted cshint">${tr('Without an e-mail address: {0}', m.without.map(x => x.name).join(', '))}</p>` : ''}
+    ${none && m.without.length ? `<p class="muted cshint">${trh('Without an e-mail address: {0}', m.without.map(x => x.name).join(', '))}</p>` : ''}
     <div class="row"><label for="csm-subject">${tr('Subject')}</label><input id="csm-subject" maxlength="200" value="${esc(st.subject)}"></div>
     <div class="row"><label for="csm-text">${tr('Text')}</label><textarea id="csm-text" rows="5" maxlength="5000">${esc(st.text)}</textarea></div>
     <p class="muted cshint">${tr('Attachment')}: ${esc(m.filename)}${m.sender?.note ? ' · ' + esc(m.sender.note) : ''}</p>
@@ -343,7 +343,7 @@ async function cs_mail(job, org) {
       try {
         const r = await api('POST', cs_url(job, org, '/mail'), req(false));
         if (r.failed?.length) {
-          setHtml(card, `<h3>${tr('Send the call sheet')}</h3><p>${tr('Sent to {0} of {1} recipients.', r.sent.length, r.sent.length + r.failed.length)}</p>
+          setHtml(card, `<h3>${tr('Send the call sheet')}</h3><p>${trh('Sent to {0} of {1} recipients.', r.sent.length, r.sent.length + r.failed.length)}</p>
             <p class="lbl">${tr('Not sent')}</p><ul class="csprev">${/*html-ok*/ r.failed.map(x => `<li><b>${esc(x.email)}</b> <span class="muted">${esc(x.error)}</span></li>`).join('')}</ul>
             <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-csm="cancel">${tr('Close')}</button></div>`);
         } else { md.remove(); toast(trn('Call sheet sent to {0} recipient', 'Call sheet sent to {0} recipients', r.sent.length)); }
