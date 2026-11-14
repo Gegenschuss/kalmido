@@ -185,6 +185,8 @@ document.addEventListener('click', ev => {
   const b = /** @type {any} */ (ev.target).closest?.('[data-wsh-new], [data-wsh-newf]'); if (!b) return;
   ev.preventDefault(); wsh_newIn(+(b.dataset.wshNew || b.dataset.wshNewf), !!b.dataset.wshNewf);
 });
+// 2.1151.0 A (#3835): phones hide the two symbols of a shared folder (wiki.css); a long press on its row offers them as a menu
+ms_rowMenu('#view .wshfh', r => { if (r.querySelector(':scope > .iconbtn')) ms_btnMenu(r, ':scope > .iconbtn', $(':scope > span', r)?.textContent || ''); });
 async function wsh_read(id, md) {
   let p;
   try { p = await calReq('GET', '/api/wiki/shared/pages/' + id); } catch (x) { toast(x.status === 404 ? tr('This page does not exist or you cannot see it.') : x.message); return; }

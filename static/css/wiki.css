@@ -276,3 +276,11 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkdpbar>.muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wkdpbar .spacer{flex:1}
 .wkdpmd{max-width:var(--w-lesen)}
+/* 2.1151.0 A (#3835): phones: no symbols in the rows of the knowledge area (folder list, tree, a page's files, folders shared
+   with me), the name gets the width; a long press opens the row menu (wiki.js wk_lpS, the files' and wkshare.js's ms_rowMenu).
+   The buttons stay for screen readers (like .sr), as the office rows (#3834) */
+@media (max-width:767px){
+  #view .wkrow .wkmore,#view .wkfiles li>.iconbtn,#view .wshfh>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  #view .wkfiles li,#view .wshfh{position:relative;-webkit-touch-callout:none}
+  #view .wkfiles a.wkfile{-webkit-touch-callout:none}
+}
