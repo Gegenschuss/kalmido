@@ -18551,7 +18551,7 @@
   "At most {0} recipients at once": "Maximaal {0} ontvangers tegelijk",
   "Call sheet sent to {0} recipient": ["Callsheet verstuurd naar {0} ontvanger", "Callsheet verstuurd naar {0} ontvangers"],
   "Call sheet: {0} – {1}": "Callsheet: {0} – {1}",
-  "Everyone gets a mail of their own; the recipients do not see one another.": "Iedereen krijgt een eigen mail; de ontvangers zien elkaar niet.",
+  "Everyone gets an e-mail of their own; the recipients do not see one another.": "Iedereen krijgt een eigen e-mail; de ontvangers zien elkaar niet.",
   "Hello,\n\nattached is the call sheet for {0} on {1}.": "Hallo,\n\nin de bijlage vind je de callsheet voor {0} op {1}.",
   "Nobody in the distribution has an e-mail address yet. Add them to the contacts of the crew, the agency or the client.": "Nog niemand in de verzendlijst heeft een e-mailadres. Voeg ze toe aan de contacten van de crew, het bureau of de klant.",
   "Recipients": "Ontvangers",
