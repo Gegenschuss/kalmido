@@ -608,9 +608,7 @@ function fvd_gripPlace(/** @type {number | null} */ f) {
   if (f == null) g.style.removeProperty('--favgrip-x'); else g.style.setProperty('--favgrip-x', (Math.round(f * 10000) / 100) + '%');
 }
 function fvd_gripEnd(/** @type {boolean} */ keep) {
-  const m = FVD.mv; FVD.mv = null; if (!m) return;
-  clearTimeout(m.t);
-  if (!m.on) return;
+  const m = FVD.mv; FVD.mv = null; if (!m || !m.on) return;  // a hold not ended yet: its timer finds FVD.mv changed and does nothing
   $('#favgrip')?.classList.remove('moving');
   FVD.sw = FVD.mvd = Date.now();  // the click that follows the finger's lift is no tap on the grip
   if (keep && m.f != null) LS.set('favgripX', m.f); else fvd_gripPlace(fvd_gripX());
@@ -621,8 +619,8 @@ function fvd_touchStart(e) {
   FVD.g = p && e.touches.length === 1 ? {x: p.clientX, y: p.clientY, done: false} : null;
   if (FVD.mv) fvd_gripEnd(false);
   if (FVD.g && e.currentTarget?.id === 'favgrip' && !fvd_isOpen()) {
-    const m = FVD.mv = {x: p.clientX, y: p.clientY, on: false, f: /** @type {number | null} */ (null), t: 0};
-    m.t = setTimeout(() => {
+    const m = FVD.mv = {x: p.clientX, y: p.clientY, on: false, f: /** @type {number | null} */ (null)};
+    setTimeout(() => {
       if (FVD.mv !== m) return;
       m.on = true; if (FVD.g) FVD.g.done = true;  // no swipe any more: the finger moves the grip
       $('#favgrip')?.classList.add('moving');
