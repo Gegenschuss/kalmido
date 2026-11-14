@@ -122,12 +122,14 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ================= phone (bob, German): long-press task -> "Move to section…", long-press header -> up / down
   w = await boot({user: 'bob', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}}); d = w.document;
   touch(w, row(t2), 'touchstart'); await sleep(450);  // wanted: the long press (dnd.js timer)
-  const te = touch(w, row(t2), 'touchend'); await until(() => w.eval(`S.multiMode && S.multi.has(${t2})`));
-  // 2.13.0 (#453 A14): a long press without moving selects the task in a list (Kanban keeps "Move to column…"); the
-  // section picker itself is the same
-  // 2.32.0 (#1055): the long press selects the task at once (2.25.0 UX-11 opened its menu with "Select" first)
-  check(te.defaultPrevented && !d.querySelector('#pop:not(.hidden)') && w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), 'long-press on a task without moving selects it (2.32.0)');
-  w.eval('S.multi.clear(); S.multiMode = false; render()');
+  const te = touch(w, row(t2), 'touchend');
+  // 2.13.0 (#453 A14): Kanban keeps "Move to column…"; the section picker itself is the same
+  // 2.1151.0 (#3835): a long press without moving opens the task's menu with "Select" on top (2.32.0 #1055 selected at once)
+  const lpItems = await until(() => { const it = [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]:not([disabled])')].map(b => b.textContent.trim()); return it.length && it; });
+  check(te.defaultPrevented && (lpItems || [])[0] === 'Auswählen' && !w.eval('S.multiMode'), 'long-press on a task without moving opens its menu, "Select" first (2.1151.0): ' + lpItems);
+  [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]')].find(b => b.textContent.trim() === 'Auswählen')?.click();
+  check(await until(() => w.eval(`S.multiMode && S.multi.has(${t2})`)), '"Select" in that menu starts the selection with the task');
+  w.eval('closePop(); S.multi.clear(); S.multiMode = false; render()');
   w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await until(() => /Later/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   let pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Ohne Abschnitt/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');  // 2.800.0 (#5441): was "Nicht zugeordnet"
