@@ -76,7 +76,9 @@ in your statement.
 A person can also delete their own account (Settings > Account > Delete account, GDPR Art. 17): confirmed with the
 password (and the app code when one is set), the account is locked at once and deleted for good after 7 days. Meanwhile
 projects they share stay usable for the others; for each own project they chose before whether it goes to a member or is
-deleted along. A mail with a cancel link goes out at once and a reminder one day before; signing in with the password
+deleted along; the other people of a project that goes along find a notice in their News (the account's name, the day and
+the project's name, nothing of its content; switched with the project notices of the notification settings). A mail with a
+cancel link goes out at once and a reminder one day before; signing in with the password
 also offers only "Cancel the deletion". The last admin of an organisation and the only server admin cannot delete
 themselves until somebody else holds the role.
 
