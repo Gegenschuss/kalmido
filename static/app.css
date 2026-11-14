@@ -2207,10 +2207,28 @@ button.tvr-task:hover{color:var(--accent)}
   .chcomp > .btn.pri{flex:none;height:2.75rem;min-width:2.75rem;padding:0 .875rem;justify-content:center;border-radius:var(--radius)}
   .chcomp > .btn.pri svg{width:var(--ic-l);height:var(--ic-l)}
 }
+/* 2.1163.0 (#6094): the team chat from 768 to 899 px is no third mixed form (three tools + Send with its word left a 160 px box):
+   its composers (conversation and thread) are the phone's - tools behind the plus, round icon-only Send, the box takes the rest */
+@media (min-width:768px) and (max-width:899px){
+  .chcomp.tccomp{position:relative;gap:.375rem;padding:.5rem .625rem;align-items:flex-end}
+  .tccomp .chplus{display:inline-flex;flex:none;width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%}
+  .tccomp > :is(.chclip,.mtgbtn,.rfins,.tvcmic){flex:none;width:2.75rem;height:2.75rem;padding:0;justify-content:center;border-radius:50%}
+  .tccomp .chtools{display:none}
+  .tccomp textarea{min-height:2.75rem;padding:.625rem .875rem;border-radius:1.375rem}
+  .tccomp > .btn.pri{flex:none;width:2.75rem;height:2.75rem;min-width:0;padding:0;border-radius:50%}
+  .tccomp > .btn.pri > span{display:none}
+  .tccomp > .btn.pri svg{width:var(--ic-l);height:var(--ic-l)}
+}
 /* 2.350.0 A (#2790): the team chat on the phone: one header (the app header steps aside while a conversation is open, like
    the agent chat), a long name stays on one line */
 .tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:899px){ body.in-team:has(.tcview.inroom) #top{display:none} }
+/* 2.1163.0 (#6094): from 900 px an open conversation brings its own head: the page head above it is one low row (title smaller,
+   star / undo / agent status stay) instead of a second big head */
+@media (min-width:900px){
+  body.in-team:has(.tcview.inroom) #top{padding-top:.25rem;padding-bottom:.25rem;min-height:2.75rem}
+  body.in-team:has(.tcview.inroom) #top h1{font-size:var(--fs-xl)}
+}
 @media (max-width:767px){ .tcrhead .msbtn{display:none} }  /* 2.446.0 (#3334): in the ⋯ menu, the hidden button anchors the search bar */
 .cmsg .runtask{display:inline-flex;align-items:center;gap:.25rem;padding:.125rem .25rem;color:var(--muted);font-size:var(--fs-m);max-width:100%}
 .chnote{padding:0 .75rem .75rem;margin:0}
@@ -2248,6 +2266,7 @@ body.pop-open #chatfab,body.modal-open #chatfab{visibility:hidden}
    keeps the corner free */
 :root{--fab-safe:4.75rem}
 body.fab-on #view .chcomp{padding-right:var(--fab-safe)}
+body.fab-on #view .chcomp.tccomp{padding-right:calc(var(--fab-safe) + .75rem)}  /* 2.1163.0 (#6094): the team chat's Send (and the thread's) keeps a clear gap to the button, its badge and ring included */
 .dchatb{display:none!important}
 @media (min-width:1000px){body.chat-yield .dchatb{display:inline-flex!important}}
 /* ---- 2.0.2: comments under the description (#242), inline title edit (#182), section "+" (#283), list icons (#245),
@@ -4122,6 +4141,7 @@ a.tref:hover{background:var(--accent-soft)}
   .tcview.inroom .tclist{display:none}
   .tcview:not(.inroom) .tcroom{display:none}
   .tcview.inthread .tcroom{display:none}  /* 2.139.0 A (#2127): only the thread (its x returns) */
+  .tcview.inthread,.tcview.nolist.inthread{grid-template-columns:minmax(0,1fr)}  /* 2.1163.0 (#6094): the three columns of .inthread (more specific) kept the thread in a 90 px column beside empty ones */
   .tcback{display:inline-flex}
   .ntview.open{grid-template-columns:minmax(0,1fr)}
   .ntview.open .ntlist{display:none}
