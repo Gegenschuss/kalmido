@@ -75,6 +75,9 @@ def scenario(S, who, org=None):
     track(S, sub, 40, who)  # + the subtask: 490 min = 8.17 h -> 8.25
     track(S, ts["Animation"], 130, who)  # 2.17 h -> 2.25
     track(S, ts["Konzept"], 600, who)  # a day position: not by time, 10 h shown
+    # review F1: a time marked not billable counts nowhere
+    r = S.post(B + "/api/time/entries", json={"task_id": ts["Schnitt"], "start": "2026-11-11T09:00", "minutes": 120, "billable": False})
+    check(r.ok, f"{who}: a time not billable {r.text[:160]}")
     other = S.post(B + "/api/tasks", json={"title": "Fremd", "list_id": L}).json()["id"]
     track(S, other, 300, who)  # a task without a link counts nowhere
     # ------------------------------------------------------------ the preview
@@ -107,10 +110,17 @@ def scenario(S, who, org=None):
           and q.get("Konzept") == (2, "day", 800) and q.get("Tonmischung") == (3, "hour", 80), f"{who}: the positions {q}")
     check(abs(float(inv["totals"]["net"]) - actual) < 0.01, f"{who}: the draft's net = the preview's actual {inv['totals'].get('net')}")
     check(S.post(B + f"{D}/{Q}/postcalc", json={"client_ref": f"pc-{who}-1"}).json().get("id") == inv["id"], f"{who}: sent again = the same draft")
+    # review F1: the counted times are billed by the draft (never twice with "invoice from time"), the preview has none left
+    bound = sql("SELECT COUNT(*), COUNT(billed_item_id) FROM time_entries WHERE billed_doc_id=?", (inv["id"],))
+    check(bound == [(3, 3)], f"{who}: Schnitt, Feinschnitt and Animation bound to the draft with their position {bound}")
+    rb = {x["title"]: x for x in S.get(B + f"{D}/{Q}/postcalc").json()["rows"]}
+    check(rb["Schnitt"]["actual_qty"] == 0.0 and rb["Konzept"]["actual_h"] == 10.0, f"{who}: billed hours count no more {rb['Schnitt']}")
     r = S.post(B + f"{D}/{Q}/postcalc", json={"client_ref": f"pc-{who}-2"})
     check(r.status_code == 409 and r.json().get("code") == "invoice_exists", f"{who}: a second invoice asks first {r.status_code} {r.text[:160]}")
     r = S.post(B + f"{D}/{Q}/postcalc", json={"client_ref": f"pc-{who}-3", "force": True})
     check(r.status_code == 201 and r.json()["id"] != inv["id"], f"{who}: with force a second draft {r.status_code}")
+    inv2 = r.json()["id"]
+    check(not sql("SELECT 1 FROM time_entries WHERE billed_doc_id=?", (inv2,)), f"{who}: the second draft bills no time twice")
     log = S.get(B + f"{D}/{inv['id']}/log").json()
     log = log.get("log", log) if isinstance(log, dict) else log
     check(any(x.get("action") == "create" and (x.get("detail") or {}).get("postcalc") for x in log or []), f"{who}: the office log says create (postcalc)")
@@ -127,6 +137,10 @@ def scenario(S, who, org=None):
     check(S.get(B + f"{D}/{QF}/postcalc").status_code == 409, f"{who}: a flat price quotation 409")
     # an invoice is no quotation
     check(S.get(B + f"{D}/{inv['id']}/postcalc").status_code == 409, f"{who}: an invoice 409")
+    for x in (inv2, inv["id"]):  # review F1: deleting the drafts frees the times
+        check(S.delete(B + f"{D}/{x}").status_code in (200, 204), f"{who}: draft {x} deleted")
+    rb = {x["title"]: x for x in S.get(B + f"{D}/{Q}/postcalc").json()["rows"]}
+    check(rb["Schnitt"]["actual_qty"] == 8.25, f"{who}: the times are open again {rb['Schnitt']}")
     return Q, L, ts
 
 
