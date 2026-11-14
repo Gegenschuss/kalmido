@@ -59,7 +59,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   // a synced subscription of alice with one event today, written like the sync does
   py(`from kalmido.core.db import connect
 c = connect()
-c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(${ME},'ics','Club fixtures','#f5b041',1,'x','ok','2026-01-01T00:00:00Z')")
+c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(${ME},'ics','Club fixtures','#f5b041',TRUE,'x','ok','2026-01-01T00:00:00Z')")
 sid = c.execute('SELECT MAX(id) FROM cal_subs').fetchone()[0]
 c.execute('INSERT INTO cal_events(sub_id,uid,title,all_day,start,"end",d0,d1) VALUES(?,?,?,?,?,?,?,?)', (sid, 'm1', 'Home match', 1, '${D}', '${D}', '${D}', '${D}'))
 c.commit(); c.close()`);
