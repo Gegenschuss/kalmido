@@ -122,7 +122,7 @@ if (!process.env.P2783A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
           return {...m, dsc: document.scrollingElement.scrollHeight - innerHeight, add: a ? [Math.round(a.top), Math.round(a.bottom)] : null, foot: f ? Math.round(f.bottom) : null, inner: c ? [c.scrollHeight, c.clientHeight] : null, h2}; })()`);
         check(pg && pg.h2 === 'Shoot day', `${tag}: the page's title ${pg?.h2}`);
         // 2.1163.0 (#6089): the bar (Find a page, New page, ...) belongs to the list, the page has only its own head
-        check(pg && pg.barL === null, `#6089 ${tag}: no area bar above the open page ${JSON.stringify(pg)}`);
+        check(pg && pg.barL == null, `#6089 ${tag}: no area bar above the open page ${JSON.stringify(pg)}`);
         check(pg && L && pg.topL != null && Math.abs(pg.topL - L.topL) <= 4, `#5376 ${tag}: #top's title stands where the list has it ${JSON.stringify([L?.topL, pg?.topL])}`);
         check(pg && L && pg.w >= 0.8 * pg.area && Math.abs(pg.l - L.l) <= 8, `#5376 ${tag}: the card takes the full width from the list's left edge ${JSON.stringify(pg)}`);
         // 2.1163.0 (#6089): the page scrolls as a whole: the text has no box of its own, the footer comes after the text

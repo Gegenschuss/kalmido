@@ -1,6 +1,9 @@
 /* Kalmido web client: the styles of the module "wiki" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
 .wkside .ntbar select{flex:1;min-width:0}
+/* 2.1163.0 (#6089): the phone's list in one row - Find a page takes what New page and "…" leave (its basis was its own width) */
+.wkside .ntbar .ctsearch{flex:1 1 0;min-width:6rem}
+.wkside .ntbar .ctsearch input{min-width:0;width:100%}
 .wktree{list-style:none;margin:0;padding:0 0 0 .25rem}
 .wktree .wktree{padding-left:.875rem;border-left:1px solid var(--line)}
 .wktree summary{list-style:none;cursor:pointer}
