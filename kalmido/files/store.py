@@ -837,6 +837,15 @@ def fs_folder(c, uid, org_id, names, agent_id=None):
 fs_change_hooks = []  # 2.352.0 A (#2748): f(c, nid, action) after every change noted by fs_log_add (lists/lffolder.py)
 
 
+# 2.1138.0 (#6025): a person share the knowledge dialog made by e-mail address (its card, or the pair of one, names the
+# address) is listed nowhere in the file store -- not in the node's dialog, its shares above, its "Shared with" names or its
+# shared mark -- and the file store's routes do not reach it: its account would tell the sharer that the address has one,
+# which an open share by address (core/addrshare.py, no row of fs_shares at all) never does. The knowledge dialog shows and
+# ends both alike. a = the alias of fs_shares.
+FS_NOT_ADDR = ("NOT EXISTS (SELECT 1 FROM wiki_share_cards fk WHERE (fk.fs_share_id={a}.id OR fk.pair_id={a}.id) "
+               "AND fk.email IS NOT NULL AND fk.email<>'')")
+
+
 def fs_log_add(c, nid, action, detail="", uid=None):
     """Note an access of the signed-in account in the node's history. Agents: every access; people: only changes (reads of
     people are not logged -- the history answers "what did the agent do with my file").

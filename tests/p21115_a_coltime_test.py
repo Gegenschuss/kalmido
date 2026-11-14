@@ -12,6 +12,8 @@ CT_MORE, turned by core/coltype.py _ct_more at the start). Own container (start.
  - an ALTER that fails (a view on the column): the column stays TEXT, but its DEFAULT '' and NOT NULL go and '' becomes NULL,
    so an INSERT with None works (review #5951, M4); a CT_CLOSED "all" mark keeps its ''
  - a DATE reads back as 'YYYY-MM-DD' text (core/pg.py _DateLoader), a TIMESTAMPTZ as canonical ISO text
+ - 2.1139.0 (#6028): one ALTER TABLE per table (one rewrite), a partial index over two columns made anew; a failing one ALTER
+   falls back to column by column (the others still turn)
 usage: p21115_a_coltime_test.py <datadir>"""
 import json
 import os
@@ -139,6 +141,65 @@ check(kept.get("rows") == [[1, None, None, ""], [2, "2026-03-02T10:00:00Z", "x",
       f"kept: '' becomes NULL (not in an 'all' mark), other values stay {kept.get('rows')}")
 check(kept.get("insert") == "ok" and kept.get("isnull") == 2, f"kept: an INSERT with None works, IS NULL finds the empty ones {kept}")
 check("5951: zz5951k.f_at stays TEXT" in err, f"kept: the log says why {err[-400:]}")
+
+# ---- 2.1139.0 (#6028): the columns of one table turn in ONE ALTER TABLE (one rewrite), a partial index over two of them is
+# made anew with both conditions; when that one ALTER fails (a view on one column), column by column: the others still turn
+one, err = py("""
+import kalmido.core.coltype as ct
+c.execute("CREATE TABLE zz6028 (id BIGINT PRIMARY KEY, created_at TIMESTAMPTZ, a_at TEXT, b_at TEXT NOT NULL DEFAULT '', c_on TEXT)")
+c.execute("INSERT INTO zz6028 VALUES (1, '2026-03-01T10:00:00Z', '2026-03-02T12:00:00Z', '', '2026-03-04'), (2, '2026-03-01T10:00:00Z', '', '2026-03-06T07:00:00', '')")
+c.execute("CREATE INDEX zz6028_ab ON zz6028 (id) WHERE a_at <> '' AND b_at <> ''")
+c.execute("CREATE TABLE zz6028k (id BIGINT PRIMARY KEY, created_at TIMESTAMPTZ, d_at TEXT, e_at TEXT)")
+c.execute("INSERT INTO zz6028k VALUES (1, '2026-03-01T10:00:00Z', '2026-03-02T12:00:00Z', '2026-03-03T12:00:00Z')")
+c.execute("CREATE VIEW zz6028kv AS SELECT e_at FROM zz6028k")
+ct.CT_MORE = {('zz6028', 'a_at'): 'ts', ('zz6028', 'b_at'): 'ts', ('zz6028', 'c_on'): 'date', ('zz6028k', 'd_at'): 'ts', ('zz6028k', 'e_at'): 'ts'}
+ct.CT_MORE_TABLES = {'zz6028', 'zz6028k'}
+ct.CT_MORE_NAMES = {'a_at', 'b_at', 'c_on', 'd_at', 'e_at', 'created_at'}
+ct.CT_CLOSED = {}
+alters = []
+ex = c.execute
+def counted(sql, *a, **k):
+    if sql.startswith("ALTER TABLE"):
+        alters.append(sql.split()[2].strip('"'))
+    return ex(sql, *a, **k)
+c.execute = counted
+out = {'first': ct._ct_more(c, '2026-11-13T08:00:00+00:00')}
+c.execute = ex
+out['alters'] = alters
+out['types'] = {r[0]: r[1] for r in c.execute("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name IN ('zz6028', 'zz6028k') AND column_name <> 'created_at' AND column_name <> 'id'").fetchall()}
+out['rows'] = [list(r) for r in c.execute("SELECT id, a_at, b_at, c_on FROM zz6028 ORDER BY id").fetchall()]
+out['idx'] = c.execute("SELECT indexdef FROM pg_indexes WHERE indexname='zz6028_ab'").fetchone()[0]
+c.rollback()
+print(json.dumps(out))
+""")
+check(one.get("first") == {"zz6028.a_at": "done", "zz6028.b_at": "done", "zz6028.c_on": "done", "zz6028k.d_at": "done",
+                           "zz6028k.e_at": "kept"}, f"#6028: one table turns, the other column by column {one}")
+al = one.get("alters") or []
+check(al.count("zz6028") == 1, f"#6028: the three columns of zz6028 in ONE ALTER TABLE (was one per column) {al}")
+check(al.count("zz6028k") >= 3, f"#6028: the failed one ALTER of zz6028k falls back to one per column {al}")
+check((one.get("types") or {}) == {"a_at": "timestamp with time zone", "b_at": "timestamp with time zone", "c_on": "date",
+                                   "d_at": "timestamp with time zone", "e_at": "text"}, f"#6028: the types {one.get('types')}")
+check(one.get("rows") == [[1, "2026-03-02T12:00:00+00:00", None, "2026-03-04"], [2, None, "2026-03-06T07:00:00+00:00", None]],
+      f"#6028: the values turn as column by column {one.get('rows')}")
+idx = one.get("idx") or ""
+check("a_at IS NOT NULL" in idx and "b_at IS NOT NULL" in idx and "''" not in idx,
+      f"#6028: the partial index over both columns is made anew with both conditions {idx}")
+check("6028: zz6028k: one ALTER for 2 columns failed, column by column" in err and "5951: zz6028k.e_at stays TEXT" in err,
+      f"#6028: the log names the fallback and the column that stays {err[-600:]}")
+
+# ---- 2.1139.0 (#6028): core/db.py fresh_within (the step-up checks): a point in time, anything else is not fresh
+fw, _e = py("""
+from datetime import datetime, timedelta, timezone
+from kalmido.core.db import fresh_within, now_utc
+n = now_utc()
+cases = {'none': None, 'empty': '', 'blank': '   ', 'zzz': 'zzz', 'num': 5, 'z': (n - timedelta(minutes=1)).isoformat().replace('+00:00', 'Z'),
+         'naive': (n - timedelta(minutes=1)).replace(tzinfo=None), 'old': (n - timedelta(minutes=11)).isoformat(),
+         'ahead': (n + timedelta(minutes=1)).isoformat(), 'future': '9999-12-31T00:00:00+00:00',
+         'zone': (n - timedelta(minutes=1)).astimezone(timezone(timedelta(hours=2))).isoformat()}
+print(json.dumps({k: fresh_within(v, 10) for k, v in cases.items()}))
+""")
+check(fw == {"none": False, "empty": False, "blank": False, "zzz": False, "num": False, "z": True, "naive": True, "old": False,
+             "ahead": True, "future": False, "zone": True}, f"#6028: fresh_within reads points in time, the rest is not fresh {fw}")
 
 print(f"p21115_a_coltime: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

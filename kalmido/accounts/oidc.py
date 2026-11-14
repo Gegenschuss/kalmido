@@ -9,7 +9,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import timedelta  # 2.611.0 (#4019): reauth_fresh
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
@@ -19,14 +18,14 @@ from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET_KEY, USERNAME_RE
 from ..core.i18n import browser_lang, N_, tr
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, fresh_within, gset, gsetting, iso, now_utc, uset
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
 from ..accounts.login import _reauth, _user, seal, unseal
 from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
-from ..core.pg import system_ctx, ts_canon  # 2.149.0 G (#2517): pulled up from functions; 2.1115.0 (#5951): ts_canon
+from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from .login import twofa_methods  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import _org_admin  # 2.369.5 (#2517): pulled up from functions
 
@@ -715,8 +714,9 @@ def reauth_fresh(c):
                   (_token_hash(tok), g.user["id"])).fetchone() if tok else None
     if not r:
         return False
-    since = iso(now_utc() - timedelta(minutes=REAUTH_FRESH_MIN))
-    return (r[1] in REAUTH_FRESH_VIA and str(r[0] or "") >= since) or (r[3] == "0:su" and ts_canon(r[2]) >= since)
+    # 2.1139.0 (#6028): compared as points in time (fresh_within) - a value that is no time is not fresh (the text compare took it)
+    return ((r[1] in REAUTH_FRESH_VIA and fresh_within(r[0], REAUTH_FRESH_MIN))
+            or (r[3] == "0:su" and fresh_within(r[2], REAUTH_FRESH_MIN)))
 
 
 def oidc_reauth(c, b):

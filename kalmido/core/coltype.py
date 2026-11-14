@@ -263,15 +263,18 @@ def ct_more_empty_indexes(c, table, col):
     """2.1115.0 (#5951): [(index name, its definition for the new type)] of the partial indexes of table whose condition
     compares col with '' (`col <> ''` -> `col IS NOT NULL`, `col = ''` -> `col IS NULL`); Postgres rebuilds an index on
     ALTER ... TYPE from its stored definition, and `timestamptz <> ''::text` has no operator, so _ct_more drops them and
-    creates them anew with the new condition."""
+    creates them anew with the new condition. 2.1139.0 (#6028): col may be several columns (one ALTER for the table)."""
+    cols = (col,) if isinstance(col, str) else tuple(col)
     out = []
     for name, d in c.execute("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=current_schema() AND tablename=?",
                              (table,)).fetchall():
         if " WHERE " not in d or "''" not in d.split(" WHERE ", 1)[1]:
             continue
         head, cond = d.split(" WHERE ", 1)
-        new = re.sub(rf"\(?\b{re.escape(col)}\s*<>\s*''(?:::text)?\)?", f"({col} IS NOT NULL)", cond)
-        new = re.sub(rf"\(?\b{re.escape(col)}\s*=\s*''(?:::text)?\)?", f"({col} IS NULL)", new)
+        new = cond
+        for one in cols:
+            new = re.sub(rf"\(?\b{re.escape(one)}\s*<>\s*''(?:::text)?\)?", f"({one} IS NOT NULL)", new)
+            new = re.sub(rf"\(?\b{re.escape(one)}\s*=\s*''(?:::text)?\)?", f"({one} IS NULL)", new)
         if new != cond:
             out.append((name, f"{head} WHERE {new}"))
     return out
@@ -279,8 +282,12 @@ def ct_more_empty_indexes(c, table, col):
 
 def _ct_more(c, at):
     """2.1115.0 (#5951): the CT_MORE columns that are still TEXT -> TIMESTAMPTZ / DATE (core/coltime.py says how '' and the
-    misfits turn) -> {"table.col": "done" | "kept" | "present" | "missing"}. Runs inside ct_migrate's system context."""
+    misfits turn) -> {"table.col": "done" | "kept" | "present" | "missing"}. Runs inside ct_migrate's system context.
+    2.1139.0 (#6028): the columns of one table turn in ONE ALTER TABLE (Postgres rewrites the table once, not once per column -
+    office_docs / doc_meta have six, agent_chat four); when that one fails, column by column as before (each in its own
+    savepoint, a failing one stays TEXT via _ct_more_kept, the others still turn)."""
     out = {}
+    plans = {}  # 2.1139.0 (#6028): table -> [(k, col, ALTER parts, the _ct_more_kept arguments)], in CT_MORE's order
     types = ct_more_types(c)
     has_created = {t for t, col, typ in c.execute(
         "SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() "
@@ -314,27 +321,52 @@ def _ct_more(c, at):
         # 2.1115.0 (#5951): review (M3 / F2) - a set value stays set: a text that is no time never becomes NULL (a locked
         # invoice, a billed receipt, a revoked link would open again), in every column it takes the fill
         misfit = fill
-        sql = f"ALTER TABLE {qi(table, CT_MORE_TABLES)} ALTER COLUMN {q} DROP DEFAULT"
+        parts = [f"ALTER COLUMN {q} DROP DEFAULT"]
         if to_null and not nullable:
-            sql += f", ALTER COLUMN {q} DROP NOT NULL"
-        sql += f", ALTER COLUMN {q} TYPE {target} USING (CASE WHEN {q} IS NULL THEN NULL WHEN {ok} THEN {val} WHEN btrim({q}) = '' THEN {empty} ELSE {misfit} END)"
-        try:
-            with c.savepoint():
-                idx = ct_more_empty_indexes(c, table, col)  # review 2.1115 (B): a partial index "WHERE x <> ''" fails the TYPE
-                for name, _d in idx:
-                    c.execute(f"DROP INDEX {qi(name, {name})}")
-                c.execute(sql)
-                for _n, d in idx:
-                    c.execute(d)
-        except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
-            out[k] = "kept"
-            print(f"migrations: 5951: {k} stays TEXT: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
-            _ct_more_kept(c, table, col, dflt is not None, to_null and not nullable, to_null and closed != "all")
-            continue
-        c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'applied') ON CONFLICT(id) DO UPDATE SET "
-                  "applied_at=excluded.applied_at, note=excluded.note", (CT_ID.format(table, col), at))
-        out[k] = "done"
+            parts.append(f"ALTER COLUMN {q} DROP NOT NULL")
+        parts.append(f"ALTER COLUMN {q} TYPE {target} USING (CASE WHEN {q} IS NULL THEN NULL WHEN {ok} THEN {val} WHEN btrim({q}) = '' THEN {empty} ELSE {misfit} END)")
+        plans.setdefault(table, []).append((k, col, parts, (dflt is not None, to_null and not nullable, to_null and closed != "all")))
+    for table, cols in plans.items():
+        if len(cols) > 1:  # 2.1139.0 (#6028): all columns of the table in one rewrite
+            try:
+                _ct_more_alter(c, table, cols)
+            except Exception as e:  # noqa: BLE001 -- column by column below, the log says why
+                print(f"migrations: 6028: {table}: one ALTER for {len(cols)} columns failed, column by column: "
+                      f"{type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
+            else:
+                for k, col, _p, _kept in cols:
+                    _ct_more_done(c, table, col, at)
+                    out[k] = "done"
+                continue
+        for k, col, parts, kept in cols:
+            try:
+                _ct_more_alter(c, table, [(k, col, parts, kept)])
+            except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
+                out[k] = "kept"
+                print(f"migrations: 5951: {k} stays TEXT: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
+                _ct_more_kept(c, table, col, *kept)
+                continue
+            _ct_more_done(c, table, col, at)
+            out[k] = "done"
     return out
+
+
+def _ct_more_alter(c, table, cols):
+    """2.1139.0 (#6028): ONE ALTER TABLE for the planned columns cols ([(k, col, ALTER parts, _)]) of table in a savepoint;
+    raises when Postgres refuses (the savepoint is rolled back, nothing changed)."""
+    with c.savepoint():
+        # review 2.1115 (B): a partial index "WHERE x <> ''" fails the TYPE - dropped and made anew with IS NULL / IS NOT NULL
+        idx = ct_more_empty_indexes(c, table, [col for _k, col, _p, _kept in cols])
+        for name, _d in idx:
+            c.execute(f"DROP INDEX {qi(name, {name})}")
+        c.execute(f"ALTER TABLE {qi(table, CT_MORE_TABLES)} " + ", ".join(p for _k, _c, parts, _kept in cols for p in parts))
+        for _n, d in idx:
+            c.execute(d)
+
+
+def _ct_more_done(c, table, col, at):
+    c.execute("INSERT INTO kalmido_migrations(id,applied_at,note) VALUES(?,?,'applied') ON CONFLICT(id) DO UPDATE SET "
+              "applied_at=excluded.applied_at, note=excluded.note", (CT_ID.format(table, col), at))
 
 
 def _ct_more_kept(c, table, col, drop_default, drop_not_null, empty_null):

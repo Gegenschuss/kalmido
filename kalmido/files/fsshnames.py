@@ -12,6 +12,7 @@ The entries: {"n": name, "k": "u" (person) | "g" (group) | "a" (agent) | "o" (th
 groups first, then agents, each name once; "o" when the node or a folder above is open to its whole organisation.
 """
 from ..core.db import now_iso as _now
+from .store import FS_NOT_ADDR  # 2.1138.0 (#6025)
 
 
 def fs_share_with(c, nodes, above=()):
@@ -24,7 +25,8 @@ def fs_share_with(c, nodes, above=()):
     ids = list({int(n["id"]) for n in nodes} | {int(a["id"]) for a in above})
     q = ",".join("?" * len(ids))
     rows = c.execute(f"SELECT node_id, user_id, group_id, agent_id FROM fs_shares WHERE node_id IN ({q}) "
-                     "AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0 ORDER BY id",  # #4739 (review F6)
+                     "AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0 "  # #4739 (review F6)
+                     f"AND {FS_NOT_ADDR.format(a='fs_shares')} ORDER BY id",  # 2.1138.0 (#6025): no share by e-mail address
                      (*ids, _now())).fetchall()
     uids = {r["user_id"] or r["agent_id"] for r in rows if r["user_id"] or r["agent_id"]}
     gids = {r["group_id"] for r in rows if r["group_id"]}

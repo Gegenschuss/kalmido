@@ -54,6 +54,11 @@ def ads_bound():
         g.ads_bound = True
 
 
+def ads_replaying():
+    """2.1138.0 (#6027): the request is the replay of an open row (_replay), not a share typed in now."""
+    return bool(has_request_context() and g.get("ads_replay"))
+
+
 def ads_clean(em):
     em = str(em or "").strip().lower()[:200]
     return em if EMAIL_RE.fullmatch(em) else ""
@@ -280,7 +285,7 @@ def _replay(uid, em, x):
         return 0
     with app.app_context(), app.test_request_context("/api/addr-shares/redeem", method="PUT"):
         c = db()
-        g.pushes, g.auth_via, g.ads_bound = [], None, False
+        g.pushes, g.auth_via, g.ads_bound, g.ads_replay = [], None, False, True  # ads_replay: 2.1138.0 (#6027)
         with system_ctx(c):  # review F2: no person in this context yet ("anon" would not see an organisation's project)
             by = c.execute("SELECT * FROM users WHERE id=? AND NOT disabled", (x["created_by"],)).fetchone()
             drop = by is None or by["id"] == uid or bool(k["gone"] and k["gone"](c, x))

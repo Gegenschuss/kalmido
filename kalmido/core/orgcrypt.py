@@ -57,9 +57,9 @@ from flask import has_request_context, jsonify
 
 from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
-from ..core.pg import system_ctx, ts_canon, write_lock  # 2.1115.0 (#5951): ts_canon
+from ..core.pg import system_ctx, write_lock
 from ..core.errors import Denied  # 2.1124.0 (#6047)
-from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from ..core.db import body, bump, connect, db, err, fresh_within, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from .moneycol import mc_fields  # 2.755.0 (#5293): the NUMERIC money columns back as the text the office code reads
 
 PREFIX = "kenc1:"
@@ -1573,22 +1573,21 @@ def _rck_fresh(c, want=""):
     ("<org id>:<show|new>"; one for new also allows show) or a sign-in with password / second factor / passkey in the
     last RCK_FRESH_MIN minutes (a sign-in link, a restore or an OIDC session without step-up never count)."""
     from flask import g, request
-    from datetime import timedelta
     from ..accounts.session import _token_hash
     tok = request.cookies.get(COOKIE)
     if g.auth_via != "session" or not tok:
         return False
     r = c.execute("SELECT created_at, via, stepup_at, stepup_for FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
-    since = iso(now_utc() - timedelta(minutes=RCK_FRESH_MIN))
     if not r:
         return False
     # 2.144.5 A (#2387): an OIDC sign-in counts only as the step-up sign-in (prompt=login + a fresh auth_time, oidc.py):
     # a new session alone may come from a live session at the provider without anyone typing anything
     oid = want.split(":")[0]
     ok_for = (want,) if want.endswith(":su") else (want, f"{oid}:new")  # 2.223.2 (#2871, review): su counts only for itself
-    if want and ts_canon(r[2]) >= since and str(r[3] or "") in ok_for:  # 2.1115.0 (#5951): stepup_at NULL = never (empty)
+    # 2.1139.0 (#6028): compared as points in time (fresh_within): NULL or a value that is no time is not fresh
+    if want and fresh_within(r[2], RCK_FRESH_MIN) and str(r[3] or "") in ok_for:
         return True
-    return r[1] in ("password", "2fa", "passkey") and str(r[0]) >= since
+    return r[1] in ("password", "2fa", "passkey") and fresh_within(r[0], RCK_FRESH_MIN)
 
 
 def rck_stepup_via(c, u):
