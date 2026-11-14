@@ -21,6 +21,13 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1147.0] - 2026-11-14
+
+Package 2.1147 (Bündel: Abhängigkeiten auffrischen: Basis-Digests und Sper).
+
+### Changed
+- #6077 Base images and lock files refreshed: golang:1.27-alpine and python:3.12-slim digests, filelock 4.2.10 in the embed lock file (weekly pin refresh, no version decisions changed).
+
 ## [2.1146.0] - 2026-11-14
 
 Package 2.1139 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -452,7 +459,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1146.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1147.0...HEAD
+[2.1147.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1147.0
 [2.1146.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1146.0
 [2.1142.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1142.0
 [2.1136.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1136.0
