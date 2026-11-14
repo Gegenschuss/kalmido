@@ -55,7 +55,8 @@ check("runs-on: windows-latest" in wj and "needs: windows-launcher-changes" in w
 check("python tests/p2609_d_winlauncher_test.py" in wj and "PWSH: pwsh" in wj and "PWSH: powershell.exe" in wj,
       "ci.yml: this file with PowerShell 7 and Windows PowerShell 5.1")
 check("runs-on: ubuntu-latest" in cj and "run: ${{ steps.changed.outputs.run }}" in cj, "ci.yml: the filter job is a small Linux job")
-check(re.search(r"needs: tests\n", td) and "windows" not in td, "ci.yml: the required check (tests-done) does not wait for the Windows job")
+# #6063 (job/4446): tests-done also needs plan (a queue-made push on main) - the list may hold more jobs, never the Windows one
+check(re.search(r"needs: (tests|\[[^\]\n]*\btests\b[^\]\n]*\])\n", td) and "windows" not in td, "ci.yml: the required check (tests-done) does not wait for the Windows job")
 sm = re.search(r"        run: \|\n((?:          .*\n)+)", cj)
 check(sm, "ci.yml: the filter step has a run block")
 bash = shutil.which("bash")
