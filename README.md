@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.1125.0** (2026-11-13):
-- **Files**: tags of files, folders and documents now live in the shared core; a tag name is unique per workspace, and people a single item is shared with no longer see other tag names.
-- **Database**: 53 yes/no columns move to real booleans at the first start (one-way, back up before updating).
-- **Reliability**: fixed the IndexedDB "connection is closing" error line.
+**2.1150.0** (2026-11-14):
+- **Files**: "Receipts" below the folder tree lists the receipts of Office, Entertainment and Household as references; they open in their own area.
+- **Phone**: the star above the tab bar can be moved sideways (hold, then slide); each device remembers its place.
+- **Security**: knowledge shares by e-mail address keep the account hidden in more edge cases.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

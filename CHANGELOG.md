@@ -21,6 +21,26 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1150.0] - 2026-11-14
+
+Package 2.1145 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Unfolded foldable in landscape (e.g. 840 px wide): the 900 px desktop layout is scaled to the screen width, nothing sits off screen on the right any more (account button, edge of pop-up cards) (#6075).
+
+### Security
+- Knowledge shares by e-mail address keep the account hidden in more edge cases (#6062): sharing the same person by name afterwards gets an entry of its own instead of taking over the address share; the Undo of a share by address works after a share by name (and the other way round); typing the address again never makes a second entry; the file store's share dialog no longer takes over, raises or counts a hidden share by address; a folder moved to another workspace also ends its open shares by address; the limit of shares per address counts per sharer, and open shares are redeemed in turns of their sharers; old history lines naming the account of a share by address are removed once at the start.
+
+Package 2.1150 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Phone: the star grip that pulls up the favourites can be moved along the top edge of the tab bar: hold it briefly, then slide sideways. Each device remembers its own place (as a share of the width, so turning the phone fits); a tap and a swipe up work as before; Settings > Reset settings puts it back in the middle (#6082).
+
+Package 2.1148 (Bündel: Dateien: Punkt "Belege" unter dem Ordnerbaum mit B).
+
+### Added
+- #4895: Files - below the folder tree a point "Receipts" with the parts "Office", "Entertainment" and "Household" (each only while it holds something you may read). It is a list of references, no copies: a part lists the recorded receipts of the space's office, its entertainment receipts and the receipts of household budget entries with name, day and amount; a tap opens the receipt in its own area (Office > Receipts, Office > Entertainment receipts, the budget list in the entry's month), where it is changed, deleted and booked. Rights stay the areas' own (office admin / accounting / office groups with the receipts or entertainment area, "own" = only one's own; budget lists one sees), nothing in the trash, no agents, no kids. On a phone the top of "My files" has the row "Receipts" with the parts as sections. Server: `kalmido/files/fsreceipts.py` (collections `receipts`, `rcoffice`, `rcmeals`, `rcbudget` of `GET /api/files/collections/<key>`); the budget opens a month by its address `#budget/<list>/<YYYY-MM>`.
+
 ## [2.1147.0] - 2026-11-14
 
 Package 2.1147 (Bündel: Abhängigkeiten auffrischen: Basis-Digests und Sper).
@@ -459,7 +479,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1147.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1150.0...HEAD
+[2.1150.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1150.0
 [2.1147.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1147.0
 [2.1146.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1146.0
 [2.1142.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1142.0
