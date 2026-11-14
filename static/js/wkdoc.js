@@ -20,6 +20,11 @@ const wdxX = s => String(s ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u00
 const wdxStyle = sp => (typeof wkst_of === 'function' ? wkst_of(sp) : '') || '';
 function wdxName(p, ext) { return (String(p.path || '').split('/').pop().replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').trim().replace(/^\.+|\.+$/g, '') || 'page').slice(0, 80) + '.' + ext; }
 // the page as the app draws it, as a detached element (DOMParser: nothing runs, nothing is put into the page)
+// the drawn text starts with a heading that only repeats the page's name: no extra title then (as the server's file)
+function wdxDupTitle(dom, title) {
+  const h = dom.querySelector('h1, h2, h3, h4, h5, h6'), t = String(title).trim().toLowerCase();
+  return !!h && (h.textContent || '').trim().toLowerCase() === t && (dom.textContent || '').trim().toLowerCase().startsWith(t);
+}
 function wdxDom(p) {
   const html = typeof wk_render === 'function' ? wk_render(p) : '';
   return /** @type {HTMLElement} */ (new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstElementChild);
@@ -86,8 +91,8 @@ function wdxDocx(p) {
       else { const t = inl(e); if (t) body.push(para(t, quote ? 'Quote' : '')); }
     }
   };
-  const dom = wdxDom(p), h1 = dom.querySelector('h1');
-  if (!(h1 && dom.firstElementChild === h1 && (h1.textContent || '').trim().toLowerCase() === title.trim().toLowerCase())) body.push(para(run(title, {}), 'Title'));
+  const dom = wdxDom(p);
+  if (!wdxDupTitle(dom, title)) body.push(para(run(title, {}), 'Title'));
   blocks(dom);
   const hs = Math.round(lk.fs * 2), ln = Math.round(240 * lk.lh / 1.15), after = Math.round(lk.fs * lk.gap * 20), side = Math.round(lk.side * 56.7), f = lk.font;
   const doc = WDX_HEAD_XML + '<w:document ' + WDX_NS + '><w:body>' + body.join('') + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1247" w:right="' + side + '" w:bottom="1134" w:left="' + side + '" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body></w:document>';
@@ -124,8 +129,7 @@ function wdxPrint(p) {
   box.className = 'wdxprint' + (st ? ' wkst-' + st : '');
   const h = document.createElement('h1'); h.textContent = title;
   const md = wdxDom(p); md.className = 'md ntmd wkmd';
-  const h1 = md.querySelector('h1');
-  if (!(h1 && md.firstElementChild === h1 && (h1.textContent || '').trim().toLowerCase() === title.trim().toLowerCase())) box.append(h);
+  if (!wdxDupTitle(md, title)) box.append(h);
   box.append(document.importNode(md, true));
   document.body.append(box); document.body.classList.add('wdxprinting');
   const done = () => { document.body.classList.remove('wdxprinting'); box.remove(); window.removeEventListener('afterprint', done); };
