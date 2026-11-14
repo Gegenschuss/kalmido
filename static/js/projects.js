@@ -902,9 +902,9 @@ function fieldModal(lid, f, done, ep) {
 function fieldsBox(lid) {
   const fs = fieldsAll(lid);
   return fs.map((f, i) => `<div class="mrow" data-fid="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(ftLabel(f.type))}${f.org_field_id ? ' · ' + esc(tr('linked')) : ''}</span>
-    <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}" aria-pressed="${!!f.pinned}">${ic(f.pinned ? 'pinf' : 'pin', 's')}</button>
-    <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
-    <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +
+    <button class="iconbtn ms-phsr ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}" aria-pressed="${!!f.pinned}">${ic(f.pinned ? 'pinf' : 'pin', 's')}</button>
+    <button class="iconbtn ms-phsr" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
+    <button class="iconbtn ms-phsr" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', f.name) /* 2.1167.0 C (#6083): one "…" on a phone */}</div>`).join('') +
     `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this project: budget, stage, client, …'))}</div>`;
 }
 // 2.550.0 (#4528): a deleted field lies in the field trash with its values; Undo (toast) and "Restore" in the project settings
