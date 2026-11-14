@@ -68,11 +68,11 @@ jobs:
       contents: read
       actions: read
     outputs:
-      stage: ${{ steps.plan.outputs.stage }}
+      stage: ${{ steps.plan.outputs.stage || steps.stage.outputs.stage }}  # #6063: "none" skips the planning steps
       count: ${{ steps.plan.outputs.count }}
       shards: ${{ steps.plan.outputs.shards }}
       hard: ${{ steps.plan.outputs.hard }}
-      matrix: ${{ steps.plan.outputs.matrix }}
+      matrix: ${{ steps.plan.outputs.matrix || steps.stage.outputs.matrix }}  # #6063: stage none = a one-entry placeholder (the shard job is skipped)
       parallel: ${{ steps.plan.outputs.parallel }}
       limit: ${{ steps.plan.outputs.limit }}
     steps:
@@ -86,7 +86,18 @@ jobs:
           CI_INPUT_STAGE: ${{ inputs.stage }}
           CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title || github.event.merge_group.head_commit.message }}
           CI_BASE_SHA: ${{ github.event.merge_group.base_sha }}  # #4006: the queue entry's base (the target branch before it)
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # #6063 (decision 14.11.2026): a push on main the merge queue made is the very commit its merge_group run checked
+          # (gate green, same tree) - look that run up by head SHA; found (green or still finishing) = stage "none", no test
+          # shards (tests/stages.py). The train's release push, the nightly run and runs by hand keep the full run. Not found
+          # / API error = the usual stage
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
+            CI_QUEUE_RUN=$(timeout 60 gh api "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&head_sha=$GITHUB_SHA&per_page=10" \
+                             --jq '[.workflow_runs[] | select((.path // "" | startswith(".github/workflows/ci.yml")) and (.conclusion == null or .conclusion == "success"))][0].id // empty' || true)
+            export CI_QUEUE_RUN
+            echo "merge_group run of $GITHUB_SHA: ${CI_QUEUE_RUN:-none}"
+          fi
           # 2.321 (#1368): a package branch (job/**) is tested against its merge base with main (tests/stages.py fetches main)
           # CI fix of 2.351.0: stages.py searched 6+ min for the 204 files of a live train push and the job limit cancelled the
           # plan; now it decides in seconds, the 150 s limit turns a slow run into the full stage
@@ -94,12 +105,18 @@ jobs:
           stage=$(sed -n 's/^stage=//p' <<<"$out"); reason=$(sed -n 's/^reason=//p' <<<"$out")
           if [ "$stage" = push ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the push stage - full run"; fi
           if [ "$stage" = queue ] && ! [ -s /tmp/push-groups.txt ]; then stage=full; reason="no groups for the queue stage - full run"; fi
-          [ "$stage" = push ] || [ "$stage" = queue ] || stage=full  # #5787: queue = a merge queue entry (hard + touched suites)
+          [ "$stage" = push ] || [ "$stage" = queue ] || [ "$stage" = none ] || stage=full  # #5787: queue = a merge queue entry (hard + touched suites); #6063: none = a push from the queue
           { echo "stage=$stage"; echo "reason=$reason"; } >> "$GITHUB_OUTPUT"
+          if [ "$stage" = none ]; then
+            echo 'matrix=[{"shard": 1, "hart": ""}]' >> "$GITHUB_OUTPUT"  # never expanded: the shard job is skipped
+            echo "::notice title=stage::none - no test shards - ${reason//%/%25}"
+            { echo "### Test stage: none (no test shards)"; echo; echo "$reason"; } >> "$GITHUB_STEP_SUMMARY"
+          fi
       # 2.166.0 CI fix: the times of the last THREE finished runs, the newer wins per group (tools/shards.py: the last file
       # wins). With one run only, the groups a shard did not reach (cancelled at the 45 min limit) counted as 20 s per
       # suite: 2.166.0 planned such groups onto shards 1 and 3 and both ran into the limit again
       - name: Suite times (the last three finished runs, back to the last full one; artifacts timings-shard-*)
+        if: steps.stage.outputs.stage != 'none'  # #6063
         env:
           GH_TOKEN: ${{ github.token }}
         # 2.180.0 A (#2695): a push stage run has times of its groups only: the runs newest first until at least three and the
@@ -126,6 +143,7 @@ jobs:
           echo "runs (oldest first): ${order:-none - estimates only}"
       - name: Plan (full H hard + others of ~25 min, push stage ~15 min per shard, hard shards first ~9 min)
         id: plan
+        if: steps.stage.outputs.stage != 'none'  # #6063
         env:
           STAGE: ${{ steps.stage.outputs.stage }}
           REASON: ${{ steps.stage.outputs.reason }}
@@ -168,6 +186,7 @@ jobs:
           echo "::notice title=stage::$stage - $n shards ($h hard first), $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
           { echo "### Test stage: $stage ($n shards, $h of them hard first)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.stage.outputs.stage != 'none'  # #6063
         with:
           name: shard-plan
           path: shard-plan.txt
@@ -603,6 +622,7 @@ jobs:
     name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }}${{ matrix.hart }} (API, UI, security)
     runs-on: ubuntu-latest
     needs: plan
+    if: needs.plan.outputs.stage != 'none'  # #6063: a push from the merge queue runs no test shards (the queue checked the commit)
     timeout-minutes: ${{ fromJSON(needs.plan.outputs.limit || '90') }}  # #6054: full 60 (shards of ~25 min), push / queue 90 (job "plan"); 2.80.1: four shards ran into the 30 min limit on a slow runner; CI of 2.166.1 (#945): 50 as a safety net (#1315: 20 shards, the plan aims at ~30 min per shard); 2.556 (#4388): 60 with 20 fixed shards
     # CI red v2.560.0 (job/2867): the first full run with 20 fixed shards had 7 hard shards (~9 min) and 13 others - all 13 hit
     # the 60 min limit ("exceeded the maximum execution time"), their suites never finished. The other suites need ~900 shard
@@ -836,12 +856,14 @@ jobs:
     # #5787: for push / schedule / workflow_dispatch as before; a pull request / queue entry has the job "Merge queue gate" instead
     name: Test suites (API, UI, security)
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [plan, tests]
     if: always() && github.event_name != 'pull_request' && github.event_name != 'merge_group'
     timeout-minutes: 5
     steps:
+      # #6063: stage "none" (a push from the merge queue) skips the shards on purpose = green; a skipped shard job otherwise red
       - run: |
-          echo "shards: ${{ needs.tests.result }}"
+          echo "plan: ${{ needs.plan.result }}, stage: ${{ needs.plan.outputs.stage }}, shards: ${{ needs.tests.result }}"
+          if [ "${{ needs.plan.result }}" = success ] && [ "${{ needs.plan.outputs.stage }}" = none ]; then exit 0; fi
           test "${{ needs.tests.result }}" = "success"
 
   queue-gate:

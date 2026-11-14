@@ -31,6 +31,8 @@ test files and the changed files, nothing is started; Python standard library on
                      "reason=" lines, writes the groups of the push stage to --groups-out
                      #5787: a merge queue entry (merge_group) gets the stage "queue" = the groups of the hard suites
                      (tests/hard_suites.txt) + the suites it touches (--touched), never the push stage or the full run
+                     #6063: a push on main the merge queue made (CI_QUEUE_RUN = its merge_group run, looked up by ci.yml)
+                     gets the stage "none" = no test shards (the queue checked the same commit)
 
 With a separate test runner, only the suites a branch touches (exit 3 = the change needs the full run):
   s=$(python3 tests/stages.py --suites --changed origin/main) && <test runner> run $s
@@ -729,6 +731,13 @@ def ci_base():
         if base:
             return None, "package branch (job/**) against main", base
         return "full", "package branch (job/**) without a merge base with main: full run", None
+    queue_run = os.environ.get("CI_QUEUE_RUN", "").strip()
+    if ev == "push" and os.environ.get("GITHUB_REF", "") == "refs/heads/main" and queue_run and ": Live-Zug (" not in msg:
+        # #6063 (decision 14.11.2026): the merge queue lands its entry on main as the very commit its merge_group run checked
+        # (ci.yml job "plan" looks that run up by head SHA and sets CI_QUEUE_RUN): the same tree, so the push runs no test
+        # shards ("none"). Only the train's release push, the nightly run and runs by hand run the full stage; a push from
+        # the queue took ~60 shards (too many groups = full) and left the train's run waiting for runners
+        return "none", f"push from the merge queue: the same commit was checked in merge_group run {queue_run}", None
     if ev == "push":
         before = os.environ.get("CI_BEFORE", "")
         if not before or set(before) == {"0"}:
