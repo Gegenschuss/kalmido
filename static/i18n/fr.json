@@ -18561,7 +18561,7 @@
   "Receipts stay in their area. Open one to view, change or book it there.": "Les justificatifs restent dans leur espace. Ouvre-en un pour le consulter, le modifier ou le comptabiliser là-bas.",
   "Create the first page": "Créer la première page",
   "Back to the pages": "Retour aux pages",
-  "It may have been deleted, or it is not shared with you.": "Elle a peut-être été supprimée, ou elle n'est pas partagée avec vous.",
+  "It may have been deleted, or it is not shared with you.": "Elle a peut-être été supprimée, ou elle n'est pas partagée avec toi.",
   "The knowledge pages could not be loaded": "Les pages de connaissances n'ont pas pu être chargées",
   "The page could not be loaded": "La page n'a pas pu être chargée",
   "The new order could not be saved": "Le nouvel ordre n'a pas pu être enregistré",
@@ -18593,6 +18593,6 @@
   "The shares could not be loaded": "Les partages n'ont pas pu être chargés",
   "The tags could not be loaded": "Les étiquettes n'ont pas pu être chargées",
   "Daily notes": "Notes du jour",
-  "Write …": "Écrivez …",
-  "Write … (/ for commands)": "Écrivez … (/ pour les commandes)"
+  "Write …": "Écrire …",
+  "Write … (/ for commands)": "Écrire … (/ pour les commandes)"
 }
