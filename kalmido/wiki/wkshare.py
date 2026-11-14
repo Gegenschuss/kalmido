@@ -51,7 +51,7 @@ from ..core.access import addr_account  # 2.983.0 (#5643)
 from ..core.addrshare import ads_bound, ads_dict, ads_kind, ads_open, ads_repath, ads_row  # 2.1071.0 (#5658)
 from ..core.addrshare import ads_back, ads_take, ads_taken, ads_taken_row  # 2.1115.0 (#5967)
 from ..core.addrshare import ADS_MAX, ADS_PER_ADDR, ADS_SEAL, ads_clean, ads_mark, ads_replaying  # 2.1138.0 (#6027)
-from ..accounts.login import addr_key  # 2.1138.0 (#6027)
+from ..accounts.login import addr_key, unseal  # 2.1138.0 (#6027)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -817,7 +817,6 @@ def _wsh_addr_full(c, uid, em, who):
 
 def _wsh_card_mail(c, token):
     """The address a card keeps (sealed, wsh_dict), '' when it cannot be read."""
-    from ..accounts.login import unseal
     try:
         return unseal(c, WSH_SEAL + "mail", token).strip().lower()
     except Exception:  # noqa: BLE001  a server key that changed
