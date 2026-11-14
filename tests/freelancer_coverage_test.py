@@ -424,6 +424,7 @@ ROUTES = {
     "GET /api/team/dispo/callsheets": "hub", "POST /api/team/dispo/callsheets": "hub",  # 2.988.0 (#5651): a project's tab "Call sheets" (p2988_a_callsheets_test.py, freelancer-matrix: hub)
     "GET /api/team/dispo/callsheet/{}/logo": "hub", "GET /api/team/dispo/callsheet/{}/photo/{}": "hub",  # 2.993.0 (#5650): the logos of the call sheet (p2993_a_cslogos_test.py, freelancer-matrix: hub)
     "PUT /api/team/dispo/callsheet/{}/photo/{}": "hub",  # 2.993.0 (#5650): a logo saved as the contact's photo (p2993_a_cslogos_test.py)
+    "GET /api/team/dispo/callsheet/{}/mail": "hub", "POST /api/team/dispo/callsheet/{}/mail": "hub",  # 2.1155.0 (#5652): the call sheet by e-mail (p21155_a_csmail_test.py, freelancer-matrix: hub)
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",

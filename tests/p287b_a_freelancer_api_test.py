@@ -78,6 +78,7 @@ EXPECT_4XX = {
     "GET /api/team/dispo/callsheet/{}/history": (404, "the sweep's freelancer has no Film & Video and no shoot day (p5532_a_dispokern_test.py covers it)"),  # 2.872.0 (#5532): the call sheet's new history route
     "GET /api/team/dispo/callsheet/{}/logo": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2993_a_cslogos_test.py covers it)"),  # 2.993.0 (#5650)
     "GET /api/team/dispo/callsheet/{}/photo/{}": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2993_a_cslogos_test.py covers it)"),  # 2.993.0 (#5650)
+    "GET /api/team/dispo/callsheet/{}/mail": (404, "the sweep's freelancer has no Film & Video and no shoot day (p21155_a_csmail_test.py covers it)"),  # 2.1155.0 (#5652)
     "GET /api/lists/{}/shotlist.pdf": (404, "the own list is no shoot (project type Shoot only with Film & Video; p2636_c_dreh_api_test.py covers it)"),  # 2.636.0 (#4565)
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
     "GET /api/approvals/diff": (400, "the sweep names no approval card (?chat= / ?comment= required, the same for every person; p21068_apvdiff_test.py covers it)"),  # 2.1068.0 (#5831)
