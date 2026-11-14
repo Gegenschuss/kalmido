@@ -333,6 +333,22 @@ check("Wander" not in shared(Da) and anon(f"/s/w/{wtok}").status_code == 404 and
       sql("SELECT COUNT(*) FROM wiki_shares WHERE path='Wander' AND revoked_at IS NULL")[0][0] == 0,
       "#2104: moving to the other workspace ends the page's shares")
 
+# 2.1145.0 (#6062, Fable review 2.1138 F5): a folder that moves as a whole takes its open shares by address along like the bound
+# ones: the dry run counts both, the move ends both (an open one stayed and would have shared a new folder of that name)
+page(A, "private", "Roam/One", "moves with its folder")
+for em in ("nobody-roam@example.com", "dave@example.com"):
+    r = share(A, space="private", folder="Roam", kind="person", email=em)
+    check(r.ok and r.json().get("by_email") is True, f"#6062: folder Roam shared with {em} {r.status_code} {r.text[:200]}")
+check(sql("SELECT COUNT(*) FROM obj_addr_shares WHERE kind='wiki' AND path='Roam'")[0][0] == 1, "(setup) one open share of Roam")
+r = A.post(B + "/api/wiki/move-space", json={"space": "private", "folder": "Roam", "to": SP, "dry": 1})
+check(r.ok and r.json().get("shares") == 2, f"#6062: the dry run counts the open share by address too {r.status_code} {r.text[:300]}")
+r = A.post(B + "/api/wiki/move-space", json={"space": "private", "folder": "Roam", "to": SP})
+check(r.ok and sql("SELECT COUNT(*) FROM obj_addr_shares WHERE kind='wiki' AND path='Roam'")[0][0] == 0,
+      f"#6062: the move ends the open share of the folder {r.status_code} {r.text[:200]}")
+page(A, "private", "Roam/New", "a new folder of the same name")
+check(not [x for x in A.get(B + "/api/wiki/shares", params={"space": "private", "folder": "Roam"}).json().get("shares", [])
+           if x["kind"] == "person" and not x.get("revoked")], "#6062: a new folder of that name is shared with nobody")
+
 # ---------------------------------------------------------------- organisation (tenant-matrix: wiki)
 hb = page(A, SP, "Docs/Handbook", "For the customer.")
 r = share(A, page_id=hb, kind="person", email="dave@example.com")
