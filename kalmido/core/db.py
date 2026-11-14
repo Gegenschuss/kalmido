@@ -8,7 +8,7 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone  # 2.1139.0 (#6028): timedelta for fresh_within
 from cryptography.hazmat.primitives.asymmetric import ec
 from flask import g, has_request_context, jsonify, request
 from werkzeug.security import generate_password_hash
@@ -101,6 +101,22 @@ def iso_ms(dt):
 
 def parse_iso(s):
     return datetime.fromisoformat(s)
+
+
+def fresh_within(v, minutes):
+    """2.1139.0 (#6028): the point in time v (ISO text of any form - Z, an offset, none = UTC - or a datetime, as a TEXT or a
+    TIMESTAMPTZ column gives it) lies at most `minutes` minutes back; None, '' and anything unreadable are NOT fresh. For the
+    step-up / re-sign-in checks (accounts/oidc.py reauth_fresh, admin/offsite.py stepup_need, core/orgcrypt.py _rck_fresh):
+    a text compare there let a value that is no time ('zzz', a damaged row) count as fresh."""
+    if v is None or v == "":
+        return False
+    try:
+        d = v if isinstance(v, datetime) else datetime.fromisoformat(str(v).strip().replace("Z", "+00:00"))
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return d >= now_utc() - timedelta(minutes=minutes)
+    except (ValueError, TypeError, OverflowError):
+        return False
 
 
 def local_now():

@@ -10,6 +10,8 @@ sign-in. Invented data only; session ages are set in the database (no waiting).
  - closing switches ask nothing (also with an old session); PUT /api/admin/oidc of the admin rule asks the same
  - an admin with a password: unchanged (password_needed, then the password)
  - a person without an organisation: the switches are the server's (instance admins only); a non-admin gets 403 as before
+ - 2.1139.0 (#6028): the step-up is compared as a point in time (core/db.py fresh_within): a value that is no time is not
+   fresh, another zone counts as its moment
 usage: p2611_a_reauth_test.py <datadir>"""
 import sys
 import time
@@ -103,6 +105,24 @@ check(r.ok and kinds_off() == [], f"#4019: the OIDC step-up a minute ago -> goes
 close()
 age(created=now_iso(30), via="restore", stepup_at=OLD, stepup_for="")
 check(reopen().status_code == 403, "#4019: a session made by a restored backup is no fresh sign-in")
+age(created=now_iso(30), via="password")
+assert reopen().ok
+
+# ---- 2.1139.0 (#6028): the step-up compared as a point in time - a stepup_at kept as TEXT (an ALTER the start refused,
+# core/coltype.py _ct_more_kept) holding a value that is no time is NOT fresh (the text compare took 'zzz' >= '2026-...')
+dbx("ALTER TABLE sessions ALTER COLUMN stepup_at TYPE text USING CAST(stepup_at AS text)")
+close()
+age(created=OLD, via="oidc", stepup_at="zzz", stepup_for="0:su")
+r = reopen()
+check(r.status_code == 403 and r.json().get("reauth_needed") is True,
+      f"#6028: a step-up mark that is no point in time is no fresh sign-in {r.status_code} {r.text[:160]}")
+age(stepup_at=now_iso(60).replace("+00:00", "Z"))
+r = reopen()
+check(r.ok and kinds_off() == [], f"#6028: a real step-up as TEXT with Z a minute ago -> goes {r.status_code} {r.text[:160]}")
+close()
+# 20 minutes ago written in +02:00: the text "12:30+02:00" sorts after "10:40+00:00", the moment is too old
+age(stepup_at=time.strftime("%Y-%m-%dT%H:%M:%S+02:00", time.gmtime(time.time() - 20 * 60 + 2 * 3600)))
+check(reopen().status_code == 403, "#6028: another zone is read as its moment (the text compare took it as fresh)")
 age(created=now_iso(30), via="password")
 assert reopen().ok
 
