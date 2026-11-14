@@ -38,7 +38,7 @@ async function calsDraw(md, j) {
       <label class="calvis" title="${tr('Show')}"><input type="checkbox" data-calact="vis" ${x.visible ? 'checked' : ''} aria-label="${tr('Show')}"></label>
       <button class="iconbtn ms-phsr" data-calact="refresh" title="${tr('Refresh now')}" aria-label="${tr('Refresh now')}">${ic('repeat', 's')}</button>
       <button class="iconbtn ms-phsr" data-calact="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
-      <button class="iconbtn ms-phsr" data-calact="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button>${ms_dots('.ms-phsr', x.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
+      <button class="iconbtn ms-phsr" data-calact="del" title="${tr('Remove')}" aria-label="${tr('Remove')}">${ic('trash', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', x.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
     : `<div class="muted mhint">${tr('No calendars yet.')}</div>`;
 }
 async function calPatch(md, id, body) {

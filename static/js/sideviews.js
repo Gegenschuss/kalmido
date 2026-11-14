@@ -324,7 +324,7 @@ function sv_setFill() {
       ${rowd_arrows(`<button type="button" class="iconbtn" data-sv="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + v.name)}" title="${esc(tr('Move up'))}">${ic('up', 's')}</button>
       <button type="button" class="iconbtn" data-sv="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + v.name)}" title="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn ms-phsr" data-sv="edit" aria-label="${esc(tr('Edit') + ': ' + v.name)}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
-      <button type="button" class="iconbtn ms-phsr" data-sv="del" aria-label="${esc(tr('Delete') + ': ' + v.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${ms_dots('.ms-phsr', v.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
+      <button type="button" class="iconbtn ms-phsr" data-sv="del" aria-label="${esc(tr('Delete') + ': ' + v.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', v.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
     : `<p class="muted">${esc(tr('No views yet.'))}</p>`;
 }
 
