@@ -190,7 +190,7 @@ async function wkp_open(p) {
   wkp_close();
   WKP.sl = wkp_slides(pg); WKP.sp = pg.space; WKP.i = 0;
   if (!WKP.sl.length) { toast(tr('Empty page.')); return; }
-  const m = document.createElement('div');
+  const m = /** @type {any} */ (document.createElement('div'));
   m.id = 'wkp'; m.className = 'wkp'; m.tabIndex = -1;
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', tr('Presentation: {0}', wk_base(pg.path)));
   m.innerHTML = `<div class="wkpstage"></div><div class="wkpbar"><button type="button" class="iconbtn" data-wkp="-1" title="${esc(tr('Previous slide'))}" aria-label="${esc(tr('Previous slide'))}">${ic('left')}</button><span class="wkpno" role="status" aria-live="polite"></span><button type="button" class="iconbtn" data-wkp="1" title="${esc(tr('Next slide'))}" aria-label="${esc(tr('Next slide'))}">${ic('right')}</button><span class="wkpttl">${esc(wk_base(pg.path))}</span><button type="button" class="iconbtn" data-wkp="x" title="${esc(tr('End presentation'))}" aria-label="${esc(tr('End presentation'))}">${ic('x')}</button></div>`;
