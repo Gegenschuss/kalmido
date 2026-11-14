@@ -252,13 +252,17 @@ def _callsheet(c, run, src, d, ctx):
     target area) and only once per job (the unique index); its details through cs_clean like a save, a sketch that is no
     PNG / JPEG picture is left out (the upload checks of hub/callsheet.py run for new pictures only)."""
     job = _txt(src.get("job"), 64)
-    if not job or not c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? LIMIT 1", (run.org, job)).fetchone():
+    sp = run.org or getattr(run, "pb", None)  # 2.1158.0 (#4566 A): into the private space the person's own office (oi_space)
+    if not job or not sp or not c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? LIMIT 1", (sp, job)).fetchone():
         return False
-    if c.execute("SELECT 1 FROM hub_callsheets WHERE org_id=? AND job=?", (run.org, job)).fetchone():
+    if c.execute("SELECT 1 FROM hub_callsheets WHERE org_id=? AND job=?", (sp, job)).fetchone():
         return False
     try:
-        raw = json.loads(src.get("data") or "{}")
-        d["data"] = json.dumps(cs_clean(raw), ensure_ascii=False)
+        raw = cs_clean(json.loads(src.get("data") or "{}"))
+        if raw.get("pack"):  # 2.1158.0 (#4566 A): a ticked device (e:<equipment id>) on its new id, a device that did not come along drops
+            keys = [k if not k.startswith("e:") else (f"e:{n}" if (n := run.m("office_equipment", int(k[2:]))) else "") for k in raw["pack"]]
+            raw["pack"] = sorted({k for k in keys if k})
+        d["data"] = json.dumps(raw, ensure_ascii=False)
     except (ValueError, TypeError, BadInput):
         d["data"] = "{}"
     sk, mime = str(src.get("sketch") or ""), str(src.get("sketch_mime") or "")
