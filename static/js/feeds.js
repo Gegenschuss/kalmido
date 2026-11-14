@@ -90,6 +90,8 @@ function viewFeeds() {
 
 // ---- actions
 const rss_item = id => RSS.items.find(x => x.id === id);
+// 2.1151.0 C (#3835): on a phone the buttons of an article are hidden (feeds.css): a long press opens their menu
+ms_rowMenu('#view .rssitem', r => ms_btnMenu(r, '.rssacts .btn', rss_item(+r.dataset.id)?.title));
 async function rss_add(url) {
   RSS.busy = true; rss_draw();
   try {
