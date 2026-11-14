@@ -107,8 +107,8 @@ function rul_rowsHtml(lid) {
   const rows = d.rules.map(r => `<div class="mrow rul-row${r.active ? '' : ' off'}" data-rid="${r.id}">${ic('zap', 's')}
     <div class="rul-txt"><b>${esc(r.name)}</b><span class="muted">${esc(rul_sentence(r))}</span>${r.paused_text ? `<span class="rul-paused">${esc(tr('Paused: {0}', r.paused_text))}</span>` : ''}</div>
     <label class="rul-sw" title="${esc(tr('Active'))}"><input type="checkbox" data-rul-on="${r.id}" ${r.active ? 'checked' : ''} aria-label="${esc(tr('Active') + ': ' + r.name)}"></label>
-    <button type="button" class="iconbtn" data-rul-edit="${r.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit') + ': ' + r.name)}">${ic('edit', 's')}</button>
-    <button type="button" class="iconbtn" data-rul-del="${r.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete') + ': ' + r.name)}">${ic('trash', 's')}</button></div>`).join('');
+    <button type="button" class="iconbtn ms-phsr" data-rul-edit="${r.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit') + ': ' + r.name)}">${ic('edit', 's')}</button>
+    <button type="button" class="iconbtn ms-phsr" data-rul-del="${r.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete') + ': ' + r.name)}">${ic('trash', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', r.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('');
   return rows + `<div class="mrow"><button type="button" class="btn sm" data-rul-add="1" ${d.rules.length >= d.limit ? 'disabled' : ''}>${ic('plus', 's')} ${tr('Add rule')}</button>${d.rules.length ? '' : `<span class="muted">${tr('Automatic, e.g.: a task that moves to “Review” is assigned to Anna.')}</span>`}</div>`;
 }
 async function rul_load(lid) {

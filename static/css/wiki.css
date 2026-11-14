@@ -276,3 +276,22 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkdpbar>.muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wkdpbar .spacer{flex:1}
 .wkdpmd{max-width:var(--w-lesen)}
+/* 2.1151.0 A (#3835): phones: no symbols in the rows of the knowledge area (folder list, tree, a page's files, folders shared
+   with me), the name gets the width; a long press opens the row menu (wiki.js wk_lpS, the files' and wkshare.js's ms_rowMenu).
+   The buttons stay for screen readers (like .sr), as the office rows (#3834) */
+@media (max-width:767px){
+  #view .wkrow .wkmore,#view .wkfiles li>.iconbtn,#view .wshfh>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  #view .wkfiles li,#view .wshfh{position:relative;-webkit-touch-callout:none}
+  #view .wkfiles a.wkfile{-webkit-touch-callout:none}
+}
+/* 2.1151.0 D (#5524): a page of a space with the lock printed alone ("Download as PDF", wkdoc.js wdxPrint) in its reading style */
+.wdxprint{display:none}
+@media print{
+  body.wdxprinting>*:not(.wdxprint){display:none!important}
+  body.wdxprinting,html:has(body.wdxprinting){background:#fff!important;height:auto;overflow:visible}
+  body.wdxprinting .wdxprint{display:block;color:#000;background:#fff;padding:0}
+  .wdxprint .wkmd{max-width:none;border:0;background:none}
+  .wdxprint :is(pre,table,img,blockquote){break-inside:avoid}
+  .wdxprint :is(h1,h2,h3,h4){break-after:avoid}
+  @page{margin:20mm 22mm}
+}

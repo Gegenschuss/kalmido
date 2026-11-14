@@ -31,6 +31,8 @@ RM_LEFT = {
     ("bookmarks.js", 'data-bm="more"'): (1, "the page menu of the bookmarks (import / export)"),
     ("budget.js", 'data-bg="more"'): (1, "the page menu of a budget"),
     ("feeds.js", 'data-rss="omenu"'): (1, "the page menu of the feeds (OPML import / export)"),
+    # 2.1151.0 (#3835): settings / dialog rows get ONE "…" on a phone instead of their symbols, no long press (the decision of #3835)
+    ("multisel.js", 'data-msdots="${esc(btns)}"'): (1, "ms_dots: the phone \"…\" of a settings / dialog row (#3835: settings rows open their menu by this button, not by a long press)"),
     # 2.997.0 (#5354): the merge dialog's drag handle (#4805, 0642f884bd) shows the dots icon; it is no button and opens no menu
     ("docpages.js", 'class="dpm-grip"'): (1, "the drag handle of a row in Merge PDFs (aria-hidden, a press drags the row), no menu"),
     ("calabs.js", 'class="iconbtn abchid"'): (1, "an invisible stand-in (aria-hidden) that keeps the columns of the rows in line, no button"),

@@ -151,7 +151,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
       return {over: document.documentElement.scrollWidth - innerWidth, n: rows.length, minH: Math.round(Math.min(...rows.map(x => x.height))), out: rows.filter(x => x.right > innerWidth + 1).length,
         spH: Math.round(Math.min(...sp.map(x => x.height))), btnW: Math.round(Math.min(...btn.map(x => x.width))), tree: !!document.querySelector('#side .sbbt.on') && getComputedStyle(document.querySelector('#side .sbbt.on')).display !== 'none'}; })()`);
     check(L.n >= 1 && L.over <= 1 && L.out === 0, `${tag}: the list fits ` + JSON.stringify(L));
-    if (touch) check(L.minH >= 44 && L.spH >= 44 && L.btnW >= 44, `${tag}: rows, spaces and the actions button at least 44 px ` + JSON.stringify(L));
+    // 2.1151.0 (#3835): a phone hides the row's actions button (a long press opens its menu): the button is 1 px, for screen readers only
+    if (touch) check(L.minH >= 44 && L.spH >= 44 && L.btnW <= 1, `${tag}: rows and spaces at least 44 px, no actions button in the row ` + JSON.stringify(L));
     else check(L.tree, `${tag}: the panel shows the open folder`);  // 2.152.3 (#2621): the panel instead of the tree column
     await shot(`p248a-${tag}-folder.png`);
     await ev(`(() => { ab_share(${FID}); return 1; })()`);

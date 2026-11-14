@@ -34,6 +34,9 @@ from ..notify.push import WD_TICKS
 from ..notify.alerts import aa_now
 from ..core.access import my_inbox
 from ..lists.lists import list_purge
+from ..accounts.orglists import _ol_people  # 2.1151.0 D (#4562)
+from ..collab.news import KIND_ROW
+from ..core.objnotify import obj_notify
 from ..lists.ownership import owner_candidates, owner_transfer
 from ..accounts.users import _active_admins, user_delete_run
 from ..accounts.useradmin import ua8_foreign, ua8_list_info, ua8_owned
@@ -228,6 +231,7 @@ def sdl_request():
             c.execute("UPDATE agents SET enabled=false WHERE owner_id=? AND enabled", (uid,))
     plan = {"lists": choice, "how": how, "along": along, "agents": paused, "toks": [tkh_hash(tok)], "asked": iso(now_utc()),
             "rx": rx_counts(c, rx_subject(c, "user", uid), along)}  # review M2: the records to keep the gate saw when it was asked for
+    sdl_notify(c, uid, choice, at)  # 2.1151.0 D (#4562): before the lock (the projects' roles as they are now)
     c.execute("UPDATE users SET disabled=true, delete_at=?, delete_plan=? WHERE id=?", (at, json.dumps(plan), uid))
     ses_end(c, uid)  # every session, this one too
     bump(c)
@@ -237,6 +241,30 @@ def sdl_request():
     resp = jsonify(ok=True, delete_at=at, mail=bool(u["email"]))
     resp.delete_cookie(COOKIE, path="/")
     return resp
+
+
+def sdl_notify(c, uid, choice, at):
+    """2.1151.0 D (#4562): the person asked for the deletion -- everybody who still reads one of their projects that goes along
+    (choice "delete") hears it in the bell: a News entry of the existing kind orglist (action acctdel: the project's name, the
+    day, nothing of its content), switched with the row "share" of the notification settings like the other project notices.
+    Through the core's send decision (obj_notify, kind list): only people with a role on the project, never agents. A project
+    handed over says nothing (it stays); taking the request back sends no second notice (decision of the build, #4562)."""
+    day = parse_iso(at).astimezone(local_now().tzinfo).date().isoformat()
+    for k, ch in sorted(choice.items()):
+        if not ch.get("delete"):
+            continue
+        with system_ctx(c):  # the members of the own project (structure)
+            lr = c.execute("SELECT id, name, owner_id FROM lists WHERE id=?", (int(k),)).fetchone()
+            people = [x for x in _ol_people(c, lr) if x != uid] if lr else []
+            # review (job/4457): asking, taking back and asking again does not fill the bell -- whoever still has an unread
+            # notice of this project's deletion by this person gets no second one
+            told = {r[0] for r in c.execute("SELECT user_id FROM notifications WHERE kind='orglist' AND list_id=? AND actor_id=? "
+                                            "AND read_at IS NULL AND CAST(data AS jsonb)->>'action'='acctdel'", (lr["id"], uid)).fetchall()} if people else set()
+            people = [x for x in people if x not in told]
+        if people:
+            obj_notify(c, "list", lr["id"], people, row=KIND_ROW["orglist"], lid=lr["id"], push=False,
+                       news={"kind": "orglist", "list_id": lr["id"], "actor": uid,
+                             "data": {"action": "acctdel", "name": lr["name"], "day": day, "member": 1}})
 
 
 def _lift(c, u):

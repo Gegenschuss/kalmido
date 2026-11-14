@@ -1305,7 +1305,9 @@ stays on the task; the answer names it in `move_ttype` (the type key) - tell the
 
 - Contact (vCard / CSV) and calendar (ICS) imports change only the fields the file holds. A contact or event changed here after
   its last import and later than the file's `REV` / `LAST-MODIFIED` stays as it is; the answer counts it in `kept_newer` - tell
-  the person instead of importing again.
+  the person instead of importing again. A card without `REV` keeps such a contact too (`kept_norev`); 2.1151.0: the import
+  dialog of the app has the switch *Take over cards without a change date too* (form field `norev=1` of
+  `POST /api/books/{id}/import`), then those cards win (`taken_norev`). The agents' import keeps the rule without the switch.
 - Documents: date, due date, amount and currency set by a person or an agent stay on "Recognise again" and on a new file
   version. A document's answer lists them in `hand`; the redo answer names the ones it kept in `kept`. Emptying a value hands it
   back to the recognition.
@@ -4995,7 +4997,8 @@ page, case ignored) puts the text at the end of that heading's section instead; 
 *Changing part of a long text* below). A new page
 (`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
 `409` when a page of that name is already there. Renaming, moving, the trash, uploading / removing files of pages, shares,
-export / import and the encryption stay with people in the app.
+export / import (2.1151.0: also a page as PDF / Word, `GET /api/wiki/pages/{id}/export` - a file for people; an agent reads
+the same text as Markdown with `wiki_read`) and the encryption stay with people in the app.
 
 **Files of a page (2.488.0).** With `wiki:read` an agent lists the files people uploaded to a page shared with it (PDFs and
 pictures: `wiki_files` = id, name, mime, size, created_at, image) and reads one (`wiki_read_file`: as text by default - a

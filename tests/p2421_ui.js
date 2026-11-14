@@ -41,18 +41,19 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     check(await until(() => ev(`!!document.querySelector('#top h1')`).catch(() => false)), 'the list is drawn');
     await ev(`(() => { openDetail(${T}); return 1; })()`);
     check(await until(() => ev(`!!document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts .iconbtn')`).catch(() => false)), 'the comment with its buttons');
-    // 2.490.0 (#4018): at rest the icons are hidden; a tap on the comment shows them (.cacton)
-    check(await ev(`getComputedStyle(document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts')).display`) === 'none', '#4018: at rest the icons take no room at 360 px');
+    // 2.1151.0 (#3835): on the phone the comment has no symbols, not at rest and not after a tap (was 2.490.0 #4018: a tap
+    // showed them); they stay in the page for screen readers and the menu of the long press holds every one of them
+    const hid = `(() => { const a = document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts'), r = a.getBoundingClientRect(); return r.width <= 1 && r.height <= 1; })()`;
+    check(await ev(hid), '#3835: at rest the icons take no room at 360 px');
     await ev(`(() => { document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .chead b').click(); return 1; })()`);
-    check(await until(() => ev(`getComputedStyle(document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"] .cacts')).display !== 'none'`).catch(() => false)), '#4018: a tap on the comment shows the icons');
+    check(await ev(hid), '#3835: a tap on the comment shows no icons either');
     const g = await ev(`(() => {
-      const d = document.querySelector('#detail'), dr = d.getBoundingClientRect(), c = document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"]');
-      const h = c.querySelector('.chead'), a = c.querySelector('.cacts'), ar = a.getBoundingClientRect(), nr = h.querySelector('b').getBoundingClientRect();
-      return {wide: d.scrollWidth - d.clientWidth, head: h.scrollWidth - h.clientWidth, right: Math.round(ar.right - dr.right),
-        below: ar.top >= c.getBoundingClientRect().top - 1 && ar.bottom <= c.getBoundingClientRect().bottom + 1, n: a.querySelectorAll('.iconbtn').length, page: document.documentElement.scrollWidth <= innerWidth}; })()`);
-    check(g && g.wide <= 0 && g.head <= 0 && g.right <= 0 && g.page, '#3471: nothing of the comment reaches over the edge at 360 px ' + JSON.stringify(g));
-    check(g && g.below, '#3471/#4018: the icons sit inside the comment, over its top right corner ' + JSON.stringify(g));
-    check(g && g.n >= 4, '#3471: no button left out (Reply, Copy, Save as task, Edit, Delete) ' + JSON.stringify(g));
+      const d = document.querySelector('#detail'), c = document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"]'), h = c.querySelector('.chead');
+      return {wide: d.scrollWidth - d.clientWidth, head: h.scrollWidth - h.clientWidth, n: c.querySelectorAll('.cacts .iconbtn').length, page: document.documentElement.scrollWidth <= innerWidth}; })()`);
+    check(g && g.wide <= 0 && g.head <= 0 && g.page && g.n >= 4, '#3471: nothing of the comment reaches over the edge at 360 px, the buttons stay in the page ' + JSON.stringify(g));
+    await ev(`(() => { const c = document.querySelector('#d-tl-items .cm[data-cid="${cm.id}"]'); cmCopyMenu(c.querySelector('[data-act="cm-copy"]'), c); return 1; })()`);
+    const mi = await until(() => ev(`(() => { const l = [...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].map(b => b.textContent.trim()); return l.length ? l : null; })()`).catch(() => null));
+    check(mi && ['Copy', 'Reply', 'Save as task', 'Edit', 'Delete'].every(x => mi.includes(x)), '#3835: the comment\'s long press menu holds Copy, Reply, Save as task, Edit, Delete ' + JSON.stringify(mi));
     await shot('p2421-360-comment.png');
   }, true);
 

@@ -429,7 +429,7 @@ async function formsModal(lid) {
   let j; try { [j] = await Promise.all([api('GET', `/api/lists/${lid}/forms`), loadModule('formq', () => formsModal(lid))]); } catch { return; }
   const l = listById(lid), secs = S.sections.filter(s => s.list_id === lid);
   const row = f => `<div class="mrow fmrow ${f.live ? '' : 'off'}" data-fid="${f.id}"><span class="n"><b>${esc(f.title)}</b> <span class="muted">${esc(f.access === 'public' ? tr('anyone with the link') : tr('people who see the project'))} · ${esc(trn('{0} sent', '{0} sent', f.count))}${f.live ? '' : ' · ' + esc(tr('off'))}</span></span>
-    <button class="iconbtn" data-fm="copy" title="${esc(tr('Copy the link'))}" aria-label="${esc(tr('Copy the link of {0}', f.title))}">${ic('copy', 's')}</button><button class="iconbtn" data-fm="edit" title="${esc(tr('Edit form'))}" aria-label="${esc(tr('Edit {0}', f.title))}">${ic('edit', 's')}</button></div>`;
+    <button class="iconbtn ms-phsr" data-fm="copy" title="${esc(tr('Copy the link'))}" aria-label="${esc(tr('Copy the link of {0}', f.title))}">${ic('copy', 's')}</button><button class="iconbtn ms-phsr" data-fm="edit" title="${esc(tr('Edit form'))}" aria-label="${esc(tr('Edit {0}', f.title))}">${ic('edit', 's')}</button>${/*html-ok*/ ms_dots('[data-fm]', f.title) /* 2.1151.0 B (#3835): the phone's one "…" (escaped inside) */}</div>`;
   // 2.298.0 A2 (#3186): the explanation of a form only while there is none; the status link's how behind (i), its privacy
   // promise stays visible word for word
   const md = modal(`<div class="lhdr"><h3>${tr('Forms')} · ${esc(lname(l))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>

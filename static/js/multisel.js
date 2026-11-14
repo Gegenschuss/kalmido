@@ -38,6 +38,31 @@ function ms_rowMenu(sel, open) {
   window.addEventListener('click', e => { if (e.detail && ms_lpRecent(st) && /** @type {any} */ (e.target).closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);
   return st;  // 2.627.0 (#4962): ms_lpTake
 }
+// 2.1151.0 (#3835): the menu of a phone row whose symbols are hidden (like .sr, they stay for screen readers): one entry per
+// button of btns (a selector inside anchor, or a list of elements) with its name (title / aria-label / text), its icon and red
+// for .danger; an entry clicks its button (detail 0: the click guard of ms_rowMenu lets it through). [hidden] buttons are left
+// out, disabled ones stay greyed. head: entries above them (cm_selHead: "Select" on top)
+let ms_icMap = null;
+function ms_icName(svg) {
+  if (!svg) return '';
+  if (!ms_icMap) { ms_icMap = new Map(); const d = document.createElement('div'); for (const k of Object.keys(P)) { d.innerHTML = ic(k); ms_icMap.set(d.firstElementChild.innerHTML, k); } }
+  return ms_icMap.get(svg.innerHTML) || '';
+}
+function ms_btnItems(anchor, btns) {
+  const list = typeof btns === 'string' ? [...anchor.querySelectorAll(btns)] : [...btns];
+  return list.filter(b => !b.hidden && !b.closest('[hidden]')).map(b => ({label: (b.getAttribute('title') || b.getAttribute('aria-label') || b.textContent || '').trim(),
+    icon: ms_icName(b.querySelector('svg.i')), cls: b.classList.contains('danger') ? 'danger' : '', dis: b.disabled, fn: () => b.click()}));
+}
+function ms_btnMenu(anchor, btns, title, head = []) { menu(anchor, [...head, ...ms_btnItems(anchor, btns)], null, null, title); }
+// 2.1151.0 C (#3835): settings / dialog rows with two or more symbols: on a phone ONE "…" (no long press) instead of the row of
+// symbols (each marked .ms-phsr): ms_dots(btns, title) is that button (hidden on the computer, start-phrows-3835.css); it opens
+// the menu of the buttons btns (a selector) inside its parent element
+const ms_dots = (btns, title = '') => `<button type="button" class="iconbtn ms-phdots" data-msdots="${esc(btns)}" data-mstitle="${esc(title)}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(title ? tr('More for {0}', title) : tr('More'))}">${ic('dots', 's')}</button>`;
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-msdots]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  ms_btnMenu(b, [...b.parentElement.querySelectorAll(b.dataset.msdots)].filter(x => x !== b), b.dataset.mstitle || '');
+});
 // Shift-click: the ids between the last ticked one and id in the shown order (both included); id alone without an anchor
 function ms_range(order, from, id) {
   const a = order.indexOf(from), b = order.indexOf(id);
@@ -151,7 +176,7 @@ function cm_bind(sel, open, pick, keep) {  // 2.571.0 (#4608): keep(e, row) true
     if (ms_lpRecent(st)) { e.preventDefault(); return; }
     if (open(r)) e.preventDefault();
   });
-  window.addEventListener('click', e => { if (ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row
+  window.addEventListener('click', e => { if (e.detail && ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row; 2.1151.0 (#3835): a click of the menu on a hidden button of the row (detail 0) goes through, as in ms_rowMenu
   return st;
 }
 // 2.607.0 (#4612): the top of a row menu opened by a long press / right click where rows can be chosen (like tasks, o.select):
@@ -173,8 +198,9 @@ const lm_open = (sel, fn) => r => { const b = lm_btn(r, sel); if (!b) return fal
 // click on that button, which the click guard of the press lets through for that one click (as #4616). Every row's "…" button
 // carries data-rowmenu="<a word of sel>": tests/p2695_a_rowmenu_coverage_test.py finds a "…" without it or without a binding.
 // keep: as cm_bind (default lm_keep: a link or a selection inside the row keeps the browser's menu)
-function lm_btnMenu(sel, btn, keep = lm_keep) {
-  const st = cm_bind(sel, r => { const b = r.querySelector(btn); if (!b) return false; const d = st.done; st.done = 0; b.click(); st.done = d; return true; }, null, keep);
+// 2.1151.0 (#3835): phone(row) given = on a phone the long press calls it instead (the menu of the row's hidden symbols, ms_btnMenu)
+function lm_btnMenu(sel, btn, keep = lm_keep, phone = null) {
+  const st = cm_bind(sel, r => { if (phone && isMobile()) { phone(r); return true; } const b = r.querySelector(btn); if (!b) return false; const d = st.done; st.done = 0; b.click(); st.done = d; return true; }, null, keep);
   return st;
 }
 const lm_selKeep = (e, r) => { const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); };  // a row that is a link as a whole

@@ -147,7 +147,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
     await o.nav(B + '#bookmarks');
     for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.bmcard')`).catch(() => false)); i++) await sleep(300);
     await sleep(800);
-    const g = await ev(`(() => { const bs = [...document.querySelectorAll('.bmadd .btn, .bmcard .iconbtn, .bmseg button')].map(b => b.getBoundingClientRect()).filter(r => r.width);
+    const g = await ev(`(() => { const bs = [...document.querySelectorAll('.bmadd .btn, .bmcard .iconbtn, .bmseg button')].map(b => b.getBoundingClientRect()).filter(r => r.width > 1 /* 2.1151.0 (#3835): a card symbol hidden for the eye on a phone (kept for screen readers, long press = menu) is no touch target */);
       return {wide: document.documentElement.scrollWidth <= 390, min: Math.min(...bs.map(r => r.height)), n: bs.length}; })()`);
     check(g && g.wide, `${tag}: #1950 the view has no horizontal scrolling ` + JSON.stringify(g));
     check(g && g.n > 0 && g.min >= 40, `${tag}: #1950 the buttons are >= 40 px ` + JSON.stringify(g));

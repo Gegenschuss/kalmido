@@ -382,3 +382,10 @@ input.shvmx{color:transparent!important;caret-color:var(--text);background:trans
 .shgag:hover{background:var(--bg3)}
 #shv-scroll tr.an-rowin>*{animation:an_rowin .25s cubic-bezier(.2,.8,.2,1)}
 @media (prefers-reduced-motion: reduce){#shv-scroll tr.an-rowin>*{animation:none}}
+/* 2.1151.0 A (#3835): phones: no "…" on the cards of tables and folders (a row each on a phone), the name gets the width; a long
+   press opens the same menu (sheets.js lm_btnMenu, sheetfold.js shf_lpS). The button stays for screen readers (like .sr) */
+@media (max-width:767px){
+  .shvcard>.iconbtn[data-shv="cmenu"],.shfcard>.iconbtn[data-shf="fmenu"]{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .shvcard{position:relative}
+  .shvcl{-webkit-touch-callout:none}
+}

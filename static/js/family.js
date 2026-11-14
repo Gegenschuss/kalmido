@@ -609,6 +609,12 @@ async function shopPoll() {
   if (!OUT.online && (S.shop.n = (S.shop.n || 0) + 1) % 5) return;
   try { const {v, vs} = await api('GET', '/api/version'); if (v !== S.v && !lpSkip(v, vs)) { await load(); shopDraw(); } } catch { /* offline: the ticks wait in the queue */ }
 }
+// 2.1151.0 C (#3835): on a phone a meal and an item of the shopping mode show no symbols (an item keeps its tick and a quantity
+// it has); a long press opens the menu with the hidden ones (ms_btnMenu)
+domReady(() => {  // multisel.js loads after this file
+  ms_rowMenu('#view .fmeal', r => ms_btnMenu(r, '.iconbtn', r.querySelector('a')?.textContent.trim()));
+  ms_rowMenu('.shopmode .shopi', r => ms_btnMenu(r, '.shopq, .shoparea', r.querySelector('.shopt')?.firstChild?.textContent.trim()));
+});
 function shopDraw() {
   const ov = $('.shopmode'); if (!ov || !S.shop) return;
   const l = listById(S.shop.lid); if (!l) { ov.remove(); return; }
@@ -617,7 +623,7 @@ function shopDraw() {
   const secs = S.sections.filter(s => s.list_id === l.id).sort((a, b) => a.sort - b.sort || a.id - b.id);
   const ro = !canAddTo(l.id);
   const qn = t => shopQty(t), pr = t => t.fam?.kind === 'shop' && t.fam.price != null ? t.fam.price : null;  // 2.140.0 A (#2131)
-  const row = t => `<li class="shopi ${t.status ? 'done' : ''}"><button type="button" class="shopchk" data-act="shop-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status !== 0}" aria-label="${esc((qn(t) ? qn(t) + ' ' : '') + t.title)}" ${canEdit(t) ? '' : 'disabled'}>${t.status ? ic('check') : ''}</button><span class="shopt">${esc(t.title)}${pr(t) != null ? `<small class="shoppr">${esc(fmtMoney(pr(t)))}</small>` : ''}</span><button type="button" class="shopq ${qn(t) ? '' : 'none'}" data-act="shop-qty" data-id="${t.id}" title="${esc(tr('Quantity and price'))}" aria-label="${esc(tr('Quantity and price of {0}', t.title) + (qn(t) ? ': ' + qn(t) : ''))}" ${canEdit(t) ? '' : 'disabled'}>${qn(t) ? esc(qn(t)) : ic('plus', 's')}</button>${!t.status && secs.length && canEditList(l.id) ? `<button type="button" class="iconbtn shoparea" data-act="shop-area" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Shop area'))}" aria-label="${esc(tr('Shop area of {0}', t.title))}">${ic('columns', 's')}</button>` : ''}</li>`;
+  const row = t => `<li class="shopi ${t.status ? 'done' : ''}"><button type="button" class="shopchk" data-act="shop-tick" data-id="${t.id}" role="checkbox" aria-checked="${t.status !== 0}" aria-label="${esc((qn(t) ? qn(t) + ' ' : '') + t.title)}" ${canEdit(t) ? '' : 'disabled'}>${t.status ? ic('check') : ''}</button><span class="shopt">${esc(t.title)}${pr(t) != null ? `<small class="shoppr">${esc(fmtMoney(pr(t)))}</small>` : ''}</span><button type="button" class="shopq ${qn(t) ? '' : 'none ms-phsr'}" data-act="shop-qty" data-id="${t.id}" title="${esc(tr('Quantity and price'))}" aria-label="${esc(tr('Quantity and price of {0}', t.title) + (qn(t) ? ': ' + qn(t) : ''))}" ${canEdit(t) ? '' : 'disabled'}>${qn(t) ? esc(qn(t)) : ic('plus', 's')}</button>${!t.status && secs.length && canEditList(l.id) ? `<button type="button" class="iconbtn shoparea ms-phsr" data-act="shop-area" data-id="${t.id}" aria-haspopup="menu" title="${esc(tr('Shop area'))}" aria-label="${esc(tr('Shop area of {0}', t.title))}">${ic('columns', 's')}</button>` : ''}</li>`;
   const groups = [...secs.map(s => [s.name, open.filter(t => t.section_id === s.id)]), [tr('Other'), open.filter(t => !t.section_id || !secs.some(s => s.id === t.section_id))]].filter(g => g[1].length);
   const focusId = document.activeElement?.closest?.('.shopmode') ? (document.activeElement.dataset.id ? `[data-act="${document.activeElement.dataset.act}"][data-id="${document.activeElement.dataset.id}"]` : document.activeElement.id ? '#' + document.activeElement.id : '') : '';
   const val = $('#shop-in', ov)?.value || '';

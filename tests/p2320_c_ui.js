@@ -56,7 +56,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('#view .trow .tmain')][${i}].getBoundingClientRect(); return {x: r.left + 40, y: r.top + r.height / 2}; })()`);
 
     // ================= #1055 long press = select, the bar
+    // 2.1151.0 (#3835): the long press opens the task's menu with "Select" on top; a tap on it selects the row
     let p = await rowAt(1); await hold(p.x, p.y, 700); await sleep(500);
+    const lpm = await ev(`(() => { const r = document.querySelector('#pop:not(.hidden) [data-act="cm-select"]')?.getBoundingClientRect(); return r ? {x: r.left + r.width / 2, y: r.top + r.height / 2} : null; })()`);
+    check(!!lpm, '#3835: the long press opens the task menu with "Select"');
+    if (lpm) { await hold(lpm.x, lpm.y, 60); await sleep(500); }
     const s1 = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {m: S.multiMode, n: S.multi.size, pop: !!document.querySelector('#pop:not(.hidden) [role="menuitem"]'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb .mbl')].map(x => x.textContent).join('|'), grips: document.querySelectorAll('#view .trow .tgrip').length, gh: Math.round(document.querySelector('#view .trow .tgrip')?.getBoundingClientRect().height || 0)}; })()`);
     check(s1.m && s1.n === 1 && !s1.pop && s1.in && s1.lab === 'Move|Date|Complete|More', '#1055: a long press selects the row, the bar Move | Date | Complete | More ' + JSON.stringify(s1));
     check(s1.grips >= 8 && s1.gh >= 44, '#1055: while selecting every row has a grip (44 px) ' + JSON.stringify(s1));
@@ -75,6 +79,8 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     check(mv && moved.every(x => x === L2) && await ev(`!S.multiMode && !S.multi.size`), '#1055: Move > a list moves the selection there and ends it ' + JSON.stringify(moved));
     // the grip drags a row while selecting
     p = await rowAt(0); await hold(p.x, p.y, 700); await sleep(400);
+    // 2.1151.0 (#3835): the long press opens the menu first; its "Select" starts the selection
+    { const q = await ev(`(() => { const r = document.querySelector('#pop:not(.hidden) [data-act="cm-select"]')?.getBoundingClientRect(); return r ? {x: r.left + r.width / 2, y: r.top + r.height / 2} : null; })()`); if (q) { await hold(q.x, q.y, 60); await sleep(400); } }
     const g = await ev(`(() => { const gs = [...document.querySelectorAll('#view .trow .tgrip')]; const a = gs[1].getBoundingClientRect(), b = gs[4].getBoundingClientRect(); return {x: a.x + a.width / 2, y: a.y + a.height / 2, y2: b.y + b.height * .8, id: +gs[1].closest('.trow').dataset.id}; })()`);
     const before = await ev(`JSON.stringify([...document.querySelectorAll('#view .trow')].map(r => +r.dataset.id))`);
     await touch([{type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y + 20), duration: 100}, {type: 'pointerMove', x: Math.round(g.x), y: Math.round(g.y2), duration: 300}, {type: 'pointerUp', button: 0}]);
@@ -120,10 +126,12 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const st = await ev(`(() => { const m = document.querySelector('.smodal'), n = m.querySelector('.snav'), sub = m.querySelector('.aisub:not(.admsub)') /* 2.364.0 (#3041): the Organisation area has its own strip */, bs = [...sub.querySelectorAll('button')];
       const lbl = s => { const b = m.querySelector('#s-ags [data-ag="' + s + '"] .aglbl'); return b ? getComputedStyle(b).display !== 'none' && b.textContent : ''; };
       return {nav: getComputedStyle(n).display, back: getComputedStyle(m.querySelector('.sback')).display, h: m.querySelector('.shdr h3').textContent,
-        flex: getComputedStyle(bs[0]).flexGrow, sc: sub.scrollWidth > sub.clientWidth, ox: getComputedStyle(sub).overflowX, test: lbl('test'), edit: lbl('edit'), over: document.documentElement.scrollWidth <= 390}; })()`);
+        flex: getComputedStyle(bs[0]).flexGrow, sc: sub.scrollWidth > sub.clientWidth, ox: getComputedStyle(sub).overflowX, test: lbl('test'), edit: lbl('edit'), stop: lbl('pause'), over: document.documentElement.scrollWidth <= 390,
+        hid: ['test', 'edit', 'hold'].every(s => m.querySelector('#s-ags [data-ag="' + s + '"]')?.getBoundingClientRect().width <= 1), dots: m.querySelector('#s-ags .agacts .ms-phdots')?.getBoundingClientRect().width > 20}; })()`);
     check(st.nav === 'none' && st.back !== 'none' && st.h === 'Agents', '#1060: inside an area no area tabs, a back arrow, the header names the area ' + JSON.stringify(st));
     check(st.flex === '0' && st.sc && st.ox === 'auto' && st.over, '#1060: the sub-tabs keep their width and scroll sideways ' + JSON.stringify(st));
-    check(st.test === 'Send test' && st.edit === 'Edit', '#1060: the agent card says "Send test" and "Edit" in words ' + JSON.stringify(st));
+    // 2.1151.0 (#3835): on the phone "Send test", "Edit" and the pause sit behind one "…" (its menu names them in words); the emergency stop stays in words
+    check(st.hid && st.dots && /Emergency stop|Resume/.test(st.stop || ''), '#1060 / #3835: the agent card: one "…" for test, edit and pause, the emergency stop in words ' + JSON.stringify(st));
     await shot('p2320c-390-settings-agents.png');
     await ev(`(() => { document.querySelector('.smodal .sback').click(); return 1; })()`); await sleep(400);
     const ix = await ev(`(() => { const m = document.querySelector('.smodal'); return {idx: m.classList.contains('sidx'), h: m.querySelector('.shdr h3').textContent, nav: getComputedStyle(m.querySelector('.snav')).display}; })()`);

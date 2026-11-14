@@ -401,8 +401,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await ev(`(() => { closePop(); return 1; })()`);
     // A14: long press on a row = select
     const rw = await ev(`(() => { const r = document.querySelector('#view .trow .tmain').getBoundingClientRect(); return {x: r.left + 30, y: r.top + r.height / 2}; })()`);
-    await tap(rw.x, rw.y, 700); await fu(`S.multiMode && S.multi.size > 0 && !document.querySelector('#mbar').classList.contains('hidden')`); await settle(ev, idle);
-    // 2.32.0 (#1055): the long press selects the row at once (2.25.0 UX-11 opened the task's menu first); the phone's bar:
+    // 2.1151.0 (#3835): the long press opens the task's menu, "Select" on top (2.32.0 #1055 selected at once); its tap selects
+    await tap(rw.x, rw.y, 700); await fu(`!!document.querySelector('#pop:not(.hidden) [data-act="cm-select"]')`); await settle(ev, idle);
+    const sb = await ev(`(() => { const r = document.querySelector('#pop:not(.hidden) [data-act="cm-select"]').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
+    await tap(sb.x, sb.y); await fu(`S.multiMode && S.multi.size > 0 && !document.querySelector('#mbar').classList.contains('hidden')`); await settle(ev, idle);
+    // the phone's bar:
     // Verschieben, Datum, Erledigt, Mehr (Löschen is under Mehr)
     const sel = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {mode: S.multiMode, n: S.multi.size, menu: !!document.querySelector('#pop:not(.hidden) [role="menuitem"]'), vis: !b.classList.contains('hidden'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb:not([hidden]) .mbl')].map(x => x.textContent).join('|')}; })()`);
     check(sel.mode && sel.n === 1 && !sel.menu && sel.vis && sel.in && sel.lab === 'Verschieben|Datum|Erledigen|Mehr', '390 #1055: long press selects the row, the bar fits with labels ' + JSON.stringify(sel));
@@ -432,7 +435,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     for (const pct of [150, 50]) {
       await ev(`(() => { localStorage.setItem('tasks.fsize', '${pct}'); return 1; })()`);
       await nav(B + `?fs=${pct}#l/` + P); await ready(ev, idle);
-      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
+      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth > 1 /* 2.1151.0 (#3835): a button hidden for the eye (kept for screen readers) is no touch target */).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
       check(!r.over && r.h1 && (pct === 150 || !r.small.length), `390 #429 ${pct} %: no sideways overflow, the title shows` + (pct === 50 ? ', touch targets still 44 px ' : ' ') + JSON.stringify(r));
       await shot(`p2130-fontsize-${pct}-390.png`);
     }

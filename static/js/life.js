@@ -85,7 +85,7 @@ function viewLife() {
   }
   if (d.reading) {
     const r = d.reading, kk = r.karakeep || {};
-    const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
+    const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow lrdrow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn ms-phsr" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
       : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” project, or bookmarks from Karakeep, show up here.')}</p>`)
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
     const acts = `<a class="btn sm" href="#${esc(rd_home('reading'))}">${ic('book', 's')}<span>${tr('Open')}</span></a>`  // 2.172.0 B (#2679): the view Read later (area Reading)
@@ -98,6 +98,8 @@ function viewLife() {
   return `<div class="dash fam life">${head}<div class="dgrid">${cards.join('')}</div></div>`;
 }
 
+// 2.1151.0 C (#3835): on a phone a row of "Read later" shows no link symbol; a long press opens the menu with it (ms_btnMenu)
+ms_rowMenu('#view .lrdrow', r => ms_btnMenu(r, '.iconbtn', r.querySelector('b')?.textContent));
 // ---- dialogs
 function lifeListOpts(kind, sel) {
   const ls = S.lists.filter(l => !l.archived && canEditList(l.id) && !l.is_inbox && (kind === 'health' ? l.life === 'health' : true));

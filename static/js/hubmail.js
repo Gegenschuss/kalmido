@@ -52,13 +52,13 @@ function hbm_listHtml(key) {
   if (!j.mails.length) return `<p class="muted hbmempty">${(s.q || '').trim() ? tr('No e-mail matches.') : inbox ? tr('Nothing waits here: every e-mail found its client.')
     : j.enabled ? tr('No e-mails yet. Send or forward e-mails to the address of this client or project (Copy address), they are filed here.') : tr('No e-mails yet.')}</p>`;
   const more = j.total > j.mails.length ? `<p class="muted">${trh('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
-  return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow">
+  return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow${inbox ? ' hbmin' : ''}">
     <button type="button" class="hbmopen" data-hbmopen="${m.id}" data-hbmk="${key}">
       <span class="hbmtop"><b class="hbmfrom">${m.dir === 'out' ? `${ic('send', 's')} ${esc(tr('To {0}', m.to_list || ''))}` : esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.state === 'failed' ? `<span class="hmbtag bad">${tr('Not sent')}</span>` : m.state === 'sending' ? `<span class="hmbtag">${tr('Sending…')}</span>` : m.dir === 'out' ? `<span class="hmbtag">${tr('Sent')}</span>` : ''}${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>
       <span class="hbmsubj">${esc(m.subject || tr('(no subject)'))}</span>
       ${key.startsWith('client') && m.list_name ? `<span class="muted hbmproj">${ic('brief', 's')} ${esc(m.list_name)}</span>` : ''}
     </button>
-    ${inbox ? `<span class="hbmacts"><button type="button" class="btn sm" data-hbmasg="${m.id}" data-hbmk="${key}">${tr('Assign')}</button><button type="button" class="iconbtn" data-hbmdel="${m.id}" data-hbmk="${key}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span>` : ''}
+    ${inbox ? `<span class="hbmacts ms-phsr"><button type="button" class="btn sm" data-hbmasg="${m.id}" data-hbmk="${key}">${tr('Assign')}</button><button type="button" class="iconbtn" data-hbmdel="${m.id}" data-hbmk="${key}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span>` : ''}
   </li>`).join('')}</ul>${more}`;
 }
 function hbm_bodyHtml(key) {
@@ -83,8 +83,8 @@ function hbm_projHtml(l) {
 function hbm_hubView() {
   const key = 'inbox:0', j = hbm_state(key).j;
   const sp = (j?.spaces || []).map(x => `<li class="hbmsp"><span class="hbmspn"><b>${esc(x.name)}</b><small class="muted">${x.address ? esc(x.address) : tr('No address yet')}</small></span>
-      <button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" data-ws="${esc(x.ws)}">${ic('copy', 's')}<span>${tr(x.address ? 'Copy address' : 'Create address')}</span></button>
-      ${x.address ? `<button data-rowmenu="hbmsp" type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" data-ws="${esc(x.ws)}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}</li>`).join('');
+      <button type="button" class="btn sm${x.address ? ' ms-phsr' : ''}" data-hbma="copy" data-hbmk="${key}" data-ws="${esc(x.ws)}">${ic('copy', 's')}<span>${tr(x.address ? 'Copy address' : 'Create address')}</span></button>
+      ${x.address ? `<button data-rowmenu="hbmsp" type="button" class="iconbtn ms-phsr" data-hbma="menu" data-hbmk="${key}" data-ws="${esc(x.ws)}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}</li>`).join('');
   // 2.298.0 C (#3187): the introduction only while nothing waits here
   const intro = !j ? '' : j.enabled ? j.total ? '' : `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a e-mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
@@ -245,8 +245,8 @@ async function hbm_addr(key, ws, renew) {
   if (j.address) await copyText(j.address);
   hbm_load(key);
 }
-function hbm_addrMenu(b, key, ws) {
-  menu(b, [{label: tr('New address'), icon: 'sync', fn: async () => {
+function hbm_addrMenu(b, key, ws, pre = []) {  // 2.1151.0 C (#3835): pre = the entries above (the phone row's hidden "Copy address")
+  menu(b, [...pre, {label: tr('New address'), icon: 'sync', fn: async () => {
     if (await askConfirm(tr('Make a new address?'), tr('The old address stops working at once.'), {ok: tr('New address')})) hbm_addr(key, ws, true);
   }}, {label: tr('Turn the address off'), icon: 'x', fn: async () => {
     if (!await askConfirm(tr('Turn the address off?'), tr('E-mails to it are no longer filed. The filed e-mails stay.'), {ok: tr('Switch off'), danger: true})) return;
@@ -279,4 +279,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.hbma === 'menu') hbm_addrMenu(b, key, ws);
 });
 // 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
-let hbm_lpS; if (typeof cm_bind === 'function') hbm_lpS = cm_bind('#view .hbmspaces .hbmsp', r => { const b = lm_btn(r, '[data-hbma="menu"]'); if (!b) return false; const d = hbm_lpS.done; hbm_lpS.done = 0; b.click(); hbm_lpS.done = d; return true; }, null, lm_keep);
+// 2.1151.0 C (#3835): an e-mail waiting in the inbox: on a phone "Assign" and "Delete" are hidden, a long press opens them as a menu
+ms_rowMenu('#view .hbmrow.hbmin', r => ms_btnMenu(r, '.hbmacts button', r.querySelector('.hbmsubj')?.textContent));
+// 2.1151.0 C (#3835): on a phone its buttons are hidden: the menu starts with "Copy address"
+let hbm_lpS; if (typeof cm_bind === 'function') hbm_lpS = cm_bind('#view .hbmspaces .hbmsp', r => { const b = lm_btn(r, '[data-hbma="menu"]'); if (!b) return false; if (isMobile()) { hbm_addrMenu(r, b.dataset.hbmk, b.dataset.ws, ms_btnItems(r, '[data-hbma="copy"]')); return true; } const d = hbm_lpS.done; hbm_lpS.done = 0; b.click(); hbm_lpS.done = d; return true; }, null, lm_keep);

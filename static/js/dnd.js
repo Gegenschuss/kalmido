@@ -420,10 +420,11 @@ async function taskToNewSection(id) {
 function secHeadMenu(anchor, sid) {
   const s = S.sections.find(x => x.id === sid); if (!s) return;
   if (!canEditList(s.list_id)) { roToast(); return; }
-  const ids = secIds(s.list_id), i = ids.indexOf(sid);
-  menu(anchor, [...(i > 0 ? [{label: tr('Move section up'), icon: 'left', fn: () => moveSection(sid, -1)}] : []),
-    ...(i < ids.length - 1 ? [{label: tr('Move section down'), icon: 'right', fn: () => moveSection(sid, 1)}] : []),
-    '-', {label: tr('Section menu…'), icon: 'dots', next: 1, fn: () => sectionMenu(anchor, sid)}]);
+  // 2.1151.0 B (#3835): the head's whole menu at once, its "+" (hidden on the phone) on top; up / down went (the head drags).
+  // Was 2.46.1 (#1635): Move section up / down and "Section menu…"
+  // the add button's own text; the call itself, not a click on it (the hold redraws the list, the button may be a new one by then)
+  const ab = anchor.querySelector('.gadd');
+  sectionMenu(anchor, sid, ab ? [{label: ab.getAttribute('aria-label') || '', icon: 'plus', fn: () => secAddOpen(+ab.dataset.sec || 0)}, '-'] : []);
 }
 let secDrag = null;
 const secOf = el => el.classList.contains('kcol') ? el.dataset.kcol : el.dataset.section;
@@ -597,7 +598,7 @@ function tdStart(t) {
   const r = t.closest?.('#view .trow, #view .ev, #view .wev, #detail .subs .trow');
   // 2.32.0 (#1055): while selecting, a row is dragged by its grip (at once, no long press); elsewhere a tap selects
   const grip = !!t.closest?.('.tgrip');
-  if (!r || !r.dataset.id || t.closest('.chk, input, .caret') || (S.multiMode && !grip) || r.classList.contains('ghost')) { lp = null; return null; }
+  if (!r || !r.dataset.id || r.classList.contains('trtrash') || t.closest('.chk, input, .caret') || (S.multiMode && !grip) || r.classList.contains('ghost')) { lp = null; return null; }
   return (lp = {r, id: +r.dataset.id, active: false, grip});
 }
 // the hold ended: the row lifts
@@ -662,12 +663,19 @@ function tdHeld(d) {
   tdOff(d); tdKill();
   swiped = true; setTimeout(() => { swiped = false; }, 400);
   if (d.r.closest('#view') && isKanban() && S.sections.some(x => x.list_id === S.tasks.get(d.id)?.list_id)) sectionPicker(d.r, d.id);  // "Move to column…"
-  else if (d.r.matches('#view .trow') && !isKanban() && !d.grip) {
-    // 2.32.0 (#1055): a long press selects the task (bar: Move, Date, Complete, More; the task's menu is under More); more
-    // rows join with a tap. Was (2.25.0, UX-11): the task's menu with "Select" first
-    S.multiMode = true; S.multi.add(d.id); S.multiLast = d.id; render();
-  }
+  // 2.1151.0 B (#3835): held and let go unmoved = the task's menu with "Select" on top (the row has no symbols on the phone,
+  // the menu has them all); was 2.32.0 (#1055): the hold selected the task at once. A subtask of the task view: its menu
+  else if (d.r.matches('#view .trow, #detail .subs .trow') && !isKanban() && !d.grip) tdRowMenu(d.r, d.id);
 }
+// 2.1151.0 B (#3835): the menu of a held task row; read-only = the title, "Select" and "Open details" (taskMenu shows only a hint there)
+function tdRowMenu(r, id) {
+  const t = S.tasks.get(id); if (!t || !r.isConnected) return;
+  const sel = !!r.closest('#view');
+  if (canEdit(t)) { taskMenu(r, id, {select: sel}); return; }
+  menu(r, [...cm_selHead(t.title, sel ? () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); } : null), {label: tr('Open details'), icon: 'edit', fn: () => openDetail(id)}]);
+}
+// 2.1151.0 B (#3835): a row of the trash (no drag, not in S.tasks): the long press opens what its two buttons do (hidden on the phone)
+domReady(() => ms_rowMenu('#view .trow.trtrash', r => ms_btnMenu(r, '[data-act="restore"], [data-act="purge"]', r.querySelector('.ttl')?.textContent.trim() || '')));  // multisel.js loads later
 document.addEventListener('touchstart', e => {
   if ((e.touches?.length || 0) > 1) return;  // a second finger: drag.js cancels the drag
   if (lp?.active || $('.ghost-drag:not(.side-ghost)')) tdCancel();  // 2.13.4: a drag whose end got lost: its ghost goes
@@ -682,14 +690,14 @@ drg_attach(document, {
 });
 // 2.38.0 (#1178): on a touch screen the long press on a task row (its title too) is the app's: the browser's own menu (Copy,
 // Select all, Search) never opens over it. When the browser took the press away from the app (touchcancel, so no selection
-// above), its menu event starts the selection instead. A mouse (also in a narrow window) keeps the browser's menu.
+// above), its menu event opens the row's menu instead (2.1151.0 B #3835; was: the selection). A mouse (also in a narrow window) keeps the browser's menu.
 document.addEventListener('contextmenu', e => {
   const r = e.target.closest?.('#view .trow[data-id]');
   if (!r || !(e.pointerType ? e.pointerType === 'touch' : isTouch()) || e.target.closest('input,textarea,.ttlin')) return;
   e.preventDefault();
   const id = +r.dataset.id;
   if (lp || S.multiMode || isKanban() || !S.tasks.has(id) || r.classList.contains('ghost')) return;
-  S.multiMode = true; S.multi.add(id); S.multiLast = id; render();
+  tdRowMenu(r, id);  // 2.1151.0 B (#3835): the row's menu, as the hold
 });
 
 // ---- 2.380 F (#3436): the subtasks of the task view sorted by dragging, only among themselves (not out of the task, not into

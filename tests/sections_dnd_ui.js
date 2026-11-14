@@ -2,7 +2,7 @@
 // that section (a subtask becomes standalone there), an empty section shows a drop zone only while a task is dragged,
 // sections are reordered by their handle (list view and kanban columns) in one request with one undo, "Move up / down"
 // in the section menu uses the same request, a view-only member gets no handles and a notice, and on a phone a
-// long-press on a task opens "Move to section…" and a long-press on a section header "Move section up / down".
+// long-press on a task opens "Move to section…" and a long-press on a section header its menu (2.1151.0 #3835: no up / down).
 const {boot, errs, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -122,12 +122,14 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ================= phone (bob, German): long-press task -> "Move to section…", long-press header -> up / down
   w = await boot({user: 'bob', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}}); d = w.document;
   touch(w, row(t2), 'touchstart'); await sleep(450);  // wanted: the long press (dnd.js timer)
-  const te = touch(w, row(t2), 'touchend'); await until(() => w.eval(`S.multiMode && S.multi.has(${t2})`));
-  // 2.13.0 (#453 A14): a long press without moving selects the task in a list (Kanban keeps "Move to column…"); the
-  // section picker itself is the same
-  // 2.32.0 (#1055): the long press selects the task at once (2.25.0 UX-11 opened its menu with "Select" first)
-  check(te.defaultPrevented && !d.querySelector('#pop:not(.hidden)') && w.eval('S.multiMode') && w.eval(`S.multi.has(${t2})`), 'long-press on a task without moving selects it (2.32.0)');
-  w.eval('S.multi.clear(); S.multiMode = false; render()');
+  const te = touch(w, row(t2), 'touchend');
+  // 2.13.0 (#453 A14): Kanban keeps "Move to column…"; the section picker itself is the same
+  // 2.1151.0 (#3835): a long press without moving opens the task's menu with "Select" on top (2.32.0 #1055 selected at once)
+  const lpItems = await until(() => { const it = [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]:not([disabled])')].map(b => b.textContent.trim()); return it.length && it; });
+  check(te.defaultPrevented && (lpItems || [])[0] === 'Auswählen' && !w.eval('S.multiMode'), 'long-press on a task without moving opens its menu, "Select" first (2.1151.0): ' + lpItems);
+  [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]')].find(b => b.textContent.trim() === 'Auswählen')?.click();
+  check(await until(() => w.eval(`S.multiMode && S.multi.has(${t2})`)), '"Select" in that menu starts the selection with the task');
+  w.eval('closePop(); S.multi.clear(); S.multiMode = false; render()');
   w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await until(() => /Later/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   let pop = d.querySelector('#pop:not(.hidden)');
   check(pop && /Ohne Abschnitt/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');  // 2.800.0 (#5441): was "Nicht zugeordnet"
@@ -136,12 +138,13 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d)), 15000), `German toast: ${toastText(d)}`);
   const hb = () => d.querySelector(`#view .ghead[data-section="${Bs}"]`);
   touch(w, hb(), 'touchstart'); await sleep(520);  // wanted: a hold longer than the long-press timer (450 ms, dnd.js)
-  const he = touch(w, hb(), 'touchend'); await until(() => /Abschnitt nach oben/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
-
+  // 2.1151.0 (#3835): held without moving = the head's whole menu, its "+" on top, no up / down (the head drags; was 2.46.1 #1635)
+  const he = touch(w, hb(), 'touchend'); await until(() => /Umbenennen/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   pop = d.querySelector('#pop:not(.hidden)');
-  check(he.defaultPrevented && pop && /Abschnitt nach oben/.test(pop.textContent) && /Abschnitt nach unten/.test(pop.textContent), 'long-press on a section header: move up / down');
-  [...pop.querySelectorAll('button')].find(b => /Abschnitt nach oben/.test(b.textContent)).click();
-  check(await until(async () => JSON.stringify(await secOrder(L, BK)) === JSON.stringify([Bs, A, C])), 'moved up (one request, same as the menu)');
+  const hl = pop ? [...pop.querySelectorAll('[role="menuitem"]:not([disabled])')].map(b => b.textContent.trim()) : [];
+  check(he.defaultPrevented && /^Aufgabe zu .* hinzufügen$/.test(hl[0] || '') && hl.includes('Umbenennen') && hl.includes('Abschnitt löschen (Aufgaben bleiben)') && !hl.some(x => /nach oben|nach unten|links|rechts/i.test(x)), 'long-press on a section header: its menu, "+" first, no up / down ' + hl.join(' | '));
+  [...pop.querySelectorAll('[role="menuitem"]')].find(b => /^Aufgabe zu/.test(b.textContent.trim())).click();
+  check(await until(() => !!d.querySelector('.qadd.sheet') && w.eval(`S.quickPreset?.section_id === ${Bs}`)), 'the menu\'s "+" opens the add sheet for that section');
   check(!d.querySelector(`#view .ghead[data-section="${A}"]`)?.classList.contains('closed'), 'the long-press did not also collapse the section');
   check(errs.length === 0, 'no script errors (phone): ' + errs.join(' | '));
   w.close();

@@ -193,8 +193,8 @@ function lyv_manage(v) {
     $('.lyvlist', md).innerHTML = rows.length ? rows.map((r, i) => `<div class="lyvrow" role="listitem" data-id="${r.id}">${rowd_grip('lyv')}<span class="lyvrn">${esc(r.name)}${r.active ? ` <small class="muted">${tr('active')}</small>` : ''}</span>
       ${rowd_arrows(`<button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
       <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>`)}
-      <button type="button" class="iconbtn" data-lyvm="ren" aria-label="${esc(tr('Rename') + ': ' + r.name)}" title="${esc(tr('Rename'))}">${ic('edit', 's')}</button>
-      <button type="button" class="iconbtn" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></div>`).join('')
+      <button type="button" class="iconbtn ms-phsr" data-lyvm="ren" aria-label="${esc(tr('Rename') + ': ' + r.name)}" title="${esc(tr('Rename'))}">${ic('edit', 's')}</button>
+      <button type="button" class="iconbtn ms-phsr" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', r.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
       : `<p class="muted">${esc(tr('No saved arrangements yet.'))}</p>`;
   };
   draw();
