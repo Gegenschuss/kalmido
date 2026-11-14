@@ -21,7 +21,25 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1131.0] - 2026-11-14
+## [2.1134.0] - 2026-11-14
+
+Package 2.1127 (Bündel: CI: überholte Merge-Queue-Läufe selbst abbrechen ().
+
+### Fixed
+- CI: a merge queue entry whose group GitHub discarded (its gh-readonly-queue ref is deleted, e.g. after a push on main) now cancels its own run in the first step of its test shards instead of holding runners; runs on main, tags, hotfix branches and nightly runs are never cancelled, unclear API answers never cancel. The test shards' checkout keeps no token for the suites (#6050).
+
+Package 2.1129 (Bündel: CI: rote Testteile sollen schnell enden statt bis ).
+
+### Changed
+- #6054: CI full run - the soft test shards are now cut to ~25 min each (as many as needed, at most 60) instead of exactly 20 shards of 57-78 min, at most 16 shards run at once (`max-parallel` from the plan) so the merge queue always finds a free runner, and a full shard ends at 60 min instead of 90. The 60+ minutes were the normal length of every full run, red or green (the longest suite takes 14-18 min, none hung). `tests/run_all.sh` gets two switches the CI sets: `KALMIDO_SUITE_LIMIT_S` (1500) stops a hanging suite and marks it red, `KALMIDO_RED_STREAK` (10) ends a shard after ten red suites in a row (database or server down) and names the rest "NOT RUN"; the results of the suites that ran stay; the merge queue gate holds a shard stopped that way (its other suites are untested), the release gate counts it like a shard cut before its end. Test `tests/p6054_a_shard_fast_test.py`.
+
+### Fixed
+- #6055: CI uploads the JUnit reports again (`include-hidden-files` for the hidden folder `tests/.junit`) - no `junit-shard-N` artifact had been uploaded, the flaky detection saw no cases.
+
+Package 2.1124 (Bündel: Einstellungen > Konto: 404 auf /api/orgs/0/encrypt).
+
+### Fixed
+- #6047: Settings > Account no longer logs a 404 for the encryption state of the private office while there is none yet: `GET /api/orgs/0/encryption` answers `{has_key: false}`; the box stays hidden as before, agents still get 403.
 
 Package 2.1122 (Bündel: CI: pg_prepare und pg_dialect in tests/hard_suites).
 
@@ -56,6 +74,10 @@ Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1131.0] - 2026-11-14
+
+Not released (the CI of this version was red); its changes are listed under 2.1134.0.
 
 ## [2.1128.0] - 2026-11-13
 
@@ -359,7 +381,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1131.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1134.0...HEAD
+[2.1134.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1134.0
 [2.1131.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1131.0
 [2.1128.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1128.0
 [2.1125.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1125.0
