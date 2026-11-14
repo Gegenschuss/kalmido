@@ -81,8 +81,8 @@ function nwl_html(set) {
   h += `<h4>${tr('Segments')}</h4>`;
   h += (d.segments || []).length ? `<ul class="nwl-segs">${d.segments.map(s => `<li><div class="nwl-sn"><b>${esc(s.name)}</b> <span class="muted">→ ${s.list_name ? esc(s.list_name) : tr('no list yet')}</span>
       <div class="muted">${esc(nwl_ruleTxt(s.rule))} · ${trh('{0} go to the service, {1} on the list', s.counts.send, s.counts.on_list)}</div></div>
-      <button type="button" class="iconbtn" data-nwl="seg-edit" data-sid="${s.id}" aria-label="${esc(tr('Edit'))}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
-      <button type="button" class="iconbtn" data-nwl="seg-del" data-sid="${s.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`
+      <button type="button" class="iconbtn ms-phsr" data-nwl="seg-edit" data-sid="${s.id}" aria-label="${esc(tr('Edit'))}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
+      <button type="button" class="iconbtn ms-phsr" data-nwl="seg-del" data-sid="${s.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${ms_dots('.ms-phsr', s.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</li>`).join('')}</ul>`
     : `<p class="muted">${tr('No segments yet: a segment picks contacts by group, company or address book and fills one list at the service.')}</p>`;
   h += `<div class="foot"><button type="button" class="btn" data-nwl="seg-new">${ic('plus', 's')} ${tr('New segment')}</button><span class="spacer"></span>
     <button type="button" class="btn pri" data-nwl="sync" ${busy || !(d.segments || []).length ? 'disabled' : ''}>${busy ? tr('Sync running…') : tr('Sync now')}</button></div>`;
