@@ -25,6 +25,8 @@ function bootDone() {
   if (inv) { bootDone(); await inviteScreen(inv[1]); return; }
   const sil = location.hash.match(/^#signin\/([A-Za-z0-9_-]{20,100})$/);  // 2.23.0 (#444): a sign-in link (QR code)
   if (sil) { bootDone(); await i18nLoad(uiLang()); await signinScreen(sil[1]); return; }
+  const cnv = location.hash.match(/^#cinv\/([A-Za-z0-9_-]{20,100})$/);  // 2.1156.0 (#4550): a person's invitation link (cinvite.js)
+  if (cnv) { history.replaceState(null, '', location.pathname); if (await cnv_boot(cnv[1])) { bootDone(); return; } }
   // 2.1033.0 (#5790): the link of the address proof mail: the token leaves the address bar at once and waits in this tab over
   // a sign-in (the login reloads the page); confirmed below once the state of the signed-in account is there (acctset.js epv_link)
   { const epv = location.hash.match(/^#mailproof\/([A-Za-z0-9_-]{20,100})$/); if (epv) { try { sessionStorage.setItem('kalmido.epv', epv[1]); } catch { /* no storage */ } history.replaceState(null, '', location.pathname); } }
@@ -40,6 +42,7 @@ function bootDone() {
   if (!MW_ON) setTimeout(spl_check, 0);  // 2.742.0 (#4858): the split view's right half, when it is on (miniwin.js)
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   { let t = ''; try { t = sessionStorage.getItem('kalmido.epv') || ''; sessionStorage.removeItem('kalmido.epv'); } catch { /* no storage */ } if (t && !MW_ON) setTimeout(() => epv_link(t), 300); }  // 2.1033.0 (#5790)
+  try { if (sessionStorage.getItem('kalmido.cinv') && !MW_ON) setTimeout(cnv_after, 300); } catch { /* no storage */ }  // 2.1156.0 (#4550)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   { const rs = LS.get('rsToast', ''); if (rs) { LS.del('rsToast'); setTimeout(() => loadModule('settings').then(() => rs_after(rs)).catch(() => {}), 600); } }  // 2.593.0 (#4590): after a reset of the settings: the message with Undo (setreset.js)
   if (!MW_GUARD) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);  // 2.891.0 (#5358): the main window's chores stay with it (not the split view's right half)

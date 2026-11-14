@@ -243,6 +243,7 @@ TENANT_EXEMPT = {
     "disc_profiles": _OWN, "disc_tokens": _OWN, "disc_quota": _OWN, "conn_blocks": _OWN,
     "conn_requests": "2.49.0 (#1106): a request between two people (no workspace); only the two see it",
     "conn_links": "2.49.0 (#1106): an accepted connection between two people, like a private shared list (no workspace)",
+    "conn_invites": "2.1156.0 (#4550): a person's invitation link for someone without an account, person to person like conn_links (no workspace)",
     "wiki_keys": "2.64.3 (#1817): a wrapped key of a knowledge space -> its wiki_spaces row (org_id or owner_id); only the person it is wrapped for reads it",
     "fs_lock_keys": "2.353.0 A (#2758): a wrapped key of a locked folder -> its fs_locks row (org_id or the folder's owner); only the person it is wrapped for reads it",
     "wiki_key_pending": "2.64.3 (#1817): an organisation member waiting for the key of a knowledge space -> its wiki_spaces row (org_id)",

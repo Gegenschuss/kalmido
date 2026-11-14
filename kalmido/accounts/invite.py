@@ -127,6 +127,8 @@ def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS, by=None):
         subject = t(N_("Confirm your registration at {0}"), APP_NAME)
         head, intro = t(N_("Hello {0},"), name), t(N_("please confirm your e-mail address and choose your password to finish your registration at {0}."), APP_NAME)
         button = t(N_("Confirm and choose a password"))
+        if inviter:  # 2.1156.0 (#4550, Fable F5): a person's invitation link (accounts/cinvite.py) -- the mail says who invited
+            intro = t(N_("{0} invited you to {1}. Please confirm your e-mail address and choose your password – after the confirmation you are connected."), inviter, APP_NAME)
     elif kind == "reset":
         subject = t(N_("Set a new password for {0}"), APP_NAME)
         head, intro, button = t(N_("Hello {0},"), name), t(N_("{0} sent you a link to set a new password for {1}."), inviter or t(N_("An admin")), APP_NAME), t(N_("Set a new password"))

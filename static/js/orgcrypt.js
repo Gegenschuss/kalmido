@@ -35,7 +35,7 @@ function ocNewsText(d, who, q) {
 const ocScopeSlotHtml = () => `<details class="sdet pmcsd" id="s-cryptscope"><summary>${tr('What is encrypted?')}</summary><div class="pmcsb"></div></details>`;
 function ocScopeFill(sc) {
   const slot = $('#s-cryptscope .pmcsb');
-  if (slot && !slot.firstChild) slot.innerHTML = pm_cryptScopeHtml(sc);
+  if (slot && !slot.firstChild) slot.innerHTML = pm_cryptScopeHtml(sc);  // lazy-ok: 2.1156.0 (#4280): the slot is only in the settings dialog, which loads cryptscope.js first (LD_NEED settings)
 }
 async function ocLoad(box) {
   const oid = +box.dataset.ocorg, st = $('.ocst', box);

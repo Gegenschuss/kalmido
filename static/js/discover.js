@@ -48,6 +48,7 @@ function dsc_html() {
     <form class="row dsc-find" data-dsc-form><input id="dsc-email" type="email" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="200"
       placeholder="${dsc_esc(tr('Full e-mail address'))}" aria-label="${dsc_esc(tr('Full e-mail address'))}" enterkeyhint="search"><button type="submit" class="btn pri">${ic('search', 's')} ${tr('Search')}</button></form>
     <div id="dsc-found" aria-live="polite">${found}</div>
+    ${d.invite_link ? `<div class="row"><button type="button" class="btn sm" data-dsc="invite">${ic('link', 's')} ${tr('Invite by link')}</button><span class="shint">${tr('For someone without an account (link or QR code)')}</span></div>` : ''}${''/* 2.1156.0 (#4550): cinvite.js */}
     ${feat('contacts') ? `<div class="row"><button type="button" class="btn sm" data-dsc="check">${ic('book', 's')} ${tr('Check my address book')}</button></div>
       <div class="shint">${tr('Shows which of your contacts use Kalmido and can be found. The addresses stay on this server.')}</div>${checkHtml}` : ''}
     ${inc.length ? `<h4 id="dsc-req-h">${tr('Requests')}</h4><div class="members" aria-labelledby="dsc-req-h">${inc.map(r => dsc_personRow(r.person,
@@ -102,6 +103,7 @@ async function dsc_open() {
     const k = b.dataset.dsc, rid = +b.dataset.rid, uid = +b.dataset.uid, ref = b.dataset.ref;
     const name = (b.closest('.dsc-row')?.querySelector('.n')?.textContent || '').trim();
     if (k === 'close') { md.remove(); return; }
+    if (k === 'invite') { cnv_open(); return; }  // 2.1156.0 (#4550)
     b.disabled = true;
     try {
       if (k === 'check') {

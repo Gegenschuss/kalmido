@@ -36,6 +36,7 @@ from ..core.mailframe import mail_html
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
 from ..accounts.pictures import avatar_url, avatar_path  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.signup import cinv_signup_on  # 2.1156.0 (#4550): the switch of the invitation links (accounts/cinvite.py)
 
 DISC_DAY = 30            # searches per account and day
 DISC_CHECK_DAY = 300     # addresses of the address book check per account and day
@@ -186,7 +187,8 @@ def disc_get():
                   outgoing=[{"id": r["id"], "at": r["created_at"], "person": pp(r)} for r in out],
                   connections=[{"at": r["created_at"], "person": pp(r)} for r in lk],
                   blocked=[{"at": r["created_at"], "person": pp(r)} for r in bl],
-                  limits={"day": DISC_DAY, "check_day": DISC_CHECK_DAY})
+                  limits={"day": DISC_DAY, "check_day": DISC_CHECK_DAY},
+                  invite_link=cinv_signup_on(c))  # 2.1156.0 (#4550): "Invite by link" (accounts/cinvite.py)
     c.commit()  # the ref key may just have been created
     return res
 
@@ -328,12 +330,16 @@ def disc_check():
 
 
 # ---------------------------------------------------------------- requests
-def _push(c, to, kind, actor_name):
-    """News item + push (row "share": News on, push off by default, both switchable in the notification settings)."""
+def _push(c, to, kind, actor_name, actor=None):
+    """News item + push (row "share": News on, push off by default, both switchable in the notification settings).
+    2.1156.0 (#4550): kind "cinvok" = someone accepted my invitation link (accounts/cinvite.py): the News kind connok with
+    data.via "invite"; actor = the new account (nobody may be signed in yet)."""
     from ..collab.news import news_add, list_push
-    news_add(c, to, kind, data={"name": actor_name}, row="share")
-    title = {"connreq": N_("Connection request"), "connok": N_("Connection accepted")}[kind]
-    msg = {"connreq": N_("{0} wants to connect with you"), "connok": N_("{0} accepted your connection request")}[kind]
+    news_add(c, to, "connok" if kind == "cinvok" else kind, data={"name": actor_name, **({"via": "invite"} if kind == "cinvok" else {})},
+             row="share", **({"actor": actor} if actor else {}))
+    title = {"connreq": N_("Connection request"), "connok": N_("Connection accepted"), "cinvok": N_("Invitation accepted")}[kind]
+    msg = {"connreq": N_("{0} wants to connect with you"), "connok": N_("{0} accepted your connection request"),
+           "cinvok": N_("{0} accepted your invitation and is connected with you now")}[kind]
     list_push(c, to, "share", None, lambda lg: tr(title, lg=lg), lambda lg: tr(msg, actor_name, lg=lg), click=f"{PUBLIC_URL}/#news")
 
 

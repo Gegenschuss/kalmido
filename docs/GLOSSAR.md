@@ -39,6 +39,7 @@ one-per-task migration fragments in `kalmido/core/migrations.d/`, and every `sta
 People and organisations: sign-in, sessions, workspaces, roles, invitations, per-person settings and layouts.
 
 - `kalmido/accounts/bgjobs.py` (`bgj`) - The short background work a request starts (mails right after an action, "Back up now", the organisation keys' passes after a move)
+- `kalmido/accounts/cinvite.py` (`cinv`) - Invitation links: a person invites someone without an account by a link or QR code
 - `kalmido/accounts/colors.py` (`ac`) - A fixed colour per account (agents and people)
 - `kalmido/accounts/colwidths.py` - The column widths of the lists, per person on every device (setting col_widths)
 - `kalmido/accounts/discover.py` (`disc`) - Finding people by e-mail like in a messenger
@@ -857,6 +858,7 @@ The start-up module.
 - `static/js/abscan.js` - The phone scan -- photograph pages with the camera (on a computer: choose pictures)
 - `static/js/absence.js` (`ab2`) - Absences -- a tab of the workload view
 - `static/js/account.js` (`auth`) - Account, users (admin), login, groups, passkeys, two-factor, sign-in policy, backups, the sample project
+- `static/js/acctadm.js` - The settings sections of account.js only the settings dialog draws (Workspaces pane, sign-up / sign-in / OIDC, storage, backups), loaded with the settings (2.1156.0 #4280)
 - `static/js/acctset.js` (`ua8`) - The settings sections of account.js that only the settings dialog draws (account, users, groups, organisations, notifications, two-factor, backups, the sample project)
 - `static/js/agentchat.js` (`chat`) - The chat with an agent (side panel / view)
 - `static/js/agentcontrol.js` (`awc`) - The section "Control" of the agent dialog "
@@ -897,7 +899,9 @@ The start-up module.
 - `static/js/chatwin.js` - A chat in its own small browser window
 - `static/js/chatwins.js` (`cw`) - Several chats at once in the chat side panel, one above the other
 - `static/js/choicecard.js` (`cc`) - (agentchat.js) and in task comments (collab.js)
+- `static/js/cinvite.js` (`cnv`) - Invitation links for people without an account (the dialog, the page /#cinv/<token>)
 - `static/js/cleanup.js` (`cln`) - "Tidy up the list"
+- `static/js/clientdlg.js` - The client dialog (clientModal) and the forms dialog of a list (formsModal), moved out of clients.js, loaded on demand (2.1156.0 #4280)
 - `static/js/clienterr.js` (`cer`) - The browser's own errors to the server
 - `static/js/clientpage.js` (`ms`) - Office > Clients in the layout of the contacts
 - `static/js/clients.js` (`cl`) - Package "Team, family, clients"
@@ -941,17 +945,21 @@ The start-up module.
 - `static/js/dupprop.js` (`dup`) - Tidy up contacts with an agent
 - `static/js/e2e.js` (`e2e`) - "e2e" = end-to-end encryption in the browser: key handling and the encrypt / decrypt helpers the locks build on
 - `static/js/envs.js` (`env`) - Environments of a project (Staging, Live, ...)
+- `static/js/evcals.js` - The dialog Calendars (evCalsModal: own calendars, shares, the calendar filter), moved out of calevents.js, loaded on demand (2.1156.0 #4280)
 - `static/js/events.js` (`q`) - Toasts, quick add wiring and the global event handlers
 - `static/js/evinvite.js` (`evi`) - Invitations by e-mail to attendees outside Kalmido (the switch in the event editor)
 - `static/js/family.js` (`fam`) - The module "Family"
 - `static/js/favorites.js` (`fav`) - Favourite lists and projects
 - `static/js/favtiles.js` (`fv2`) - Favourites of every kind as a row of symbols in the head bar
 - `static/js/feeds.js` (`rss`) - Feeds: the view "Feeds" (follow a feed, OPML import / export, the articles with "Read later")
+- `static/js/fieldmodal.js` - The dialog of a custom field (fieldModal: new / edit, kinds, options, formula), moved out of projects.js, loaded on demand (2.1156.0 #4280)
 - `static/js/filereq.js` - File requests. A folder of the file store gets a public link /u/<token>
 - `static/js/filetext.js` (`ftxt`) - Search in the file store (names + recognised text, also project files)
 - `static/js/flow.js` (`flw`) - The card "Flow" of a project page (block 'flow', projects.js POV_BLOCKS)
 - `static/js/fltdlg.js` (`flt`) - The dialog of a saved filter, loaded on demand (lazyload.js module fltdlg; its stand-in filterModal loads it, LD_CALL)
 - `static/js/fltkern.js` (`kflt`) - The filter of the shared core at start: kflt_match / kflt_conds / kflt_cond over an area's catalog (2.846.0, #5520; the dialog: fltdlg.js kflt_rows / kflt_dialog)
+- `static/js/folderprops.js` - The settings dialog of a folder (folderPropsModal: name, colour, defaults of its projects), moved out of sidebar.js, loaded on demand (2.1156.0 #4280)
+- `static/js/foldershare.js` - The Share dialog of a folder (folderShareModal: people, groups, agents, notifications), moved out of sharedlg.js, loaded on demand (2.1156.0 #4280)
 - `static/js/formguard.js` (`fg`) - Form and its organisation / document, e.g
 - `static/js/formq.js` (`fq`) - Questionnaires -- the own questions of a form (team/formq.py)
 - `static/js/formula.js` (`fx`) - Calculating with custom fields
@@ -960,6 +968,7 @@ The start-up module.
 - `static/js/ftsearch.js` (`fts`) - The command palette's group "
 - `static/js/git.js` (`snip`) - Git integration of project lists
 - `static/js/gitrepo.js` - The repository editor of a project list / folder, moved out of git.js and loaded when the list dialog or the folder settings open it
+- `static/js/habitdlg.js` - The dialog of a habit (habitModal: new / edit, reminders, delete), moved out of habits.js, loaded on demand (2.1156.0 #4280)
 - `static/js/habits.js` (`mx`) - The Eisenhower matrix, habits and the pomodoro timer
 - `static/js/helpview.js` (`hv`) - The page "Help": the how-to topics per area, their search, one topic (GET /api/help, helpuser.py; 2.1086.0)
 - `static/js/hookin.js` (`whi`) - Inbound webhooks of a list
@@ -984,6 +993,7 @@ The start-up module.
 - `static/js/liste2eui.js` (`le2u`) - The lock per list -- dialogs and display
 - `static/js/listedit.js` (`inline`) - List editing, keyboard reordering, recent lists
 - `static/js/listhead.js` (`o3c`) - Themes, header strips of lists and folders, small moments
+- `static/js/listmodal.js` - The project dialog (listModal) and its parts, moved out of dialogs.js, loaded on demand (2.1156.0 #4280)
 - `static/js/listprint.js` (`lex`) - A list / project as CSV and as a printable page
 - `static/js/liveparts.js` (`lp`) - Live updates per area: /api/version carries a change counter per area, so a change in comments, chats, news or calendars refreshes only that part of the screen
 - `static/js/lyopts.js` (`lyo`) - The settings of a block in a view built from blocks
@@ -999,7 +1009,7 @@ The start-up module.
 - `static/js/minerules.js` (`mr`) - The dialog of the own rules of "My tasks", module "minerules"
 - `static/js/minewait.js` (`mw`) - The view "Waiting for me" (#mine_wait)
 - `static/js/miniwin.js` (`mw`) - A list in its own small browser window
-- `static/js/move.js` (`umz`) - (kalmido/admin/acctexport.py: start, state polled while it runs, download, delete)
+- `static/js/move.js` (`umz`) - loaded with the settings (lazyload.js, 2.1156.0 #4280); (kalmido/admin/acctexport.py: start, state polled while it runs, download, delete)
 - `static/js/msgpop.js` - the pop-up for new chat messages: one card at the top edge, a tap opens the chat (2.1130.0, #6057)
 - `static/js/msvview.js` (`msvv`) - Several Kalmido servers in one app, the merged view
 - `static/js/multiedit.js` (`me`) - Editing several selected tasks at once in the task panel
@@ -1067,6 +1077,7 @@ The start-up module.
 - `static/js/officeagents.js` (`oa`) - Agents in the office (Office & finance)
 - `static/js/oinvview.js` (`oinv`) - The organisation settings for inviting people by e-mail
 - `static/js/oneway.js` (`dv`) - The mark "one-way step" of a task (reason, a person's yes)
+- `static/js/orgadmin.js` - The projects of an organisation for its admins (oadmOpen: list, take back, outreach log), moved out of account.js, loaded on demand (2.1156.0 #4280)
 - `static/js/orgcrypt.js` (`oc`) - Settings for the server-side encryption of an organisation (state and recovery key); not the browser encryption of e2e.js
 - `static/js/orgexport.js` (`ox`) - Encrypted archive in the background (kalmido/admin/orgexport.py)
 - `static/js/orgschema.js` - The field schema of an organisation, module "
@@ -1084,6 +1095,7 @@ The start-up module.
 - `static/js/portal.js` (`ptl`) - Customer reports in the task panel
 - `static/js/projects.js` (`pov`) - Projects: status, progress, overview, dependencies, custom fields
 - `static/js/projtime.js` (`tz`) - The tracked time of a project in a window
+- `static/js/propcards.js` - The review dialog of an agent's proposal (propOpen: select, edit, apply, discard), moved out of agents.js, loaded on demand (2.1156.0 #4280)
 - `static/js/propkinds2.js` (`pk2`) - Review dialog of the agent proposal kinds "inquiry" (becomes a project with tasks, shoot days and a quotation draft) and "setup"
 - `static/js/props.js` (`pz`) - The properties of a project
 - `static/js/pubvideo.js` - The customer page of a video sign-off (/s/q/<token>, videos/review.py vdr_sig_html)
@@ -1109,6 +1121,7 @@ The start-up module.
 - `static/js/rowsym.js` (`rsy`) - Task rows: a level (all | key | calm | custom, default key)
 - `static/js/rules.js` (`rul`) - Rules of a list ("When ... then ...")
 - `static/js/sbnav.js` (`sbp`) - The sidebar's messenger rows
+- `static/js/sched.js` - The plans of an agent (schedOpen: planned jobs, their rhythm and lists), moved out of agents.js, loaded on demand (2.1156.0 #4280)
 - `static/js/secdrag.js` (`sb`) - Where a dragged section or board column lands (mouse and long press on a phone)
 - `static/js/sectpl.js` - Section templates, module "
 - `static/js/selfdelete.js` - Settings > Account > Delete account
@@ -1118,6 +1131,7 @@ The start-up module.
 - `static/js/setreset.js` (`rs`) - Settings > Account > Reset settings
 - `static/js/settings.js` (`set`) - Settings: notifications, Web Push, autosave settings, personal agents, import
 - `static/js/sharedlg.js` (`folder`) - Head, People (the owner first, roles, "Add", by e-mail address, what the roles may do)
+- `static/js/sharemodal.js` - The Share dialog of a project (shareModal: people, groups, agents, notifications, public link), moved out of dialogs.js, loaded on demand (2.1156.0 #4280)
 - `static/js/sharews.js` (`sh`) - ("Belongs to: <organisation> (organisation)" / "Private")
 - `static/js/sheetbook.js` (`shb`) - Several sheets in one table, loaded with the tables (lazyload.js)
 - `static/js/sheetchart.js` (`shc`) - The simple chart of a table - bars or a line from its columns, plain SVG (no chart library)
@@ -1161,6 +1175,7 @@ The start-up module.
 - `static/js/templates.js` (`tpl`) - Templates and statistics
 - `static/js/tilesize.js` (`ts`) - The size of the cards of the documents and of the file store (ONE part for both: docs.js viewDocs, abdocs.js abd_toolsHtml / abd_card, tagsel.js through abd_cardsHtml2)
 - `static/js/time.js` (`tv`) - Time tracking (module "time")
+- `static/js/timeentry.js` - The dialog of a time entry (entryModal: add / edit tracked time, its target and billing), moved out of time.js, loaded on demand (2.1156.0 #4280)
 - `static/js/timeline.js` (`tl`) - The timeline (Gantt)
 - `static/js/timesheet.js` (`tsl`) - Monthly timesheets on the time page
 - `static/js/tourmods.js` - The short introductions of the areas

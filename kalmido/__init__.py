@@ -512,6 +512,7 @@ ORDER = (
     "accounts.pwreset",  # 2.49.0 (#1531): "Forgot your password?"
     "accounts.secmail",  # 2.266.0 (#2963): security mails to the person (registers its background mail job)
     "accounts.discover",  # 2.49.0 (#1106): finding people by e-mail, connection requests
+    "accounts.cinvite",  # 2.1156.0 (#4550): invitation links for people without an account
     "admin.hosting",
     "integrations.taskmail",  # 2.393.2 B (#3375): replies by e-mail become comments, answers to the reporter
     "integrations.reqmail",  # 2.553.0 B (#3460): requests by e-mail become portal tickets, answers and replies by mail

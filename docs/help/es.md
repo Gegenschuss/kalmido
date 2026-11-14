@@ -231,6 +231,18 @@ tiene además su propio chat.
 Qué pasa entonces: los mensajes fijados permanecen en la barra sobre los mensajes (como máximo cinco por conversación); un
 hilo muestra las respuestas a ese mensaje y sus participantes reciben aviso.
 
+<!-- help: team#how-to-invite-someone-without-an-account-by-a-link src=0b47d08909 -->
+## Invitar con un enlace a alguien sin cuenta
+
+1. En Ajustes > Cuenta elige **Buscar a una persona …**.
+2. Elige **Invitar con enlace**, añade si quieres para quién es (solo lo ves tú) y elige **Crear enlace**.
+3. Envía el enlace con **Copiar** o **Compartir**, o deja que la persona escanee el código QR.
+
+Qué pasa después: quien abre el enlace crea una cuenta con su nombre y su dirección de correo y queda conectado contigo al
+instante; recibes una notificación. El enlace funciona una vez y durante 14 días y solo se muestra justo después de crearlo;
+**Retirar** termina un enlace abierto al instante. Quien ya tiene cuenta lo abre con la sesión iniciada y confirma la
+conexión. Un administrador del servidor puede desactivar estos enlaces (Ajustes > Servidor > Inicio de sesión).
+
 <!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
 ## Crear un presupuesto doméstico
 
