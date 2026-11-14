@@ -37,6 +37,8 @@ and readable for agents. **Summarize**: in the preview of a task's file, when a 
 (with a confirmation naming the agent) posts a comment in your name that mentions the agent; the agent reads the file and
 answers with the summary. Kalmido calls no language model itself; undo removes the comment.
 
+**Receipts below the tree** (2.1148, #4895): below the folders, "Receipts" lists the receipts of the space as references, in up to three parts - **Office** (the receipts recorded in the office), **Entertainment** (the entertainment receipts) and **Household** (the receipts attached to household budget entries); a part shows only while it holds something you may read. A tap opens the receipt in its own area (Office > Receipts, Office > Entertainment receipts, the budget list in the entry's month); changing, deleting and booking stay there, nothing is copied into Files.
+
 **Knowledge folders** (2.200.0, #2747): knowledge pages live in the same folder tree as the file store (empty folders, drag to move or sort, a "…" menu). Share a folder or a page with people, groups or agents (read / edit, inherited). Agents reach pages through API v1 / MCP (`wiki_list`, `wiki_read`, `wiki_write`, `wiki_append`, `wiki_replace_section`, `wiki_create`, scopes `wiki:read` / `wiki:write`), only those shared with them.
 
 ## Offline knowledge, office projects, pictures
