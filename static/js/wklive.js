@@ -182,7 +182,7 @@ function wkp_slides(p) {
   if (out.length && !(lv[first] && lv[first] <= cut)) out[0].unshift(`<h4>${esc(wk_base(p.path))}</h4>`);  // the title slide
   return out.map(x => x.join('')).filter(x => x.replace(/<[^>]*>/g, '').trim() || /<(img|svg|table|pre|iframe|figure|video)\b/i.test(x));
 }
-const wkp_slideHtml = (/** @type {number} */ i) => `<section class="wkpslide md ntmd wkmd${wkst_cls(WKP.sp)}" aria-roledescription="${esc(tr('Slide'))}" aria-label="${esc(tr('Slide {0} of {1}', i + 1, WKP.sl.length))}">${/*html-ok*/ WKP.sl[i] || '' /* the page's drawing (wk_render) */}</section>`;
+const wkp_slideHtml = (/** @type {number} */ i) => `<section class="wkpslide md ntmd wkmd${esc(wkst_cls(WKP.sp))}" aria-roledescription="${esc(tr('Slide'))}" aria-label="${esc(tr('Slide {0} of {1}', i + 1, WKP.sl.length))}">${/*html-ok*/ WKP.sl[i] || '' /* the page's drawing (wk_render) */}</section>`;
 function wkp_cbOff(/** @type {any} */ el) { for (const x of $$('input', el)) x.disabled = true; return el; }
 async function wkp_open(p) {
   if (WK.dirty) await wk_flush();
