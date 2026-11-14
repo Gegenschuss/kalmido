@@ -119,8 +119,9 @@ const upload = async (url, field, name, text, extra) => {
     await place('ablage', {hash: '#ablage', ready: `typeof AB === 'object' && ${rowWith('#view .abrow', 'garden-notes')} && !!document.querySelector('#view [data-absel="mode"]')`,
       start: `(document.querySelector('#view [data-absel="mode"]').click(), 1)`, on: `AB.selOn`, bar: '#ab-sbar', close: '#ab-sbar [data-absel="close"]', content: rowWith('#view .abrow', 'garden-notes')});
     // 6. knowledge (WK.selOn)
-    await place('wiki', {hash: '#wiki', ready: `typeof WK === 'object' && ${rowWith('#view .wkrow', 'Loose')} && !!document.querySelector('#view [data-wksel="mode"]')`,
-      start: `(document.querySelector('#view [data-wksel="mode"]').click(), 1)`, on: `WK.selOn`, bar: '#wk-sbar', close: '#wk-sbar [data-wksel="close"]', content: rowWith('#view .wkrow', 'Loose') + ' && ' + rowWith('#view .wkrow', 'Other')});
+    // 2.1163.0 (#6089): the phone's list has one row (Find, New page, "…"): Select is in its "…"
+    await place('wiki', {hash: '#wiki', ready: `typeof WK === 'object' && ${rowWith('#view .wkrow', 'Loose')} && !!document.querySelector('#view [data-wk="lmenu"]')`,
+      start: `(document.querySelector('#view [data-wk="lmenu"]').click(), [...document.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(b => /^Select/.test(b.textContent.trim())).click(), 1)`, on: `WK.selOn`, bar: '#wk-sbar', close: '#wk-sbar [data-wksel="close"]', content: rowWith('#view .wkrow', 'Loose') + ' && ' + rowWith('#view .wkrow', 'Other')});
     // 7. the receipts of a trip (RK.sel): a tick starts it
     // 2.997.0 (#5681): the trip is opened by its row (a Back step of its own since #5233), the receipts' selection lies above it
     await place('travel', {hash: '#office/travel', prep: `typeof RK === 'object' && !!RK.data && (RK.year === '' || (RK.year = '', rk_reload(), true))`,

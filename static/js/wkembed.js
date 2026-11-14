@@ -152,8 +152,13 @@ function wem_cbHtml(p, h) {
     const L = ls[k++]; if (L.has || !L.text) return m;
     return `${m}<button type="button" class="iconbtn wemcb" data-wem="cb" data-k="${k - 1}" title="${esc(tr('Create as task'))}" aria-label="${esc(tr('Create as task'))}: ${esc(L.text.slice(0, 60))}">${ic('plus', 's')}</button>`;
   });
-  const open = ls.filter(L => !L.has && L.text).length;
-  return open > 1 ? `<div class="wemcbbar"><button type="button" class="btn sm" data-wem="cbs">${ic('check', 's')}${esc(tr('Open items as tasks'))} · ${open}</button></div>${h}` : h;
+  return h;  // 2.1163.0 (#6089): "Open items as tasks" is in the page's "…" (wem_cbItems), no big button above the text
+}
+// 2.1163.0 (#6089): the page's "…" (wiki.js wk_pmenuItems): every open checkbox line as a task at once, from two lines on
+function wem_cbItems(p) {
+  if (!wem_mayTask(p) || p._emb || p._wke) return [];
+  const open = wem_cbLines(p.body).filter(L => !L.has && L.text).length;
+  return open > 1 ? [{label: `${tr('Open items as tasks')} · ${open}`, icon: 'check', fn: () => wem_cbDlg(p, wem_cbLines(p.body).map((_, i) => i))}] : [];
 }
 function wem_lists() {
   const ib = inbox();

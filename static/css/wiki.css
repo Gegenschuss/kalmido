@@ -245,26 +245,15 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkdgmm svg{display:block;max-width:100%;height:auto;margin:0 auto}
 .wkdgmath .katex-display{margin:0}
 .wkdgerr{margin:.5rem 0 .25rem;font-size:var(--fs-s)}
-/* 2.783.0 (#5376): knowledge on a computer, a page open (wiki.js wk_deskHtml .wkdesk.wkpgo): the bar stays where the list has it
-   (left, no jump), the card takes the full width of the main area and ends at the window's lower edge: the text scrolls inside,
-   "Files" / "Attach files" and the footer stay in sight. Only the text column follows the width switch (#4808): Read = --w-lesen
-   in the middle of the card, Wide / Full = the card's width. Without the height chain (e.g. inside a split pane) the card just
-   grows as before. #view as a column here so the card can take the free height. */
-#view:has(> .wkdesk.wkpgo){display:flex;flex-direction:column;padding-bottom:.75rem}
-#view > .wkdesk.wkpgo{flex:1 1 auto;min-height:0}
+/* 2.783.0 (#5376): knowledge on a computer, a page open (wiki.js wk_deskHtml .wkdesk.wkpgo): the card takes the full width of the
+   main area; only the text column follows the width switch (#4808): Read = --w-lesen in the middle of the card, Wide / Full = the
+   card's width. 2.1163.0 (#6089): the page scrolls as a whole - no box of its own for the text, "Files" / "Linked from" and the
+   footer no longer pinned below it (they took a third of the height), and no area bar above it (the page's head is its only one) */
 .wkdesk.wkpgo{--wktw:var(--w-lesen)}
 .wkdesk.wkpgo:is(.pgw-breit,.pgw-voll){--wktw:100vw}
-.wkdesk.wkpgo > :not(.ntedit){flex:none}
-.ntwrap.wkdesk.wkpgo > .ntedit{width:100%;max-width:none;margin-inline:0;flex:1 1 auto;min-height:0}
-/* the column: the parts beside the text get its edges (margin), the scrolling parts the full width with the text in the middle
-   (padding) so their scrollbar stays at the card's edge */
-.ntwrap.wkdesk.wkpgo > .ntedit > :not(.wkedwrap,#wk-md){flex:none;margin-inline:max(0px,(100% - var(--wktw)) / 2)}
-.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap > :not(.wkcm,.ntbody,.wkac){flex:none;margin-inline:max(0px,(100% - var(--wktw)) / 2)}
-.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap > :is(.wkcm,.ntbody),.ntwrap.wkdesk.wkpgo > .ntedit > #wk-md{flex:1 1 auto;min-height:0;overflow-y:auto;padding-inline:max(0px,(100% - var(--wktw)) / 2)}
-.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap > .ntbody{resize:none}
-.ntwrap.wkdesk.wkpgo .wkcm .cm-content{min-height:max(8rem,calc(100dvh - 30rem))}  /* inside its own scroll box: about its free height */
-.ntwrap.wkdesk.wkpgo > .ntedit > :is(.wkfiles,.wkback) > ul{max-height:8rem;overflow-y:auto}  /* many files / links: the card keeps its edge */
+.ntwrap.wkdesk.wkpgo > .ntedit{width:100%;max-width:none;margin-inline:0}
+.ntwrap.wkdesk.wkpgo > .ntedit > :not(.wkedwrap),.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap > :not(.wkac){margin-inline:max(0px,(100% - var(--wktw)) / 2)}
+.ntwrap.wkdesk.wkpgo > .ntedit > .wkedwrap{display:flex;flex-direction:column}
 /* 2.1081.0 (#5907): a folder that has a page of the same name shows once (folder list, panel): the folder symbol with a small
    page mark; its folder view shows the page's text on top (wiki.js wk_dirPageHtml), the subfolders and subpages below */
 .wkpgdir{position:relative;display:inline-flex;flex:none;line-height:0}

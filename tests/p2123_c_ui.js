@@ -63,7 +63,9 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   // checkbox lines
   const cbs = d.querySelectorAll('#wk-md li.cb .wemcb');
   check(cbs.length === 2, `#2108: a + on the two open lines without a task (${cbs.length})`);
-  check(d.querySelector('#wk-md .wemcbbar [data-wem="cbs"]')?.textContent.includes('2'), '#2108: "Open items as tasks" with the number');
+  // 2.1163.0 (#6089): "Open items as tasks" is in the page's "…" (no big button above the text)
+  check(!d.querySelector('#wk-md .wemcbbar'), '#6089: no button bar above the text');
+  check(w.eval(`wk_pmenuItems(WK.pg).some(x => x.label === 'Open items as tasks · 2')`), '#2108: "Open items as tasks" with the number (in the page\'s "…")');
   cbs[0]?.click();
   const md = await until(() => d.querySelector('.modal.wemdlg #wem-list'));
   check(md && md.value === String(w.eval('inbox().id')), '#2108: the dialog offers the lists, the basket first');

@@ -130,7 +130,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
   check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]')), 'one workspace: its "All pages" row');
   check(!d.querySelector('#side [data-wksp]') && !d.querySelector('[data-wk="space"]'), 'one workspace: no entry per space, no switch');
-  check(await until(() => items(d).some(t => /Org page/.test(t))) && h2(d) === 'Knowledge', 'one workspace: its pages');  // 2.200.0 (#2747): audit B 1, the panel's name
+  check(await until(() => items(d).some(t => /Org page/.test(t))) && h2(d) === 'Alpha', 'one workspace: its pages');  // 2.200.0 (#2747): audit B 1, the panel's name; 2.1163.0 (#6089): the workspace's name
   w.close();
   await call('PATCH', '/api/settings', {workspace: 'all'});
 
@@ -141,7 +141,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: feats}, FK);
   await call('POST', '/api/wiki/pages', {space: 'private', path: 'Mine/Note'}, FK);
   w = await boot({user: 'frida', hash: 'wiki'}); d = w.document;
-  check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]') && /Knowledge/.test(d.querySelector('#side .sbbi[data-go="wiki"]').textContent)), 'without an organisation: one top entry');  // 2.200.0 (#2747): audit B 1, "Knowledge" as "Files" in the file store
+  check(await until(() => d.querySelector('#side .sbbi[data-go="wiki"]') && /Private/.test(d.querySelector('#side .sbbi[data-go="wiki"]').textContent)), 'without an organisation: one top entry');  /* 2.1163.0 (#6089): the workspace's name */  // 2.200.0 (#2747): audit B 1, "Knowledge" as "Files" in the file store
   check(!d.querySelector('#side [data-wksp]') && !d.querySelector('#view .wkspaces'), 'without an organisation: no entry per space, no overview');
   check(await until(() => rowOf(d, 'Mine')), 'without an organisation: the folders as before');
   check(await newPage(w, d, 'Freelance page') === null, 'without an organisation: New page asks no space');
