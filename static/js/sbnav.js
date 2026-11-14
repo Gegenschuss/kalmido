@@ -30,7 +30,7 @@ function sb_personRow(p, on) {
   const row = `<button class="srow steam ${on ? 'on' : ''}" data-go="who/${p.id}" title="${esc(tr('Tasks of {0}', p.name))}"><span class="sdot"${ac_mk(p.id)}><i class="pdot"></i></span><span class="n">${esc(p.name)}</span></button>`;
   if (!teamOn()) return row;
   const lab = tr('Message {0}', p.name);
-  return `<div class="sbpw">${row}<button type="button" class="iconbtn sbdm" data-sb="dm" data-uid="${p.id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('comment', 's')}</button></div>`;
+  return `<div class="sbpw">${row}<button type="button" class="iconbtn sbdm ms-phsr" data-sb="dm" data-uid="${p.id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('comment', 's')}</button></div>`;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="dm"]'); if (!b) return;
