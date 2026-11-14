@@ -1136,6 +1136,7 @@ ROUTES = {
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheet_v1",
     "GET /api/wiki": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki", "GET /api/wiki/tags": "wiki", "GET /api/wiki/query": "wiki",  # 2.371 (#3150): p2371_wiki_tags_test.py
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki", "DELETE /api/wiki/pages/{}": "wiki",
+    "GET /api/wiki/pages/{}/export": "wiki",  # 2.1151.0 (#5524): p21151_d_wiki_export_test.py (wiki_need like the page)
     "POST /api/wiki/pages": "wiki", "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki",
     "PUT /api/wiki/style": "wiki",  # 2.371.3 (#3152): the space's reading style (p2371_3_wiki_ui.js: a stranger 404, a member 403)
     "POST /api/wiki/folders": "wiki",  # 2.200.0 A (#2747): an empty knowledge folder (p2200_a_wiki_folder_test.py)

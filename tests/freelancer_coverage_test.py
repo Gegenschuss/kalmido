@@ -1073,6 +1073,7 @@ ROUTES = {
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "PATCH /api/wiki/pages/{}": "wiki",
+    "GET /api/wiki/pages/{}/export": "wiki",  # 2.1151.0 (#5524): p21151_d_wiki_export_test.py
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/keys": "wiki",
     "POST /api/wiki/e2e/rotate": "wiki", "POST /api/wiki/e2e/start": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/import": "wiki", "POST /api/wiki/move": "wiki", "POST /api/wiki/pages": "wiki",
