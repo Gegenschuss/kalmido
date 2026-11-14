@@ -38,7 +38,7 @@ function dup_open(bid) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     const q = {agent_id: +$('#pp-agent', md).value, kind: 'merge', book_id: book().id};
     b.disabled = true; err('');
-    try { await calReq('POST', '/api/proposals', q); } catch (x) { err(x.message); b.disabled = false; return; }
+    try { await calReq('POST', '/api/proposals', q); } catch (x) { err(errText(x)); b.disabled = false; return; }  // 2.1165.0 (#6121): errText
     md.remove();
     toast(tr('Sent to {0} – you will be notified.', (S.proposers.find(a => a.id === q.agent_id) || {}).name || ''));
     if (S.route.mod === 'agents') loadJobs();

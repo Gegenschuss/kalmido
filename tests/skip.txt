@@ -2,5 +2,3 @@
 # reported ("QUARANTINE red", a warning annotation) like their green. One line per suite: <suite> <YYYY-MM-DD> #<task> <evidence>.
 # Proven = red and green on the same code (CI or two Mac runs). The date says when the line came and ends nothing; a line goes
 # with the fix (its task) or after enough greens in a row (the train). Never quiet: tests/quarantine_never.txt.
-setup_ui 2026-11-24 #5504 rot und grün in der CI auf gleichem Code 57cac428fcfb: red CI v2.787.0; green Nachtlauf 2026-11-10
-p2467_c_ui 2026-11-24 #5506 rot und grün in der CI auf gleichem Code 57cac428fcfb: red CI v2.787.0; green Nachtlauf 2026-11-10

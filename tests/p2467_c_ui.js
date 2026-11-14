@@ -34,6 +34,11 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   w.eval("TF.year = 2026; TF.d = null; ofcDraw()");
   check(await until(() => /Summe Betriebsausgaben/.test(d.querySelector('.bk-tab')?.textContent || '')), 'the wording of the form');
   check(await until(() => [...d.querySelectorAll('.bk-tab tr')].some(t => /^76/.test(t.textContent.trim()))), '2026: line 76');
+  // #6135 (CI 14.11.2026 red: "Loading…" for good, seq 811): two loads at once - each stale answer drew and started the next load,
+  // so a newer one was always under way; now a stale answer draws nothing and the newest one ends it
+  const s0 = w.eval('TF.d = null; tfLoad(); tfLoad(); TF.seq');
+  check(await until(() => w.eval('!!TF.d') && [...d.querySelectorAll('.bk-tab tr')].some(t => /^76/.test(t.textContent.trim()))), '#6135: two loads at once: the lines come');
+  check(w.eval('TF.seq') - s0 <= 1 && !w.eval('TF.busy'), `#6135: no chain of loads behind it (seq ${s0} -> ${w.eval('TF.seq')})`);
   check(!!d.querySelector('a[href*="taxform/euer.csv?year=2026"]') && !!d.querySelector('a[href*="taxform/euer.pdf?year=2026"]'), 'CSV and PDF');
   check(/No tax advice/.test(d.querySelector('#view').textContent), 'the note');
   const inp = d.querySelector('#tf-paid'); inp.value = '12.50';

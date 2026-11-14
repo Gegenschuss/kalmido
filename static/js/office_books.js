@@ -54,7 +54,7 @@ async function bkLoadUstva() {
 }
 const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
 // 2.979.0 (#5667): an undo / redo the server did: an open receipt sheet (bkRxAfter), the books, the tax forms, the checks and the comparison come again
-histReloader('books', () => { const sh = $('.bk-sheet[data-rxid]'); if (sh) bkRxAfter(+sh.dataset.rxid); if (!BK.info && !BK.euer && !TF.d && !TC.d && !BKC.d) return; BK.ustva = null; TF.d = null; TC.d = null; BKC.src = null; bkReload(); });
+histReloader('books', () => { const sh = $('.bk-sheet[data-rxid]'); if (sh) bkRxAfter(+sh.dataset.rxid); if (!BK.info && !BK.euer && !TF.d && !TC.d && !BKC.d) return; BK.ustva = null; TF.d = null; TC.d = null; TF.busy = TC.busy = null; /* #6135: a load under way is old now */ BKC.src = null; bkReload(); });
 // 2.559.0 (#4659): a change of a receipt shows at once (optWrite): the rows of the receipt in the lists on screen (this month,
 // all receipts) get the new values, the requests run behind it; afterwards the lists are fetched again in the background (the
 // rows stay until the fresh ones are there: sums and the income statement are the server's)
@@ -251,13 +251,17 @@ async function ebSetUndo(basis) {
 }
 
 // ---- 2.467.0 (#3456): the Anlage EUeR and the annual VAT return line by line (#office/books/taxforms/euer|ust); server: office/taxforms.py
-const TF = {oid: null, kind: null, year: null, d: null, err: null, seq: 0, t: 0};
+const TF = {oid: null, kind: null, year: null, d: null, err: null, seq: 0, t: 0, busy: null};
+// #6135: one load per form + year at a time, a stale answer draws nothing - drawing it started the next load while a newer one
+// was under way, so two loads in flight chased each other for good (CI 14.11.2026: seq 811, the page stayed on "Loading…")
+const tfKey = () => `${TF.oid}|${TF.kind}|${TF.year}`;
 const tfYears = () => ofcYearOpts(TF.ys, TF.year, 1).map(y => [y, y]);  // 2.593.0 (#4891): the books' years + last year (was this year .. -6)
 async function tfLoad() {
-  const seq = ++TF.seq;
+  const seq = ++TF.seq; TF.busy = tfKey();
   try { const d = await api('GET', `/api/office/books/taxform/${TF.kind}?year=${TF.year}`); if (seq === TF.seq) Object.assign(TF, {d, err: null, ys: d.years ?? TF.ys}); }
   catch (x) { if (seq === TF.seq) TF.err = ofcErrHere(x); }
-  ofcDraw();
+  if (seq !== TF.seq) return;  // #6135: the newer load draws
+  TF.busy = null; ofcDraw();
 }
 const tfRow = r => `<tr${r.sum ? ' class="bk-tot"' : ''}><td class="num" data-l="${esc(tr('Line'))}">${r.line}</td><td class="num" data-l="${esc(tr('Field'))}">${esc(r.kz)}</td><th scope="row">${esc(r.label)}${(r.from || []).length ? ` <small class="muted">${esc(r.from.join(', '))}</small>` : ''}</th>
   <td class="num" data-l="${esc(tr('Base'))}">${r.base != null ? esc(fmtNum(+r.base, 0)) + ' ' + ofcSym(TF.d.currency) : ''}</td><td class="num" data-l="${esc(tr('Amount'))}">${r.tax != null ? ofcMoney(r.tax) : r.amount != null ? ofcMoney(r.amount) : ''}</td></tr>`;
@@ -275,7 +279,7 @@ function tfHtml() {
   const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;
   const bar = `<div class="ofcbar bk-bar">${back}${tabs}<a class="btn sm ghost" href="#office/books/taxcheck" data-bk-taxcheck>${ic('check', 's')}<span>${tr('Tax check')}</span></a><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tf-year', TF.year, tfYears())}</label></div>`;  // 2.589.0 (#3458): + the tax check
   if (TF.err) return bar + ofcFail(TF.err, () => { TF.err = null; TF.d = null; });  // 2.1076.0 (#5450)
-  if (!TF.d) { if (!TF.t) TF.t = setTimeout(() => { TF.t = 0; tfLoad(); }, 0); return bar + loadingHtml('big'); }
+  if (!TF.d) { if (!TF.t && TF.busy !== tfKey()) TF.t = setTimeout(() => { TF.t = 0; tfLoad(); }, 0); return bar + loadingHtml('big'); }  // #6135
   const d = TF.d, notes = d.notes.map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
   if (!d.rows.length) return bar + `<p class="bk-warn">${esc(d.notes[0])}</p>` + d.notes.slice(1).map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
   const dl = kind === 'euer' ? 'euer' : 'ust';
@@ -299,13 +303,15 @@ async function tfVatSave() {
 
 // ---- 2.589.0 (#3458): the tax check before filing (#office/books/taxcheck): one traffic light per point, a click leads to the
 // place; red blocks nothing. Server: office/taxcheck.py (GET /api/office/books/taxcheck?year=)
-const TC = {oid: null, year: null, d: null, err: null, seq: 0, t: 0};
+const TC = {oid: null, year: null, d: null, err: null, seq: 0, t: 0, busy: null};  // #6135: busy as TF
+const tcKey = () => `${TC.oid}|${TC.year}`;
 const TC_LBL = {green: N_('In order'), yellow: N_('Please check'), red: N_('Deviation')};
 async function tcLoad() {
-  const seq = ++TC.seq;
+  const seq = ++TC.seq; TC.busy = tcKey();
   try { const d = await api('GET', `/api/office/books/taxcheck?year=${TC.year}`); if (seq === TC.seq) Object.assign(TC, {d, err: null}); }
   catch (x) { if (seq === TC.seq) TC.err = ofcErrHere(x); }
-  ofcDraw();
+  if (seq !== TC.seq) return;  // #6135: the newer load draws
+  TC.busy = null; ofcDraw();
 }
 const tcGo = (p, inner) => !p.link ? inner : p.link.startsWith('setgo:') ? `<button type="button" class="linkbtn tc-go" data-setgo="${esc(p.link.slice(6))}">${inner}</button>` : p.link.startsWith('#') ? `<a class="tc-go" href="${esc(p.link)}">${inner}</a>` : inner;  // 2.589.0 (#3458, review): only in-app links
 const tcRow = p => `<li class="tc-pt tc-${esc(p.ampel)}" data-tc="${esc(p.punkt)}"><span class="tc-dot" aria-hidden="true"></span><div class="tc-body">
@@ -317,7 +323,7 @@ function tcHtml() {
   const back = `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-navup>${ic('back', 's')}<span>${tr('Tax forms')}</span></a>`;
   const bar = `<div class="ofcbar bk-bar">${back}<h3 class="ofcgrp">${tr('Tax check')}</h3><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tc-year', TC.year, tfYears())}</label></div>`;
   if (TC.err) return bar + ofcFail(TC.err, () => { TC.err = null; TC.d = null; });  // 2.1076.0 (#5450)
-  if (!TC.d) { if (!TC.t) TC.t = setTimeout(() => { TC.t = 0; tcLoad(); }, 0); return bar + loadingHtml('big'); }
+  if (!TC.d) { if (!TC.t && TC.busy !== tcKey()) TC.t = setTimeout(() => { TC.t = 0; tcLoad(); }, 0); return bar + loadingHtml('big'); }  // #6135
   const d = TC.d, n = d.counts;
   const sum = `<p class="tc-sum" role="status">${[['red', n.red], ['yellow', n.yellow], ['green', n.green]].map(([k, v]) => `<span class="tc-cnt tc-${k}"><span class="tc-dot" aria-hidden="true"></span>${v} ${esc(tr(TC_LBL[k]))}</span>`).join('')}</p>`;
   const groups = d.groups.map(([k, name]) => { const ps = d.points.filter(p => p.group === k); return ps.length ? `<section class="bk-sec"><h4 class="bk-h">${esc(name)}</h4><ul class="tc-list">${ps.map(tcRow).join('')}</ul></section>` : ''; }).join('');

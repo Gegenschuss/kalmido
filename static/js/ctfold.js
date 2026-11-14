@@ -61,9 +61,11 @@ function ctf_panelTree() {
 }
 function ctf_panelHtml() {
   if (S.route.mod !== 'contacts' || typeof sbb_treeHtml !== 'function') return '';
-  const nodes = ctf_panelTree(); if (!nodes.length) return '';
+  const nodes = ctf_panelTree(); if (!nodes.length && !CTF.err) return '';
   const g = 'office:ctf', fo = typeof sbb_folded === 'function' && sbb_folded(g);
-  return `<div class="sgroup sbbp sbbtree ctfpanel" role="group" aria-label="${esc(tr('Folders'))}">${sbb_head(g, tr('Folders'), 0, false)}${fo ? '' : sbb_treeHtml(nodes)}</div>`;
+  // 2.1165.0 (#6121): the folders' load failed: said in the panel with "Try again" (CTF.err was never shown)
+  const err = CTF.err ? errorState({title: tr('The folders could not be loaded'), size: 'row', cls: 'ctferr', retry: () => ctf_load(true)}) : '';
+  return `<div class="sgroup sbbp sbbtree ctfpanel" role="group" aria-label="${esc(tr('Folders'))}">${sbb_head(g, tr('Folders'), 0, false)}${fo ? '' : /*html-ok*/ err + (nodes.length ? sbb_treeHtml(nodes) : '')}</div>`;
 }
 
 // ---- changes
@@ -73,7 +75,7 @@ function ctf_after() {
 }
 // 2.979.0 (#5667): an undo / redo the server did (undo.js histRedraw): the folders of the address books come again (the side bar draws them), else on their next use (ctf_data)
 histReloader('ctfold', () => { if (!CTF.d) return; CTF.v = -1; if (S.route.mod === 'contacts') return ctf_load(true); });
-const ctf_req = async (m, url, b) => { try { const r = await rawFetch(m, url, b); ctf_after(); return r || true; } catch (e) { toast(e.message); return null; } };
+const ctf_req = async (m, url, b) => { try { const r = await rawFetch(m, url, b); ctf_after(); return r || true; } catch (e) { if (e?.message !== 'auth') toast(errText(e)); return null; } };  // 2.1165.0 (#6121): errText
 async function ctf_newFolder(sp, pid) {
   const v = await askDialog({title: tr('New folder'), input: {value: '', placeholder: tr('Folder name'), max: 120}, ok: tr('Create'), cancel: undefined, after: undefined});
   if (!v || !v.trim()) return;

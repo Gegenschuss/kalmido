@@ -229,7 +229,7 @@ function viewDocs() {
 function dc_headHtml(fold) {
   const active = dc_fEntries().length > 0;  // 2.122.0 B (#2294): the filters are drawn by dc_fltHtml / dc_fbarHtml
   const seg = fold || (typeof sbb_on === 'function' && sbb_on()) ? '' : `<div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}" class="${DC.f.review ? '' : 'on'}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}" class="${DC.f.review ? 'on' : ''}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>`;
-  const add = !fold ? (!dc_upOk() ? '' /* 2.1162.0 (#6108) */ : `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
+  const add = !fold ? (!dc_upOk() ? '' /* 2.1162.0 (#6108) */ : `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="${esc(DC_ACCEPT)}" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`)
     : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span></button><input type="file" id="ab-file" multiple hidden>
       <button type="button" class="btn sm" data-ab="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>` : '';
@@ -290,27 +290,35 @@ function dc_card(d, o = {}) {
 }
 
 // ---- upload (button, dragging, the share sheet)
+// 2.1165.0 (#6114): the kinds the button offers; a drop takes the same (ablage.js ab_upCheck leaves the others out and names them)
+const DC_ACCEPT = 'application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml';
+// 2.1165.0 (#6114): the file store's one way (ablage.js ab_upCheck / ab_upParts / ab_upOut): checked before sending, portions of
+// at most 50 (the server takes 50 per request) instead of cutting silently, the progress bar for any size, ONE message at the end
 async function dc_upload(files, ws, source) {
-  files = [...files].filter(f => f && f.size);
-  if (!files.length) return [];
-  const fd = new FormData();
-  for (const f of files.slice(0, 50)) fd.append('files', f, f.name);
-  fd.append('ws', ws || dc_upWs());
-  if ((ws || dc_upWs()) === 'private') fd.append('sort', '1');  // 2.522.0 (#4433): the general input sorts (office / private; no office: nothing)
-  if (source) fd.append('source', source);
-  let j;
-  try { j = await api('POST', '/api/docs', fd); } catch { return []; }
-  for (const e of j.errors || []) toast(e);
-  if (j.ids?.length) {
-    const ids = j.ids;
-    histToast(trn('{0} document added', '{0} documents added', ids.length), histAdd({label: trn('{0} document added', '{0} documents added', ids.length),
+  const {ok, out} = ab_upCheck(files, source ? '' : DC_ACCEPT); ab_upOut(out);  // the share sheet / a scan: every kind as before
+  if (!ok.length) return [];
+  const ids = [], dups = [], parts = ab_upParts(ok, 50);
+  for (let i = 0; i < parts.length; i++) {
+    const fd = new FormData(); fd.upBar = true;
+    for (const f of parts[i]) fd.append('files', f, f.name);
+    fd.append('ws', ws || dc_upWs());
+    if ((ws || dc_upWs()) === 'private') fd.append('sort', '1');  // 2.522.0 (#4433): the general input sorts (office / private; no office: nothing)
+    if (source) fd.append('source', source);
+    let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { if (x?.data?.ids || x?.data?.dups) j = x.data; else { out.push(...ab_upRest(parts, i, x)); break; } }
+    ids.push(...(j.ids || [])); dups.push(...(j.dups || []));
+    out.push(...(j.errors || []).map(e => ({name: '', why: e})));  // the server's own reasons (each names its file)
+  }
+  ab_upOut(out);
+  if (ids.length) {
+    const msg = trn('{0} document added', '{0} documents added', ids.length);
+    histToast(ab_upMsg(dups.length ? `${msg} · ${trn('{0} file already exists', '{0} files already exist', dups.length)}` : msg, out), histAdd({label: msg,
       undo: async () => { for (const id of ids) await api('DELETE', `/api/files/nodes/${id}`); dc_load(); return {}; },
       redo: async () => { for (const id of ids) await api('POST', `/api/files/nodes/${id}/restore`); dc_load(); return {}; }}));
   }
-  const dup = (j.dups || [])[0];  // 2.146.0 B (#2452): the same file is not stored twice -- Open shows the one there
-  if (dup) toast(j.dups.length === 1 ? tr('This file already exists: {0}', dup.name) : trn('{0} file already exists', '{0} files already exist', j.dups.length), () => dc_open(dup.id), 8000, tr('Open'));
+  const dup = dups[0];  // 2.146.0 B (#2452): the same file is not stored twice -- Open shows the one there (nothing new: its own message)
+  if (dup && !ids.length) toast(dups.length === 1 ? tr('This file already exists: {0}', dup.name) : trn('{0} file already exists', '{0} files already exist', dups.length), () => dc_open(dup.id), 8000, tr('Open'));
   if (dc_listOn()) dc_load();
-  return j.ids || [];
+  return ids;
 }
 async function dc_shareFiles(files) {  // the share sheet: "File as document"
   const ids = await dc_upload(files, dc_upWs(), 'share');
@@ -883,9 +891,18 @@ async function dc_mdClick(e) {
   }
   if (a === 'task') { await dc_newTask(d, md); return; }
   if (a === 'del') {  // 2.768.0 (#4888): the area's one way into the trash (ablage.js abm_trash: POST /api/files/trash, ONE undo)
-    if (await abm_trash([{...ab_selInfo(d), role: d.role || 'edit'}])) md.remove();
+    await abm_trash([{...ab_selInfo(d), role: d.role || 'edit'}], {leave: () => dc_leave(md)});  // 2.1165.0 (#6115): the view goes first, then the message with Undo
   }
 }
+
+// 2.1165.0 (#6115): the view of a file that went into the trash leaves BEFORE its message: an undo message ends with its page
+// (events.js), and the way back of the document view (docview.js dcv_close: history.back()) changes the address a moment later
+const dc_leave = md => new Promise(res => {
+  const h = location.hash; md.remove();
+  if (location.hash !== h || !(typeof DVW === 'object' && DVW.closed)) { res(); return; }  // left at once / nothing to leave
+  let done = false; const fin = () => { if (!done) { done = true; res(); } };  // job/4506: no clearTimeout pair (perf_budget)
+  setTimeout(fin, 1500); addEventListener('hashchange', fin, {once: true});
+});
 
 // ---- settings of a workspace: level per feature, archive numbers, rules, the lists and custom fields
 // 2.365.2 B (#2789): the settings live in Settings > Documents (dcs_paneHtml / dcs_draw, the workspace shown in the sidebar),

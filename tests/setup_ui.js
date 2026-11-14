@@ -13,6 +13,14 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 2.589.0: wait for the real state (an element), not a fixed time - under load the saved user's prompt came after 900 ms
 const waitSel = async (d, sel, ms = 10000) => { for (let t = 0; t < ms; t += 100) { const e = d.querySelector(sel); if (e) return e; await sleep(100); } return null; };
+// #6135: the requests of a window (open() counts them in its jar): wait until the app's writes are answered and nothing is in flight,
+// instead of a fixed 800 / 900 ms after "Start" / "Save" (too short on a loaded runner, the checks then read the state before it)
+const netIdle = async (jar, w0, what) => {
+  const end = Date.now() + 15000;
+  while (Date.now() < end && !(jar.w > w0 && !jar.n)) await sleep(50);
+  if (!(jar.w > w0 && !jar.n)) console.log(`setup_ui: ${what}: no answer within 15 s (writes ${jar.w - w0}, in flight ${jar.n})`);
+  await sleep(50);  // the app's code after the answer (a prompt, a redraw) runs in the next ticks
+};
 const fresh = () => execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 
@@ -25,9 +33,13 @@ async function open(jar) {  // the app with a cookie jar of its own (the setup r
       w.matchMedia = q => ({matches: false, addEventListener() {}, addListener() {}});
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
       w.fetch = async (u, o = {}) => {
-        const r = await fetch(new URL(String(u), B), {...o, headers: {...(o.headers || {}), ...(jar.c ? {Cookie: jar.c} : {})}});
-        const sc = r.headers.get('set-cookie'); if (sc) jar.c = sc.split(';')[0];
-        return r;
+        const wr = !!o.method && o.method.toUpperCase() !== 'GET'; jar.n = (jar.n || 0) + 1; jar.w = jar.w || 0;  // #6135: netIdle()
+        try {
+          const r = await fetch(new URL(String(u), B), {...o, headers: {...(o.headers || {}), ...(jar.c ? {Cookie: jar.c} : {})}});
+          const sc = r.headers.get('set-cookie'); if (sc) jar.c = sc.split(';')[0];
+          const body = await r.arrayBuffer();  // the whole answer is there before the request counts as done
+          return new Response(r.status === 204 || r.status === 304 ? null : body, {status: r.status, statusText: r.statusText, headers: r.headers});
+        } finally { jar.n--; if (wr) jar.w++; }
       };
       w.Request = Request; w.Response = Response; w.Headers = Headers; w.FormData = FormData;
       Object.defineProperty(w.navigator, 'serviceWorker', {value: {register: () => Promise.resolve(), addEventListener() {}, controller: null}});
@@ -38,10 +50,14 @@ async function open(jar) {  // the app with a cookie jar of its own (the setup r
   // #3506 (CI red of 2.532.0): a poll awaiting /api/version when a step closes its window resumes without a document
   // (staleDraw: reading 'hidden'); like boot() the late rejection of a closed window is the harness (boot.js lateAppError)
   require('./boot').trackClose(dom.window);
-  await sleep(1500);
+  // #6135: the first drawing (login form or the app: main.js bootDone() fades #boot out), not a fixed 1.5 s
+  const d = dom.window.document, drawn = () => { const b = d.getElementById('boot'); return d.readyState === 'complete' && (!b || b.classList.contains('out')); };
+  for (let t = 0; t < 20000 && !drawn(); t += 100) await sleep(100);
+  if (!drawn()) console.log('setup_ui open: not drawn after 20 s, screen:', (d.body ? d.body.textContent : '').replace(/\s+/g, ' ').slice(0, 300));
   return dom.window;
 }
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+const goSetup = async (w, jar) => { const w0 = jar.w || 0; click(w, w.document.querySelector('[data-su="go"]')); await netIdle(jar, w0, 'setup "Start"'); };  // #6135
 const api = async (jar, method, url, body) => (await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: jar.c}, body: body ? JSON.stringify(body) : undefined})).json();
 
 async function step1(w, user = 'admin') {
@@ -79,7 +95,7 @@ const feats = st => st.settings.features.split(',');
   check(d.querySelector('[data-su-start=""]').classList.contains('on'), 'back to For me: the start is Empty again');
   check(!d.querySelector('[data-use="paperless"]'), 'Paperless hidden when not configured');
   check(/Can be changed later/.test(d.querySelector('.setupcard').textContent), 'says it can be changed later');
-  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  await goSetup(w, jar);
   let st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && st.time_all === false, 'For me: instance switches off');
   check(feats(st).includes('cal') && !['timeline', 'deps', 'fields', 'family'].some(f => feats(st).includes(f)) && st.settings.purpose === 'me', 'For me: the calendar on, the rest off, purpose stored');
@@ -91,18 +107,18 @@ const feats = st => st.settings.features.split(',');
   w.close();
   // second user while collaboration is off -> prompt, "Yes" turns it on (+ personal switches of both)
   await api(jar, 'PATCH', '/api/settings', {features: feats(st).filter(f => f !== 'collab').join(',')});  // admin's own switch off too
-  w = await open(jar); d = w.document; await sleep(300);
-  const addUser = async name => {
-    await w.eval(`settingsModal('users')`); await sleep(400);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
-    click(w, d.querySelector('[data-acc="user-new"]')); await sleep(200);
+  w = await open(jar); d = w.document;
+  const addUser = async name => {  // #6135: each step waits for its real state (the list, the dialog, the answer), not 400 / 200 / 900 ms
+    await w.eval(`settingsModal('users')`); await waitSel(d, '[data-acc="user-new"]');  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+    click(w, d.querySelector('[data-acc="user-new"]')); await waitSel(d, '.modal #u-user');
     const um = [...d.querySelectorAll('.modal')].pop();
     um.querySelector('#u-user').value = name; um.querySelector('#u-name').value = name; um.querySelector('#u-pw').value = 'password123';
-    click(w, um.querySelector('[data-m="save"]')); await sleep(900);
+    const w0 = jar.w || 0; click(w, um.querySelector('[data-m="save"]')); await netIdle(jar, w0, `save user ${name}`);
   };
   await addUser('bob');
   let ask = await waitSel(d, '.modal.collabask');
   check(ask && /Switch on collaboration now\?/.test(ask.textContent), 'second user: "Switch on collaboration now?"');
-  click(w, ask.querySelector('[data-m="yes"]')); await sleep(900);
+  { const w0 = jar.w || 0; click(w, ask.querySelector('[data-m="yes"]')); await netIdle(jar, w0, '"Yes, switch on"'); }  // #6135
   st = await api(jar, 'GET', '/api/state');
   const bj = {}; await fetch(B + 'api/auth/login', {method: 'POST', headers: H, body: JSON.stringify({username: 'bob', password: 'password123'})}).then(r => { bj.c = r.headers.get('set-cookie').split(';')[0]; });
   const bst = await api(bj, 'GET', '/api/state');
@@ -119,8 +135,8 @@ const feats = st => st.settings.features.split(',');
   // ---- 2: second user, "Not now" keeps it off
   fresh();
   jar = {}; w = await open(jar); d = w.document;
-  await step1(w); click(w, d.querySelector('[data-su="go"]')); await sleep(800);
-  w.close(); w = await open(jar); d = w.document; await sleep(300);
+  await step1(w); await goSetup(w, jar);
+  w.close(); w = await open(jar); d = w.document;
   await w.eval(`settingsModal('users')`); await waitSel(d, '[data-acc="user-new"]');  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   click(w, d.querySelector('[data-acc="user-new"]')); await waitSel(d, '.modal #u-user');
   let um = [...d.querySelectorAll('.modal')].pop();
@@ -128,7 +144,7 @@ const feats = st => st.settings.features.split(',');
   click(w, um.querySelector('[data-m="save"]'));
   ask = await waitSel(d, '.modal.collabask');
   check(!!ask, 'prompt shown again on a fresh install');
-  click(w, ask.querySelector('[data-m="no"]')); await sleep(400);
+  click(w, ask.querySelector('[data-m="no"]')); await netIdle(jar, -1, '"Not now"');  // #6135: nothing to write, only quiet
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && !d.querySelector('.modal.collabask'), '"Not now": stays off');
   w.close();
@@ -139,7 +155,7 @@ const feats = st => st.settings.features.split(',');
   await step1(w);
   click(w, d.querySelector('[data-su-start="import"]')); await sleep(100);
   check(d.querySelector('[data-su-start="import"]').classList.contains('on') && !d.querySelector('[data-su-start=""]').classList.contains('on') && /Todoist/.test(d.querySelector('[data-su-start="import"]').textContent), '#4361: the Import card is marked and names the sources');
-  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  await goSetup(w, jar);
   st = await api(jar, 'GET', '/api/state');
   check(st.settings.purpose === 'me' && !(st.error), '#4361: setup with the Import card goes through (no project type "import" sent)');
   check(w.sessionStorage.getItem('kalmido-suimport') === '1', '#4361: the flag for "open Settings > Data after the reload" is set');
@@ -151,7 +167,7 @@ const feats = st => st.settings.features.split(',');
   await step1(w);
   click(w, d.querySelector('[data-su-preset="team"]')); await sleep(100);
   check([...d.querySelectorAll('[data-use]')].every(c => c.checked === !['a:life', 'habits', 'matrix', 'a:review'].includes(c.dataset.use)) /* 2.44.0 (#1187): areas; Time with the focus timer */ && d.querySelector('[data-su-preset="team"]').classList.contains('on') && !d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'Team: all ticked but Family, habits, focus timer, matrix, statistics (2.25.0)');
-  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  await goSetup(w, jar);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === true && st.time_all === true && ['collab', 'time', 'kanban', 'timeline', 'deps', 'fields', 'progress'].every(f => feats(st).includes(f)) && !['habits', 'pomo', 'matrix', 'stats'].some(f => feats(st).includes(f)), 'Team: switches + modules on, only what the name promises (2.25.0, UX-25)');
   w.close();
@@ -168,11 +184,11 @@ const feats = st => st.settings.features.split(',');
   check(!d.querySelector('.supreset.on'), 'one extra module: no preset matches');
   hb.checked = false; hb.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on'), 'back to the preset: highlighted again');
-  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  await goSetup(w, jar);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && st.time_all === false && feats(st).includes('cal') && !['timeline', 'kanban', 'matrix', 'habits', 'pomo', 'stats', 'progress', 'deps', 'fields'].some(f => feats(st).includes(f)), `For me: only the calendar on: ${feats(st)}`);
   w.close();
-  w = await open(jar); d = w.document; await sleep(300);
+  w = await open(jar); d = w.document;
   check(!d.querySelector('[data-act="view-timeline"]') && !d.querySelector('#side [data-go="habits"], #srail [data-sbb="habits"]') && !d.querySelector('#side [data-go="family"]'), 'For me: no timeline / habits / Family in the app');  // 2.152.2 (#2622): habits is an icon of the bar on a computer
   check(!w.eval('tourSteps()').some(x => x.id === 'news') && !/habits/.test(w.eval('tourSteps()').map(x => x.d).join(' ')), 'tour: no steps for modules that are off');
   w.close();
@@ -181,12 +197,13 @@ const feats = st => st.settings.features.split(',');
   fresh();
   jar = {}; w = await open(jar); d = w.document;
   await step1(w);
-  click(w, d.querySelector('[data-su-lang="de"]')); await sleep(600);
+  click(w, d.querySelector('[data-su-lang="de"]'));  // #6135: wait for the German step (i18nLoad), not 600 ms
+  for (let t = 0; t < 10000 && !/Wofür nutzt du Kalmido\?/.test(d.querySelector('.setupcard')?.textContent || ''); t += 100) await sleep(100);
   check(/Wofür nutzt du Kalmido\?/.test(d.querySelector('.setupcard').textContent) && /Für mich/.test(d.querySelector('.setupcard').textContent) && /Womit starten\?/.test(d.querySelector('.setupcard').textContent), 'language switch: step 2 in German');
   click(w, d.querySelector('[data-su-preset="me"]')); await sleep(100);
   for (const k of ['a:time']) { const c = d.querySelector(`[data-use="${k}"]`); c.checked = !c.checked; c.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(!d.querySelector('.supreset.on'), 'custom choice: no preset highlighted');
-  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  await goSetup(w, jar);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && st.time_all === true, 'fine-tuned: collab off, time on');
   check(!feats(st).includes('habits') && !feats(st).includes('matrix') && feats(st).includes('cal'), 'fine-tuned: habits + matrix off for the admin');
@@ -207,7 +224,7 @@ const feats = st => st.settings.features.split(',');
   check(!d.querySelector('[data-su="skip"]') && d.querySelector('details.sucust') && !d.querySelector('details.sucust').open && d.querySelector('details.sucust [data-use="habits"]'), 'no Skip; modules folded under Customize…');
   check(/\d+ of \d+ modules on/.test(d.querySelector('details.sucust summary').textContent), 'Customize… shows how many are on');
   click(w, d.querySelector('[data-su-preset="team"]')); await sleep(100);
-  click(w, d.querySelector('[data-su="go"]')); await sleep(600);
+  await goSetup(w, jar);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === true && st.time_all === true && feats(st).length >= 11, 'Team: everything on');
   w.close();
