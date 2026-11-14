@@ -73,7 +73,7 @@ function wsh_dlg(p, folder) {
 // "Links and earlier shares" of the one Share dialog (legacy: no new person share there, people come through the dialog)
 function wsh_fill(md, tgt, sp, folder, legacy) {
   const q = tgt.page_id ? `page=${tgt.page_id}` : `space=${encodeURIComponent(sp)}&folder=${encodeURIComponent(tgt.folder)}`;
-  md.innerHTML = `${legacy ? `<h4 class="wshleg">${ic('link', 's')} ${tr('Links and earlier shares')}</h4>` : ''}<div class="wsh-body">${loadingHtml('sec')}</div><div class="calerr" role="alert" data-wsh-err hidden></div>`;
+  md.innerHTML = `${legacy ? `<h4 class="wshleg">${ic('link', 's')} ${tr('Links and earlier shares')}</h4>` : ''}<div class="wsh-body">${/*html-ok*/ loadingHtml('sec')}</div><div class="calerr" role="alert" data-wsh-err hidden></div>`;
   /** @type {any} */ let j = null;
   /** @type {any[]|null} */ let users = null;
   const show = m => { const x = wsh$('[data-wsh-err]', md); if (x) { x.textContent = m || ''; x.hidden = !m; } };

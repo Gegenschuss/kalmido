@@ -2096,7 +2096,7 @@ function qaddBox(extraCls = '') {
 // paper clip (pick files: the task is created with them as attachments, the first file's name is the title when none
 // is typed; then its details open). Phones, Fold and desktop; 44 px targets on touch screens.
 function qExtraBtns(inp, lab = false) {  // 2.32.0 (#1059): lab = with a short visible label (the phone sheet)
-  const b = (act, icn, t, l) => `<button type="button" class="${lab ? 'btn sm qlab' : 'iconbtn'} qbtn" data-act="${act}" data-q="${inp}" title="${esc(t)}" aria-label="${esc(t)}">${ic(icn, 's')}${lab ? `<span aria-hidden="true">${esc(l)}</span>` : ''}</button>`;
+  const b = (act, icn, t, l) => `<button type="button" class="${lab ? 'btn sm qlab' : 'iconbtn'} qbtn" data-act="${/*html-ok*/ act/* the buttons above, built with esc() */}" data-q="${inp}" title="${esc(t)}" aria-label="${esc(t)}">${ic(icn, 's')}${lab ? `<span aria-hidden="true">${esc(l)}</span>` : ''}</button>`;
   return b('q-clip', 'qclip', tr('Add with a file…'), tr('File|quick add')) + b('q-open', 'qopen', tr('Add and open details'), tr('Details|quick add'));
 }
 // 2.32.0 (#1059): the quick add syntax as chips; a tap puts the shortcut into the field (# and ~ only the sign, the

@@ -40,7 +40,7 @@ const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), ico
 async function wkh_dlg(p) {
   await wk_flush();
   /** @type {any} */
-  const md = modal(`<h3>${esc(tr('History'))} · ${esc(wk_base(p.path))}</h3><div class="wkhbody" id="wkh-b">${loadingHtml('sec')}</div>
+  const md = modal(`<h3>${esc(tr('History'))} · ${esc(wk_base(p.path))}</h3><div class="wkhbody" id="wkh-b">${/*html-ok*/ loadingHtml('sec')}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-wkh="close">${esc(tr('Close'))}</button></div>`);
   md.classList.add('wkhdlg');
   const box = $('#wkh-b', md), may = WK.idx[p.space]?.mayWrite !== false;
@@ -135,7 +135,7 @@ function wks_snipHtml(p, q) {
   const ti = p.path ? wk_base(p.path).toLowerCase() : '';
   if (ti && !segs[0][1]) { const s0 = segs[0][0].replace(/^(…?\s*)#{1,6}\s+/, '$1'); if (s0.replace(/^…?\s*/, '').toLowerCase().startsWith(ti)) segs[0][0] = s0.replace(/^(…?\s*)/, '').slice(ti.length).replace(/^\s+/, ''); }
   const o = segs.map(([t, b]) => { const x = esc(wks_frag(t)); return b ? (x ? '<b>' + x + '</b>' : '') : x; }).join('').trim();
-  return o ? `<small class="wksnip">${o}</small>` : '';
+  return o ? `<small class="wksnip">${/*html-ok*/ o/* the parts escaped above */}</small>` : '';
 }
 // the name of a hit with its snippet (wks_inner, wiki.js wk_hitHtml / the hit lists): the row wraps, the snippet goes below
 const wks_nameHtml = (p, q, path = p.path) => `${wk_pathHtml(path)}${wks_snipHtml(p, q)}`;  // 2.1161.0 (#6090): the name, its folders beside it
