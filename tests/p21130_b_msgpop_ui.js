@@ -36,11 +36,19 @@ const call = async (method, url, body, ck, hdr = {}) => { const r = await fetch(
   const w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   const card = () => d.querySelector('#msgpop:not(.mpgone)');
   // what the poll does when the team chat / the agent chat moved: ask, then wait until the answer is in
-  const ask = async () => { const t0 = w.eval('JSON.stringify([S.mp.t, S.mp.a])'); w.eval('mp_check()'); await until(() => !w.eval('S.mp.busy')); return t0; };
+  const ask = async () => { const t0 = w.eval('JSON.stringify([S.mpop.t, S.mpop.a])'); w.eval('mp_check()'); await until(() => !w.eval('S.mpop.busy')); return t0; };
   await until(() => w.eval('!!S.booted'));
   await ask();
-  check(w.eval('S.mp.t !== null && S.mp.a !== null'), 'the first ask knows where the window starts');
+  check(w.eval('S.mpop.t !== null && S.mpop.a !== null'), 'the first ask knows where the window starts');
   check(!card(), 'nothing pops up for what was there before');
+  // regression (Ruhe suite #5224 found it): S.mp is the mention picker's state - the pop-up keeps its own (S.mpop), so opening a
+  // task (detail.js sets S.mp = null) never breaks the poll, and the chat's keys never see an open picker that is not there
+  check(w.eval('S.mp == null'), 'the mention picker\'s state stays free');
+  const TK = (await call('POST', '/api/tasks', {title: 'Check the van', list_id: L.id}, CK)).id;
+  w.eval(`openDetail(${TK})`);
+  await until(() => w.eval(`S.sel === ${TK}`));
+  check(w.eval('S.mp === null && !!S.mpop'), 'a task opened: the picker state is reset, the pop-up\'s own state is untouched');
+  w.eval('closeDetail()');
 
   // ================= one message: one card, the tap opens the conversation
   await bobSays('The van is booked for Monday\nand the second line');
@@ -124,7 +132,7 @@ const call = async (method, url, body, ck, hdr = {}) => { const r = await fetch(
     await nav(B + '#today');
     for (let i = 0; i < 100 && !(await ev('!!(window.S && S.booted)').catch(() => false)); i++) await sleep(100);
     const pop = async () => {
-      await ev('(mp_check(), 1)'); for (let i = 0; i < 50 && await ev('S.mp.busy'); i++) await sleep(100);
+      await ev('(mp_check(), 1)'); for (let i = 0; i < 50 && await ev('S.mpop.busy'); i++) await sleep(100);
       await bobSays('Firefox sees this ' + Date.now());
       await ev('(mp_check(), 1)');
       for (let i = 0; i < 100 && !(await ev("!!document.querySelector('#msgpop:not(.mpgone)')")); i++) await sleep(100);
