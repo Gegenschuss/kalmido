@@ -1068,11 +1068,11 @@ def cs_mail_rcpts(c, uid, oid, job, rows):
     return out, none
 
 
-def cs_mail_default(c, uid, rows, a=None):
-    """(subject, text) of the call sheet's mail in the person's language (the language of the PDF)."""
+def cs_mail_default(c, uid, rows):
+    """(subject, text) of the call sheet's mail in the person's language (the language of the PDF): the project's name (the
+    title of the shoot day without one) and the day."""
     lg = lang(c, uid)
-    proj = cs_project(c, uid, rows) if a is None else {"name": a["project"]}
-    title = proj.get("name") or rows[0]["title"] or ""
+    title = cs_project(c, uid, rows).get("name") or rows[0]["title"] or ""
     d0 = cs_when(rows)[0]
     day = cs_weekday(d0, lg) + ", " + pdf_date(d0, lg)
     return (tr(N_("Call sheet: {0} – {1}"), title, day, lg=lg).strip(" –"),
