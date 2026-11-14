@@ -21,6 +21,28 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1155.0] - 2026-11-14
+
+Package 2.1155 (Bündel: Call Sheet versenden (an Crew, Agentur, Kunde)).
+
+### Added
+- Call sheet by e-mail (#5652): the call sheet dialog has "Send by e-mail". It lists the distribution with addresses - crew (address from the contacts), agency and client (the contacts chosen, else an address in the free text or the client file) - each ticked and can be left out one by one; people without an address are named. Subject and text are prefilled and can be changed. "Preview" always comes first: recipients, subject, the text with the signature and the PDF (opens on a tap); "Send" mails each recipient a mail of their own with the call sheet PDF attached. The mail leaves like the office's document mails (signature, sender, answer address, the day's limits); only addresses of the distribution can be chosen, no link is sent. Read-only members do not get the button (sending is 403 for them); another person gets 404.
+
+Package 2.1154 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 2/2: Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Samm).
+### Fixed
+- #5037 #5039: CI red p2125_d_demo / p274_b_demo - the browser demo's shim answers GET /api/msgpop (the chat pop-up poll of #6057), so the demo makes no unknown call.
+- #5184: CI red p3136_state_size - the suite's seed writes completed_at as a point in time (the column is TIMESTAMPTZ since #5951).
+- #6059: CI red p2192_c_upgrade - the upgrade check leaves out the office's own inbox tasks of the first ticks (the old dump's invoice is overdue past the dunning grace since 14.11.2026; the suggested payment reminder is right, no migration's doing).
+
+Package 2.1151 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #5524: a knowledge page as PDF or Word file (.docx) from the page menu, in the page's reading style; spaces with the lock make the Word file in the browser and print the PDF (`GET /api/wiki/pages/<id>/export?format=pdf|docx`, readers may download too).
+- #4562: asking to delete one's own account tells the members of projects that go along in the bell (name, day, project; switched with the "share" notices); the contact import has the switch "Take cards without a change date anyway" (off by default).
+### Changed
+- #3835: phones: the rows of files, knowledge, tables, tasks, sections, project page, comments, time, bookmarks, read later, feeds, family, life, mail filing, news and the sidebar show no symbols; tapping opens, a long press opens the row menu with everything that was a symbol ("Select" on top where several can be chosen; hold and drag moves, no up / down arrows). Settings and dialog rows with two or more symbols get one "…" instead. The computer is unchanged.
+### Security
+- #5524: the page export is bounded against built pages (table size, Markdown spans, long words, picture pixels; strict scan mode as for opening a file).
+
 ## [2.1150.0] - 2026-11-14
 
 Package 2.1145 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -479,7 +501,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1150.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1155.0...HEAD
+[2.1155.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1155.0
 [2.1150.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1150.0
 [2.1147.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1147.0
 [2.1146.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1146.0
