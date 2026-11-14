@@ -53,7 +53,7 @@ function sb_secHoldStart(h, sid, x, y) {
       sb_secTouchStop();
       if (o) saveSectionOrder(o.lid, o.ids);
     },
-    // held without moving: up / down as before (on the header now shown: a live update may have drawn it anew)
+    // held without moving: the head's menu (2.1151.0 B #3835; was up / down) (on the header now shown: a live update may have drawn it anew)
     onTap: () => {
       sb_secTouchStop();
       const hh = st.h.isConnected ? st.h : $(`#view .ghead[data-section="${st.sid}"], #view .khead[data-ksec="${st.sid}"]`); if (hh) secHeadMenu(hh, st.sid);
