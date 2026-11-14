@@ -54,6 +54,15 @@ function ms_btnItems(anchor, btns) {
     icon: ms_icName(b.querySelector('svg.i')), cls: b.classList.contains('danger') ? 'danger' : '', dis: b.disabled, fn: () => b.click()}));
 }
 function ms_btnMenu(anchor, btns, title, head = []) { menu(anchor, [...head, ...ms_btnItems(anchor, btns)], null, null, title); }
+// 2.1151.0 C (#3835): settings / dialog rows with two or more symbols: on a phone ONE "…" (no long press) instead of the row of
+// symbols (each marked .ms-phsr): ms_dots(btns, title) is that button (hidden on the computer, start-phrows-3835.css); it opens
+// the menu of the buttons btns (a selector) inside its parent element
+const ms_dots = (btns, title = '') => `<button type="button" class="iconbtn ms-phdots" data-msdots="${esc(btns)}" data-mstitle="${esc(title)}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(title ? tr('More for {0}', title) : tr('More'))}">${ic('dots', 's')}</button>`;
+document.addEventListener('click', e => {
+  const b = /** @type {any} */ (e.target).closest?.('[data-msdots]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  ms_btnMenu(b, [...b.parentElement.querySelectorAll(b.dataset.msdots)].filter(x => x !== b), b.dataset.mstitle || '');
+});
 // Shift-click: the ids between the last ticked one and id in the shown order (both included); id alone without an anchor
 function ms_range(order, from, id) {
   const a = order.indexOf(from), b = order.indexOf(id);
