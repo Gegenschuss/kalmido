@@ -50,6 +50,8 @@ from ..core.access import Denied, acx_anon_bind, live_sql
 from ..core.access import addr_account  # 2.983.0 (#5643)
 from ..core.addrshare import ads_bound, ads_dict, ads_kind, ads_open, ads_repath, ads_row  # 2.1071.0 (#5658)
 from ..core.addrshare import ads_back, ads_take, ads_taken, ads_taken_row  # 2.1115.0 (#5967)
+from ..core.addrshare import ADS_MAX, ADS_PER_ADDR, ADS_SEAL, ads_clean, ads_mark, ads_replaying  # 2.1138.0 (#6027)
+from ..accounts.login import addr_key  # 2.1138.0 (#6027)
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -665,6 +667,10 @@ def wsh_create():
                            code="wiki_share_org"), 409
         who = wsh_person(c, uid, b)
         by_mail = bool(b.get("email") and not b.get("user_id"))
+        # 2.1138.0 (#6027, review N3): at the limits of shares by address both kinds get the same refusal (an open one was
+        # dropped silently, one that found its account was made); the replay of a row already counted is not held by them
+        if by_mail and not ads_replaying() and _wsh_addr_full(c, uid, b["email"], who):
+            raise Denied(409, tr("Too many shares"))
         if who is None:  # by e-mail address: nothing is revealed
             # 2.1071.0 (#5658): nobody proved the address (yet): an open share, made when its account signs in with it proved
             # (core/addrshare.py); the dialog lists it like a share by address that found its account (Fable 2.965 F2)
@@ -682,6 +688,15 @@ def wsh_create():
         nodes = wsh_nodes(c, {"owner_id": owner, "path": path, "is_folder": folder, "page_id": page})[:2]
         if not nodes:
             raise Denied(404)
+        if by_mail and c.execute("SELECT 1 FROM fs_shares f LEFT JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
+                                 "AND COALESCE(k.email, '')='' AND NOT EXISTS (SELECT 1 FROM wiki_share_cards k2 WHERE k2.pair_id=f.id "
+                                 "AND COALESCE(k2.email, '')<>'')", (nodes[0]["id"], who)).fetchone():  # (the pair of a card by address is no share by name)
+            # 2.1138.0 (#6027, review M2): the account has a share of it chosen by name -- the address gets an entry of its own
+            # all the same (an open one, as for any other address); its sign-in binds it once the share by name is gone
+            ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid, ref_id=page, path=path if folder else "")
+            bump(c)
+            c.commit()
+            return jsonify(ok=True, by_email=True)
         had = c.execute("SELECT 1 FROM fs_shares f JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
                         "AND (f.expires_at IS NULL OR f.expires_at>?)", (nodes[0]["id"], who, ts)).fetchone()
         # 2.1138.0 (#6025): by address no line of the node's history names the account (an open share writes none either)
@@ -782,6 +797,31 @@ def _wsh_open_live(c, oid, owner):
     page_paths = _wsh_page_paths(c, owner, rows)
     out = [_wsh_open_entry(c, x, page_paths, {}) for x in rows]
     return [e for e in out if e is not None and not e["expired"]]
+
+
+def _wsh_addr_full(c, uid, em, who):
+    """2.1138.0 (#6027, review N3): the limits of shares by address (core/addrshare.py ADS_MAX per sharer, ADS_PER_ADDR per
+    address) for both kinds alike: open rows plus the shares by address that found their account (cards with an address) --
+    so the limit is reached at the same step whether the address has an account or not, and both get the same answer."""
+    em = ads_clean(em)
+    if not em:
+        return False
+    bound = ("SELECT COUNT(*) FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id WHERE k.email IS NOT NULL AND k.email<>'' AND ")
+    with system_ctx(c):  # counts only (the address's rows of other sharers too, as ads_open counts them)
+        mine = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (uid,)).fetchone()[0]
+                + c.execute(bound + "f.created_by=?", (uid,)).fetchone()[0])
+        addr = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (addr_key(c, ADS_SEAL, em),)).fetchone()[0]
+                + (c.execute(bound + "f.user_id=?", (int(who),)).fetchone()[0] if who else 0))
+    return mine >= ADS_MAX or addr >= ADS_PER_ADDR
+
+
+def _wsh_card_mail(c, token):
+    """The address a card keeps (sealed, wsh_dict), '' when it cannot be read."""
+    from ..accounts.login import unseal
+    try:
+        return unseal(c, WSH_SEAL + "mail", token).strip().lower()
+    except Exception:  # noqa: BLE001  a server key that changed
+        return ""
 
 
 def _wsh_open_need(c, n):
@@ -907,15 +947,22 @@ def wsh_restore(sid):
         if x is not None and x["kind"] == "wiki" and x["owner_id"] == uid:
             return jsonify(_wsh_one(c, kind, n))  # live already
         rv = ads_taken(c, "wiki", n, uid)
-        if rv is None or _wsh_open_one(c, ads_taken_row(rv)) is None:
+        e = _wsh_open_one(c, ads_taken_row(rv)) if rv is not None else None
+        if e is None:
             raise Denied(404)
         if wsh_locked(c, None, uid):
             return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
-        if not ads_back(c, rv):
+        acct = addr_account(c, e["user"]["name"])
+        # 2.1138.0 (#6027, N3): the limits as for a share by address that found its account (the same 409)
+        if _wsh_addr_full(c, uid, e["user"]["name"], acct) or not ads_back(c, rv):
             c.commit()
             raise Denied(409, tr("Already shared"))
         bump(c)
         c.commit()
+        if acct and acct != uid:
+            # 2.1138.0 (#6027, review N1): the account proved the address while the share was ended -- it is made now, the
+            # normal way (the replay after this request, as at its sign-in), not left open until its next sign-in
+            ads_mark(acct)
         return jsonify(_wsh_one(c, kind, n))
     if kind == "person":
         if wsh_people(c, uid, live=False, fid=n):
@@ -930,6 +977,8 @@ def wsh_restore(sid):
             raise Denied(409, tr("unknown person"))
         rv = wsh_revoked(c, n)
         k = json.loads(rv["row_json"]).get("wiki_card") or {}
+        if k.get("email") and _wsh_addr_full(c, uid, _wsh_card_mail(c, k["email"]), r["user_id"]):
+            raise Denied(409, tr("Already shared"))  # 2.1138.0 (#6027, N3): the limits of an open share's Undo hold here too
         from ..core.objects import obj_node_reshare
         back = obj_node_reshare(c, rv["id"], owner=uid, org=None, log=not k.get("email"))  # 2.969.0 (#5644): the node must still be uid's private one
         if back is None:  # the person has a share of that node again (or the node went): nothing to bring back
