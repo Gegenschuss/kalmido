@@ -509,7 +509,8 @@ APP_ONLY = [
      "moving / renaming and folders, history, uploading / removing files of pages, references, search and mentions, shares and "
      "public links, export / import and the end-to-end "
      "encryption (an agent never reads an encrypted space); the outline parser only serves the mind map import of the web app; "
-     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app; 2.371 (#3150): the tag list "
+     "2.371.3 (#3152): the reading style of a space is how people look at its pages in the app; 2.1151.0 (#5524): a page as PDF / "
+     "Word (GET /api/wiki/pages/{}/export) is a file for people to send out, an agent reads the same text as Markdown; 2.371 (#3150): the tag list "
      "and the ```abfrage block are views of the panel / a page like search; 2.637.0 (#4745): the file list of a space feeds the "
      "device's offline copy of the web app (an agent reads a page's files through the mapped routes)",
      ("=DELETE /api/wiki/pages/{}", "* /api/wiki/pages/{}/", "* /api/wiki/trash", "=POST /api/wiki/restore", "=POST /api/wiki/purge",

@@ -197,6 +197,19 @@ organisation.
 
 See *Exporting encrypted content* in the self-hosting guide for backups, moving servers and lost keys.
 
+## A page as PDF or Word
+
+*Since 2.1151.0 (#5524).* For texts that go out: the page's menu (⋯) has **Download as PDF** and **Download as Word (.docx)**
+(also for people who only read the page). The file follows the reading style the page is shown in (Clear, Book, Compact,
+Notepad) and carries the page's name as its title, unless the text starts with the same heading. Understood: headings,
+paragraphs, bold / italic / struck / code, links (web and mail addresses stay clickable, links to other pages become their
+text), lists with ticks, quotes, code blocks, rules, tables, and the pictures uploaded to this page (other pictures, also
+from the web, appear as their name: the server fetches nothing). `GET /api/wiki/pages/<id>/export?format=pdf|docx&style=`;
+no extra library (the PDF comes from the office's own writer, the .docx is written by hand).
+
+In an encrypted space the server only holds the ciphertext, so the browser makes the file: Word directly, PDF through the
+browser's print function on the page alone (choose *Save as PDF* there).
+
 ## Trash
 
 *Since 2.143.0.*
