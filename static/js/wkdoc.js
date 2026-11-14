@@ -27,7 +27,7 @@ function wdxDupTitle(dom, title) {
 }
 function wdxDom(p) {
   const html = typeof wk_render === 'function' ? wk_render(p) : '';
-  return /** @type {HTMLElement} */ (new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstElementChild);
+  return /** @type {HTMLElement} */ (new window.DOMParser().parseFromString('<div>' + html + '</div>', 'text/html').body.firstElementChild);
 }
 
 // ---- .docx --------------------------------------------------------------------------------------------------------
