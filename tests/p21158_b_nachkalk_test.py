@@ -26,8 +26,8 @@ from freelancer_fixture import freelancer
 KEY = base64.b64encode(os.urandom(32)).decode()
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": KEY})
 FEAT = "cal,comments,collab,office,clients,docs,files,fields,time"
-O = "/api/office"
-D = O + "/docs"
+OFC = "/api/office"
+D = OFC + "/docs"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
            "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
 CLIENT = {"name": "Beispiel Kunde AG", "street": "Marktstrasse 5", "zip": "50667", "city": "Musterstadt", "country": "DE"}
@@ -163,7 +163,7 @@ for u in ("bob", "carol"):
     assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com", "role": "member"}).ok
 for s in (A, Bo, Ca):
     s.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
-A.put(B + O + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR"})
+A.put(B + OFC + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR"})
 
 Q, L, TS = scenario(A, "alice", ORG)
 
@@ -181,7 +181,7 @@ check(Ca.get(B + f"/api/office/docs/{Q}/postcalc").status_code in (403, 404) and
 
 # ------------------------------------------------------------ a person without an organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A, "frida")
-Fr.put(B + O + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR"})
+Fr.put(B + OFC + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR"})
 FQ, FL, _ = scenario(Fr, "frida")
 row = sql("SELECT org_id, owner_id FROM lists WHERE id=?", (FL,))
 check(row and row[0][0] is None and row[0][1] == FID, f"frida: a private project of her own {row}")

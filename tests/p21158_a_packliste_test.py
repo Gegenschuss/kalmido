@@ -24,8 +24,8 @@ from freelancer_fixture import freelancer
 
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0"})
 FEAT = "cal,comments,collab,office,clients,docs,files,fields,time,dispo,workload"
-O = "/api/office"
-D = O + "/docs"
+OFC = "/api/office"
+D = OFC + "/docs"
 CS = "/api/team/dispo/callsheet/"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
            "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
@@ -51,7 +51,7 @@ def has(txt, s):
 
 
 def settings(S, packs):
-    check(S.put(B + O + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR", "industry_packs": packs}).ok, f"office settings {packs}")
+    check(S.put(B + OFC + "/settings", json={"company_fields": COMPANY, "lang": "de", "currency": "EUR", "industry_packs": packs}).ok, f"office settings {packs}")
 
 
 def gear_rows(oid, root):
@@ -65,7 +65,7 @@ def scenario(S, who, oid, cam):
     cl = S.post(B + "/api/clients", json=CLIENT).json().get("id")
     eq = {}
     for name, cat in (("Kamera Alpha", "Kamera"), ("Stativ Beta", "Grip"), ("Altes Licht", "Licht")):
-        r = S.post(B + O + "/equipment", json={"name": name, "category": cat, "daily_rate": 50})
+        r = S.post(B + OFC + "/equipment", json={"name": name, "category": cat, "daily_rate": 50})
         check(r.status_code in (200, 201), f"{who}: the device {name} {r.text[:160]}")
         eq[name] = r.json()["id"]
     KA, ST, AL = eq["Kamera Alpha"], eq["Stativ Beta"], eq["Altes Licht"]
@@ -86,7 +86,7 @@ def scenario(S, who, oid, cam):
     check(r.ok, f"{who}: the sheet with its equipment set {r.text[:200]}")
     stf = (((r.json().get("part") or {}).get("sheet") or {}).get("staff") or [{}])[0]
     check(stf.get("uid") and stf["uid"] != "g", f"{who}: review F3: a crew row never keeps the uid g (the device key) {stf}")
-    check(S.patch(B + f"{O}/equipment/{AL}", json={"archived": 1}).ok, f"{who}: the old light archived (no device of the master data any more)")
+    check(S.patch(B + f"{OFC}/equipment/{AL}", json={"archived": 1}).ok, f"{who}: the old light archived (no device of the master data any more)")
     # ------------------------------------------------------------ the preview
     dp = S.get(B + f"{D}/{Q}/tasks").json().get("dispo") or {}
     days = dp.get("days") or []
@@ -174,7 +174,7 @@ ALICE = A.get(B + "/api/state").json()["me"]["id"]
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 settings(A, ["film"])
-CAM = A.post(B + O + "/crew", json={"name_de": "Kamera", "name_en": "Camera", "rate_day": 650, "intext": "intern"}).json()["id"]
+CAM = A.post(B + OFC + "/crew", json={"name_de": "Kamera", "name_en": "Camera", "rate_day": 650, "intext": "intern"}).json()["id"]
 JA = scenario(A, "alice", ORG, CAM)
 
 # ------------------------------------------------------------ a person without an organisation (freelancer-matrix: hub)
@@ -182,7 +182,7 @@ FID, Fr = freelancer(B, A, "frida")
 Fr.patch(B + "/api/settings", json={"lang": "de", "features": FEAT, "tour": "done"})
 settings(Fr, ["film"])
 PERS = sql("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
-FCAM = Fr.post(B + O + "/crew", json={"name_de": "Kamera", "name_en": "Camera", "rate_day": 600, "intext": "intern"}).json()["id"]
+FCAM = Fr.post(B + OFC + "/crew", json={"name_de": "Kamera", "name_en": "Camera", "rate_day": 600, "intext": "intern"}).json()["id"]
 JF = scenario(Fr, "frida", PERS, FCAM)
 # tenant-matrix: hub -- another area's call sheet (and its packing list): 404 both ways
 check(A.get(B + CS + JF, params={"org": PERS}).status_code == 404, "Alice: Frida's call sheet 404")
