@@ -681,6 +681,8 @@ function wka_put(h, fls, p) {
       : `<a href="${esc(url)}" target="_blank" rel="noopener" class="wklink">${esc(f.label || wka_dec(f.name))}</a>`;
   });
 }
+// 2.1151.0 A (#3835): phones hide a file's symbols below a page (wiki.css); a long press on its row: Open, Copy link (Delete while editing)
+ms_rowMenu('#view .wkfiles li', r => { const a = $('a.wkfile', r); if (a) ms_btnMenu(r, ':scope > .iconbtn', a.title, [{label: tr('Open'), icon: 'eye', fn: () => a.click()}]); });
 function wka_html(p, may, edit) {  // 2.750.0 (#5229): attach, drop and delete only while the page is in edit mode (WK.edit); reading keeps open + copy link
   const fs = p.files || [], open = !wk_e2e(p.space);
   if (!fs.length && !(may && open && edit)) return '';
