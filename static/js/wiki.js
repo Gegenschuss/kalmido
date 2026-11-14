@@ -37,7 +37,7 @@ function wk_pgAt(id) {
 // the area "Knowledge pages" and has no "…" of its own (render.js renderTop0), the page's head keeps the back arrow, the path and
 // the page's "…", which also carries the head bar's entries (undo / redo, favourite, help, the space's section)
 const wk_phonePage = () => isMobile() && S.route.mod === 'wiki' && !!S.route.wid && WK.pg?.id === S.route.wid && !WK.pg._wke;
-const wk_topTitle = () => wk_base(WK.pg?.path || '');
+const wk_topTitle = () => wk_label(WK.pg?.path || '');  // 2.1161.0 (#6090): a daily note as its date
 function wk_open() {
   if (!wk_all()) return wk_cur();
   const r = S.route, ok = v => !!v && wk_spaces().includes(v); if (r.mod !== 'wiki') return null;
@@ -64,12 +64,25 @@ function wk_allHits(q) {
 const wk_hitHtml = (p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}<small class="muted wkspn">${esc(wk_spaceName(p.space))}</small></a></li>`;
 // 2.376 (#3292): a hit's name with the snippet of its text when the text is here already (a space with the lock, offline;
 // wkhist.js wks_nameHtml), for the first 30 hits; nothing is loaded for it
-const wk_hitName = (p, i) => i < 30 && typeof wks_nameHtml === 'function' ? wks_nameHtml(p, WK.q) : `<span>${esc(p.path)}</span>`;
+const wk_hitName = (p, i) => i < 30 && typeof wks_nameHtml === 'function' ? wks_nameHtml(p, WK.q) : wk_pathHtml(p.path);  // 2.1161.0 (#6090): name + folders
 function wk_allHitsHtml(q, cls = '') {
   const v = wk_allHits(q), wait = wk_spaces().some(s => !WK.idx[s]?.pages && !WK.idx[s]?.err);
   return `<nav id="wk-res" class="${cls}" aria-label="${esc(tr('Pages'))}">${v.length ? `<ul class="wktree">${v.map(wk_hitHtml).join('')}</ul>` : wait ? '' : wk_noHit()}${wait ? `<div class="muted mhint">${tr('Loading…')}</div>` : ''}${typeof wks_html === 'function' ? wks_html('', WK.q, v.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>`;
 }
 const wk_base = p => p.split('/').pop();
+// 2.1161.0 (#6090): what Kalmido names itself reads like text, the paths stay as they are: the daily notes' folder "journal" and
+// the templates' folder "Templates" / "Vorlagen" (top level) in the person's language, a daily note as its date (Sa, 14. Nov 2026)
+function wk_label(path) {
+  const parts = String(path || '').split('/'), b = parts[parts.length - 1];
+  if (parts.length === 1 && /^journal$/i.test(b)) return tr('Daily notes');
+  if (parts.length === 1 && /^(templates|vorlagen)$/i.test(b)) return tr('Templates');
+  const m = /^journal\/(\d{4}-\d\d-\d\d)$/i.exec(path), d = m ? new Date(m[1] + 'T00:00:00') : null;
+  return d && !isNaN(d.getTime()) ? fmtDay('year', d) : b;
+}
+// the folders of a path as the lists name them ("Processes / Shoot day"), '' at the top
+const wk_dirLabel = path => { const ps = String(path || '').split('/').slice(0, -1); return ps.map((_, i) => wk_label(ps.slice(0, i + 1).join('/'))).join(' / '); };
+// a page in a list of hits / links: its name, its folders quietly beside it (before: the full path "A/B/Page")
+const wk_pathHtml = path => { const d = wk_dirLabel(path); return `<span>${esc(wk_label(path))}${d ? ` <small class="muted wkpdir">${esc(d)}</small>` : ''}</span>`; };
 const wk_isTpl = p => /^(templates|vorlagen)\//i.test(p);
 const wk_e2e = sp => typeof wkeOn === 'function' && wkeOn(sp);  // 2.64.3 B (#1817): the space is encrypted in the browser (wikie2e.js)
 // 2.376 (#3292): the index or a page arrived: drawn at once while one types into the search (the field keeps its focus, its
@@ -145,7 +158,7 @@ function wk_tree(pages, folders = []) {
     for (const part of path.split('/')) {
       acc = acc ? acc + '/' + part : part;
       const k = part.toLowerCase();
-      if (!n.kids.has(k)) n.kids.set(k, {name: part, path: acc, page: null, kids: new Map()});
+      if (!n.kids.has(k)) n.kids.set(k, {name: part, label: wk_label(acc), path: acc, page: null, kids: new Map()});  // 2.1161.0 (#6090): label = what the lists show
       n = n.kids.get(k);
     }
     return n;
@@ -164,8 +177,8 @@ function wk_treeHtml(n, cur, many, depth = 0, sp = wk_cur(), kept = new Set(LS.g
   return `<ul class="wktree" role="${depth ? 'group' : 'tree'}">${kids.map(k => {
     const kk = 'wk:' + sp + ':' + k.path.toLowerCase(), on = cur && k.page && k.page.id === cur.id;
     const open = kept.has(kk) || !WK_SHUT.has(kk) && (!many || (cur && cur.path.toLowerCase().startsWith(k.path.toLowerCase() + '/')));
-    const name = k.page ? `<a href="#wiki/${k.page.id}" class="wkitem ${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} role="treeitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>`
-      : `<span class="wkitem wkdir">${ic('folder', 's')}<span>${esc(k.name)}</span></span>`;
+    const name = k.page ? `<a href="#wiki/${k.page.id}" class="wkitem ${on ? 'on' : ''}" ${on ? 'aria-current="page"' : ''} role="treeitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.label)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>`
+      : `<span class="wkitem wkdir">${ic('folder', 's')}<span>${esc(k.label)}</span></span>`;
     const more = wk_rowMore(sp, k.fid && !k.page ? k.fid : k.page?.node_id, k.page && !k.fid ? k.page.updated_at : '');  // 2.200.0 A (#2747): the row's "…"
     const box = wk_selBox(sp, wk_isDir(k) ? k.fid : k.page?.node_id, k.name);  // 2.353.0 C (#2829)
     return wk_isDir(k) ? `<li class="wkrow${box && WK.selOn ? ' wkselrow' : ''}">${box}<details data-wkk="${esc(kk)}" ${open ? 'open' : ''}><summary><span class="wktog" aria-hidden="true">${ic('chev', 's')}</span>${name}${more}</summary>${wk_treeHtml(k, cur, many, depth + 1, sp, kept)}</details></li>` : `<li class="wkrow${box && WK.selOn ? ' wkselrow' : ''}">${box}${name}${more}</li>`;
@@ -270,7 +283,7 @@ function wk_dnd(sp, k, page) {  // the sbb_treeHtml marks of a folder / a page t
 }
 function wk_subNodes(sp, n, node) {
   const id = S.route.mod === 'wiki' ? S.route.wid : null;
-  return [...wk_sideDirs(n).map(node), ...wk_leaves(n).map(k => ({k: 'wk:' + sp + ':#' + k.page.id, name: k.name, go: 'wiki/' + k.page.id, icon: wk_isTpl(k.path) ? 'copy' : 'note',
+  return [...wk_sideDirs(n).map(node), ...wk_leaves(n).map(k => ({k: 'wk:' + sp + ':#' + k.page.id, name: k.label, go: 'wiki/' + k.page.id, icon: wk_isTpl(k.path) ? 'copy' : 'note',
     on: id === k.page.id, kids: false, ...wk_dnd(sp, k, k.page)}))];
 }
 function wk_nodeInfo(nid) {  // a node of a loaded space: {sp, folder | page}
@@ -471,8 +484,8 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   if (!hits && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op)) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</section></div>`;  // 2.371 (#3150): a tag's pages
   if (all && !op && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder zlefull" aria-label="${esc(tr('Workspaces'))}"><div class="nthead"><div class="wktitle"><h2>${esc(tr('All workspaces'))}</h2></div></div>${wk_recentHtml()}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</section></div>`;  // 2.769.0 (#5352): "Recently edited"  // 2.200.0 B (#2747): + Shared with me (a guest's start)
   const dir = S.route.wdir || '', parts = dir.split('/').filter(Boolean), n = d?.pages ? wk_node(wk_treeOf(sp), dir) : null;
-  const crumbs = `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}">${parts.length ? `<a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a>` : ''}${parts.slice(0, -1).map((x, i) => `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(x)}</a>`).join('')}</nav>`;
-  const head = `<div class="nthead"><div class="wktitle">${crumbs}<h2>${esc(parts.length ? (n?.name || parts[parts.length - 1]) : wk_rootName(sp))}</h2></div>${n?.fid && parts.length ? wk_rowMore(sp, n.fid, '') : ''}</div>`;  // 2.210 B (#2757): the open folder's "…" (2.200 menu)
+  const crumbs = `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}">${parts.length ? `<a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a>` : ''}${parts.slice(0, -1).map((x, i) => `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(wk_label(parts.slice(0, i + 1).join('/')))}</a>`).join('')}</nav>`;
+  const head = `<div class="nthead"><div class="wktitle">${crumbs}<h2>${esc(parts.length ? wk_label(parts.join('/')) : wk_rootName(sp))}</h2></div>${n?.fid && parts.length ? wk_rowMore(sp, n.fid, '') : ''}</div>`;  // 2.210 B (#2757): the open folder's "…" (2.200 menu)
   let body;
   if (hits) body = hits;
   else if (typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp)) body = wkeLockHtml(sp);
@@ -482,8 +495,8 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   else {
     const ps = wk_leaves(n);  // 2.200.0 A (#2747): rows like the file store's -- sorted by hand, the date, the menu "…"
     const box = (nid, nm) => wk_selBox(sp, nid, nm), rc = WK.selOn ? 'wkrow wkselrow' : 'wkrow';  // 2.353.0 C (#2829): Select
-    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${/*html-ok*/ wk_dirIcon(k, 's')}<span>${esc(k.name)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
-      + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.name)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
+    const rows = wk_dirs(n).map(k => `<li class="${rc}">${box(k.fid, k.name)}<a href="#${esc(wk_dirGo(k.path, sp))}" class="wkitem wkdrow">${/*html-ok*/ wk_dirIcon(k, 's')}<span>${esc(k.label)}</span>${/*html-ok*/ typeof wkar_mark === 'function' ? wkar_mark(sp, k.fid) : '' /* 2.1045.0 (#5823) */}</a>${wk_rowMore(sp, k.fid, '')}</li>`).join('')
+      + ps.map(k => `<li class="${rc}">${box(k.page.node_id, k.name)}<a href="#wiki/${k.page.id}" class="wkitem">${ic(wk_isTpl(k.path) ? 'copy' : 'note', 's')}<span>${esc(k.label)}</span>${k.page.shared && typeof wsh_markHtml === 'function' ? wsh_markHtml(1) : ''}</a>${wk_rowMore(sp, k.page.node_id, k.page.updated_at)}</li>`).join('');
     body = (n.page && parts.length ? wk_dirPageHtml(n.page) : '') + (rows ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${rows}</ul>` : n.page && parts.length ? '' : wk_emptyDir());
   }
   if (!hits) body = `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${body}</nav>${wk_selBar(sp)}`;
@@ -514,7 +527,7 @@ function wk_panelHtml() {
   const r = S.route, onW = r.mod === 'wiki';
   const pa = onW && r.wid ? wk_pgAt(r.wid) : null;
   const at = (onW && r.wdir != null ? r.wdir : pa && pa.space === sp ? wk_dirOf(pa.path) : '').toLowerCase();  // the open folder (a page: its folder)
-  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === r.wid, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
+  const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.label, go: wk_dirGo(n.path), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === r.wid, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };  // 2.319 (#3287): a page's own folder is open
   const top = `<div class="sgroup sbbp">${/*html-ok*/ sbb_row('wiki', 'book', wk_rootName(sp), onW && !r.wid && !r.wdir, `data-wkarea="${esc(sp)}"` /* 2.1045.0 (#5823): its right-click, wkarea.js */)}</div>`;  // 2.200.0 A (#2747, audit B 1)
   if (!d?.pages) return top + `<p class="muted sbbtl">${esc(d?.err || tr('Loading…'))}</p>`;
   const ds = wk_subNodes(sp, wk_treeOf(sp), node);  // 2.200.0 A (#2747): folders AND pages, dragged / sorted / with a menu
@@ -530,7 +543,7 @@ function wk_panelAllHtml() {
     const d = WK.idx[sp], lock = wk_locked(sp), here = op === sp;
     const pa = here && r.wid ? wk_pgAt(r.wid) : null;  // 2.319 (#3287)
     const at = here ? (r.wdir != null ? r.wdir : pa ? wk_dirOf(pa.path) : '').toLowerCase() : '';
-    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.name, go: wk_dirGo(n.path, sp), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === r.wid, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
+    const node = n => { const lp = n.path.toLowerCase(); return {k: 'wk:' + sp + ':' + lp, name: n.label, go: wk_dirGo(n.path, sp), ...(n.page ? {ichtml: wk_dirIcon(n)} : {}), on: !!at && at === lp || !!pa && !!n.page && n.page.id === r.wid, kids: wk_kidsN(n) > 0, open: at.startsWith(lp + '/') || !!pa && at === lp, sub: () => wk_subNodes(sp, n, node), ...wk_dnd(sp, n)}; };
     const root = {k: 'wk:' + sp + ':', name: wk_rootName(sp), icon: lock ? 'lock' : 'book', go: 'wiki/s/' + sp, on: here && !r.wid && !r.wdir,
       kids: !lock && !(d?.pages && !wk_kidsN(wk_treeOf(sp))), open: here, attrs: `data-wksp="${esc(sp)}"`,  // the open space shows its folders
       ...(d?.root && !wk_e2e(sp) && d.mayWrite !== false ? {ns: 'wk', id: d.root, par: 'wk:', drop: true, menu: typeof wkar_rootItems === 'function' /* 2.1045.0 (#5823) */} : {}),  // 2.200.0 A (#2747): dropped on = to the top
@@ -548,14 +561,38 @@ function wk_crumbs(p) {
   const parts = p.path.split('/'), sp = p.space;
   return `<nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}" data-wk="home">${esc(wk_rootName(sp))}</a>${parts.slice(0, -1).map((x, i) => {
     const pg = wk_byPath(sp, parts.slice(0, i + 1).join('/'));
-    if (typeof sbb_on === 'function' && sbb_on()) return `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(x)}</a>`;  // 2.152.3 B (#2620): the folder's list
-    return `<span aria-hidden="true">/</span>${pg ? `<a href="#wiki/${pg.id}">${esc(x)}</a>` : `<span>${esc(x)}</span>`}`;
+    const lb = wk_label(parts.slice(0, i + 1).join('/'));  // 2.1161.0 (#6090)
+    if (typeof sbb_on === 'function' && sbb_on()) return `<span aria-hidden="true">/</span><a href="#${esc(wk_dirGo(parts.slice(0, i + 1).join('/'), sp))}">${esc(lb)}</a>`;  // 2.152.3 B (#2620): the folder's list
+    return `<span aria-hidden="true">/</span>${pg ? `<a href="#wiki/${pg.id}">${esc(lb)}</a>` : `<span>${esc(lb)}</span>`}`;
   }).join('')}</nav>`;
 }
-function wk_attrsHtml(a, sp) {
+// 2.1161.0 (#6090): the front matter as fields, not as Markdown: the key as a word (Tags, Termin, Datum, Stand; others with a capital),
+// a date as the app writes dates, the event of minutes (termin / event, wk_meetText) as a link to it. cls: the editor's folded line
+const WK_ATTR_LB = {tags: N_('Tags'), tag: N_('Tags'), termin: N_('Event|calendar'), event: N_('Event|calendar'), datum: N_('Date'), date: N_('Date'), stand: N_('As of')};
+function wk_attrVal(k, v) {
+  const x = Array.isArray(v) ? v.join(', ') : String(v ?? '');
+  if (/^(termin|event)$/i.test(k) && /^\d{1,12}$/.test(x.trim())) return `<a href="#ev/${esc(x.trim())}" class="wklink">${esc(tr('Open event'))}</a>`;
+  const m = /^(\d{4}-\d\d-\d\d)(?:[T ](\d\d:\d\d))?/.exec(x.trim()), d = m && m[0].length === x.trim().length ? new Date(m[1] + 'T00:00:00') : null;
+  return d && !isNaN(d.getTime()) ? esc(fmtDay('year', d) + (m[2] ? ' ' + m[2] : '')) : esc(x);
+}
+function wk_attrsHtml(a, sp, cls = '') {
   const ks = Object.keys(a || {}); if (!ks.length) return '';
   const tagv = (k, v) => /^tags?$/i.test(k) && typeof wkt_attrHtml === 'function' && wkt_attrHtml(v, sp);  // 2.371 (#3150): the tags as links
-  return `<dl class="wkattrs">${ks.map(k => `<div><dt>${esc(k)}</dt><dd>${tagv(k, a[k]) || esc(Array.isArray(a[k]) ? a[k].join(', ') : String(a[k]))}</dd></div>`).join('')}</dl>`;
+  const lb = k => WK_ATTR_LB[k.toLowerCase()] ? tr(WK_ATTR_LB[k.toLowerCase()]) : (k.charAt(0).toUpperCase() + k.slice(1)).replace(/[_-]+/g, ' ');
+  return `<dl class="wkattrs${cls ? ' ' + cls : ''}">${ks.map(k => `<div><dt>${esc(lb(k))}</dt><dd>${tagv(k, a[k]) || wk_attrVal(k, a[k])}</dd></div>`).join('')}</dl>`;
+}
+// the front matter of a text as fields {key: value} (the editor reads its own text; the server's attrs come with a saved page):
+// "key: value" lines, [a, b] = a list, quotes taken off
+function wk_fmParse(t) {
+  const out = {};
+  for (const l of String(t || '').split(/\r?\n/)) {
+    const m = /^([\p{L}\p{N}_-]{1,60})[ \t]*:[ \t]*(.*)$/u.exec(l); if (!m) continue;
+    let v = m[2].trim(); if (!v) continue;
+    if (/^\[.*\]$/.test(v)) v = v.slice(1, -1).split(',').map(x => x.trim().replace(/^(['"])(.*)\1$/, '$2')).filter(Boolean);
+    else v = v.replace(/^(['"])(.*)\1$/, '$2');
+    out[m[1]] = v;
+  }
+  return out;
 }
 // 2.554.0 (#4052): one editor (wkcm.js, CodeMirror): a page one may write opens ready to type on a computer; a phone shows it
 // read first and its pen opens the same editor. "Read-only" (LS wkRo, this device) and "Edit as Markdown" (the plain field,
@@ -566,15 +603,15 @@ function wk_pageHtml(p) {
   const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), tch = isTouch(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
   const edit = WK.edit = may && (asMd || ((!wk_ro() || WK.fresh === p.id) && (WK.edit || !tch)));  // 2.655.0 (#5082): touch reads first (pen), also a tablet; a page just made opens for writing, also with the lock
   return `<div class="nthead">${mob ? `<button type="button" class="iconbtn" data-wk="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
-    <div class="wktitle">${wk_crumbs(p)}${/*html-ok*/ mob ? (typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : '') /* 2.1108.0 (#5965): the title is in the head bar */ : `<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2>`}</div>
+    <div class="wktitle">${wk_crumbs(p)}${/*html-ok*/ mob ? (typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : '') /* 2.1108.0 (#5965): the title is in the head bar */ : `<h2>${esc(wk_label(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2>`}</div>
     ${tch && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
     ${may || mob ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
-    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
+    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write …'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${/*html-ok*/ wk_bodyStrip(p.body).trim() ? wk_dupTitle(wk_render(p), p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
     ${wka_html(p, may, edit)}${wko_cfHtml(p)}
-    ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
+    ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${wk_pathHtml(b.path)}</a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"${WK.unsaved === p.id ? ` class="wkunsaved">${wk_unsavedHtml()}` : '>'}</span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
 }
 // 2.1108.0 (#5965): a first heading that only repeats the page's title (a SilverBullet import starts with "# Title") is hidden
@@ -632,10 +669,11 @@ function wk_render(p, ctx = {seen: new Set([p.id]), d: 0}) {
     if (tag) { if (/^(code|pre|a)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
     if (tid) return wk_taskLink(+tid, tlb);  // 2.619.0 (#4947)
-    const t = path.trim(), pg = wk_byPath(p.space, wk_unesc(t)), lb = label ? label : t;  // t is HTML already
+    const t = path.trim(), pg = wk_byPath(p.space, wk_unesc(t));  // t is HTML already
+    const lb = label ? label : esc(wk_label(wk_unesc(t).replace(/#.*$/, '').trim())), ti = label || !t.includes('/') ? '' : ` title="${t}"`;  // 2.1161.0 (#6090): the page's name, the path as its tooltip
     if (bang && typeof wem_pgHtml === 'function' && !/^\s*(datei|tabelle)\s*:/i.test(t)) { pgs.push({path: wk_unesc(t), part: wk_unesc((_a || '').slice(1)), label: label ? wk_unesc(label) : '', pg}); return `\u2063WKE${pgs.length - 1}\u2063`; }
     if (/^\s*(datei|tabelle)\s*:/i.test(t)) return wem_link(p, wk_unesc(t), label);  // 2.123.0 C (#2107): a file / table (wkembed.js)
-    return pg ? `<a href="#wiki/${pg.id}" class="wklink">${lb}</a>` : `<a href="#wiki" class="wklink wkmissing" data-wk="create" data-path="${t}" title="${esc(tr('Create this page'))}">${lb}</a>`;
+    return pg ? `<a href="#wiki/${pg.id}" class="wklink"${ti}>${lb}</a>` : `<a href="#wiki" class="wklink wkmissing" data-wk="create" data-path="${t}" title="${esc(tr('Create this page'))}">${lb}</a>`;
   });
   if (typeof wkt_linkHtml === 'function') h = wkt_linkHtml(h, p.space);  // 2.371 (#3150): #tags as links to their list
   h = h.replace(/(?:<p>)?\u2063WKT(\d+)\u2063(?:<\/p>)?/g, (_, n) => wk_tocHtml(p.space, tcs[+n] || ''));  // 2.376 (#3294)
@@ -864,6 +902,15 @@ function wk_after(sp) { if (WK.idx[sp]) { WK.idx[sp].v = -1; WK.idx[sp].mk = (WK
 // {{teilnehmer}} / {{participants}} and {{tagesordnung}} / {{agenda}} as well (more = those values); elsewhere they stay
 const WK_PH = /\{\{[ \t]*(datum|date|titel|title|ich|me|cursor|termin|event|zeit|time|ort|place|teilnehmer|participants|tagesordnung|agenda)[ \t]*\}\}/gi;
 const WK_PH_EN = {date: 'datum', title: 'titel', me: 'ich', event: 'termin', time: 'zeit', place: 'ort', participants: 'teilnehmer', agenda: 'tagesordnung'};
+// 2.1161.0 (#6090): a new page from a template: empty list items / boxes of the template ("- ", "- [ ] ") and the template's own
+// front matter (typ: protokoll …) are not copied; its tags stay (the new page belongs to them too). Only a template of the space:
+// the built-in minutes keep their empty points to fill (#1958)
+function wk_tplClean(text) {
+  let t = String(text || '');
+  const fm = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(t);
+  if (fm) { const keep = fm[1].split(/\r?\n/).filter(l => /^tags?[ \t]*:/i.test(l)); t = (keep.length ? `---\n${keep.join('\n')}\n---\n` : '') + t.slice(fm[0].length); }
+  return t.split('\n').filter(l => !/^[ \t]*(?:[-*+]|\d+[.)])(?:[ \t]+\[[ xX]?\])?[ \t]*\r?$/.test(l)).join('\n');
+}
 function wk_tplFill(text, path, more = {}) {
   const me = S.me?.display_name || S.me?.username || '', v = {datum: fmtDate(today()), titel: wk_base(path), ich: me, ...more};
   const val = k => v[WK_PH_EN[k] || k];
@@ -883,7 +930,7 @@ async function wk_tplText(sp, id) {  // a template's text (from the index when i
   return q.body || '';
 }
 async function wk_mk(sp, path, tpl, f0) {  // makes the page (tpl = a template's id, 0 = empty; f0 = a text made already, {text, at}); the answer {id, path, …}
-  const f = f0 || (tpl ? wk_tplFill(await wk_tplText(sp, tpl), path) : {text: '', at: -1});
+  const f = f0 || (tpl ? wk_tplFill(wk_tplClean(await wk_tplText(sp, tpl)), path) : {text: '', at: -1});  // 2.1161.0 (#6090)
   const r = wk_e2e(sp) ? await wkeCreate(sp, path, 0, f.text) : await rawFetch('POST', '/api/wiki/pages', {space: sp, path, ...(f.text ? {body: f.text} : {})});
   WK.caretNext = f.at >= 0 ? {id: r.id, at: f.at} : null;
   return r;
@@ -928,7 +975,7 @@ function wk_meetText(tpl, o, path) {  // the page's text: the template (or the b
   const agenda = items(String(o.description || '').split('\n').map(line).filter(Boolean).slice(0, 50));
   const who = items((o.attendees || []).map(a => wk_meetName(a.name || a.email)).filter(Boolean));
   const link = `[${wk_meetName(o.title) || tr('(no title)')}](#ev/${o.eid})`;
-  const body = tpl ?? `# {{titel}}\n\n**${tr('Event|calendar')}:** {{termin}} · {{zeit}}${o.location ? ' · {{ort}}' : ''}\n\n## ${tr('Participants')}\n{{teilnehmer}}\n\n## ${tr('Agenda')}\n{{tagesordnung}}\n\n## ${tr('Notes')}\n{{cursor}}\n\n## ${tr('Decisions')}\n- [ ] \n\n## ${tr('Action items')}\n- [ ] \n`;
+  const body = tpl != null ? wk_tplClean(tpl) : `# {{titel}}\n\n**${tr('Event|calendar')}:** {{termin}} · {{zeit}}${o.location ? ' · {{ort}}' : ''}\n\n## ${tr('Participants')}\n{{teilnehmer}}\n\n## ${tr('Agenda')}\n{{tagesordnung}}\n\n## ${tr('Notes')}\n{{cursor}}\n\n## ${tr('Decisions')}\n- [ ] \n\n## ${tr('Action items')}\n- [ ] \n`;
   const f = wk_tplFill(body, path, {titel: o.title || tr('(no title)'), datum: fmtDate(o.day), termin: link, zeit: o.when || '', ort: o.location || '', teilnehmer: who, tagesordnung: agenda});
   const fm = `termin: ${o.eid}\ndatum: ${o.day}\n`, has = /^---[ \t]*\r?\n/.exec(f.text);
   const text = has ? f.text.slice(0, has[0].length) + fm + f.text.slice(has[0].length) : `---\n${fm}---\n` + f.text;

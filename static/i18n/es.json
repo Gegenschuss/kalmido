@@ -17233,8 +17233,6 @@
   "Own file name template: each part only once": "Plantilla propia: cada parte solo una vez",
   "Applies to: {0}": "Se aplica a: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # título, - lista, [[Página]] enlaza una página, [[#123]] una tarea",
-  "Write … ([[Page]], [[#123]])": "Escribe … ([[Página]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Escribir … ([[Página]], [[#123]], / para comandos)",
   "This poll belongs to an agent that changed hands: it stays in the trash": "Esta encuesta pertenece a un agente que ha cambiado de propietario: se queda en la papelera",
   "is": "es",
   "is not": "no es",
@@ -18593,5 +18591,8 @@
   "The template could not be loaded": "No se pudo cargar la plantilla",
   "The reading style could not be saved": "No se pudo guardar el estilo de lectura",
   "The shares could not be loaded": "No se pudieron cargar los elementos compartidos",
-  "The tags could not be loaded": "No se pudieron cargar las etiquetas"
+  "The tags could not be loaded": "No se pudieron cargar las etiquetas",
+  "Daily notes": "Notas diarias",
+  "Write …": "Escribe …",
+  "Write … (/ for commands)": "Escribe … (/ para comandos)"
 }

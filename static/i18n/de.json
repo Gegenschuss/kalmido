@@ -17233,8 +17233,6 @@
   "Own file name template: each part only once": "Eigene Dateinamen-Vorlage: jeder Teil nur einmal",
   "Applies to: {0}": "Gilt für: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, [[#123]] eine Aufgabe",
-  "Write … ([[Page]], [[#123]])": "Schreiben … ([[Seite]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Schreiben … ([[Seite]], [[#123]], / für Befehle)",
   "This poll belongs to an agent that changed hands: it stays in the trash": "Diese Umfrage gehört zu einem Agenten, der den Besitzer gewechselt hat: sie bleibt im Papierkorb",
   "is": "ist",
   "is not": "ist nicht",
@@ -18593,5 +18591,8 @@
   "The template could not be loaded": "Die Vorlage konnte nicht geladen werden",
   "The reading style could not be saved": "Der Lese-Stil konnte nicht gespeichert werden",
   "The shares could not be loaded": "Wer Zugriff hat, konnte nicht geladen werden",
-  "The tags could not be loaded": "Die Tags konnten nicht geladen werden"
+  "The tags could not be loaded": "Die Tags konnten nicht geladen werden",
+  "Daily notes": "Tagesnotizen",
+  "Write …": "Schreiben …",
+  "Write … (/ for commands)": "Schreiben … (/ für Befehle)"
 }

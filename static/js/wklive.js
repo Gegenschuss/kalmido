@@ -74,7 +74,7 @@ async function wklv_slashPick(ta, c) {
   if (c.k === 'tpl') {
     let t; try { t = await rawFetch('GET', '/api/wiki/pages/' + c.id); if (typeof wkePage === 'function') await wkePage(t); } catch (e) { toast(errText(e, tr('The template could not be loaded'))); return; }  // 2.1161.0 (#6088)
     if (!ta.isConnected) return;
-    const f = wk_tplFill(wk_bodyStrip(t.body).replace(/\n+$/, ''), p?.path || '');  // 2.371.2 (#3151): {{datum}}, {{cursor}} …
+    const f = wk_tplFill(wk_tplClean(wk_bodyStrip(t.body)).replace(/\n+$/, ''), p?.path || '');  // 2.371.2 (#3151): {{datum}}, {{cursor}} …; 2.1161.0 (#6090): no empty points
     put(f.text, f.at >= 0 ? f.at : f.text.length);
   }
 }

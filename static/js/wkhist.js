@@ -122,14 +122,21 @@ function wks_snip(text, q) {
   return {snippet: pre + t.slice(start, end).join('') + (end < t.length ? '…' : ''), marks: mg.filter(([a]) => a >= start && a < end).map(([a, b]) => [a + sh, Math.min(b, end) + sh])};
 }
 // the snippet line of a hit p (query q): escaped, the words <b>; '' without one
+// 2.1161.0 (#6090): a snippet reads like text - the server's / wks_plain's text is plain already, but a cut can split a link or a
+// mark ("…/[[Ab"): what is left of them goes here, and a snippet that starts with the page's title starts after it
+const wks_frag = t => String(t).replace(/\[\[|\]\]|\*\*|__|~~|`/g, '');
 function wks_snipHtml(p, q) {
   const h = p.snippet ? p : typeof p.body === 'string' && p.body ? wks_snip(p.body, q) : null; if (!h?.snippet) return '';
-  const cs = Array.from(h.snippet); let o = '', at = 0;
-  for (const [a, b] of h.marks || []) { if (a < at) continue; o += esc(cs.slice(at, a).join('')) + '<b>' + esc(cs.slice(a, b).join('')) + '</b>'; at = b; }
-  return `<small class="wksnip">${o + esc(cs.slice(at).join(''))}</small>`;
+  const cs = Array.from(h.snippet), segs = []; let at = 0;
+  for (const [a, b] of h.marks || []) { if (a < at) continue; segs.push([cs.slice(at, a).join(''), 0], [cs.slice(a, b).join(''), 1]); at = b; }
+  segs.push([cs.slice(at).join(''), 0]);
+  const ti = p.path ? wk_base(p.path).toLowerCase() : '';
+  if (ti && !segs[0][1]) { const s0 = segs[0][0].replace(/^(…?\s*)#{1,6}\s+/, '$1'); if (s0.replace(/^…?\s*/, '').toLowerCase().startsWith(ti)) segs[0][0] = s0.replace(/^(…?\s*)/, '').slice(ti.length).replace(/^\s+/, ''); }
+  const o = segs.map(([t, b]) => { const x = esc(wks_frag(t)); return b ? (x ? '<b>' + x + '</b>' : '') : x; }).join('').trim();
+  return o ? `<small class="wksnip">${o}</small>` : '';
 }
 // the name of a hit with its snippet (wks_inner, wiki.js wk_hitHtml / the hit lists): the row wraps, the snippet goes below
-const wks_nameHtml = (p, q, path = p.path) => `<span>${esc(path)}</span>${wks_snipHtml(p, q)}`;
+const wks_nameHtml = (p, q, path = p.path) => `${wk_pathHtml(path)}${wks_snipHtml(p, q)}`;  // 2.1161.0 (#6090): the name, its folders beside it
 // ---- the text search below the page list (wiki.js viewWiki: wks_html in #wk-res)
 function wks_html(sp, q, shown) {
   q = String(q || '').trim();

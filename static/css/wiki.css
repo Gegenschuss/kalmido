@@ -297,3 +297,9 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 #wk-saved.wkunsaved{color:var(--danger);font-weight:600}
 #wk-saved.wkunsaved .linkbtn{font-weight:400}
 @media (pointer:coarse){#wk-saved.wkunsaved .linkbtn{min-height:2.75rem}}
+/* 2.1161.0 (#6090): the front matter as fields - in the editor one folded line (a click opens its lines, wkcm.js), a page's
+   folders quietly beside its name in hits and "Linked from", the task's title after "#1" in the editor */
+.wkcm .cm-wkfmw{padding:.25rem 0}
+.wkcm .cm-wkfmw .wkattrs{cursor:text}
+.wkpdir{margin-left:.25rem;font-size:var(--fs-s);font-weight:400}
+.wkcm .cm-wkreft{text-decoration:none;color:var(--muted)}

@@ -77,7 +77,7 @@ function wkt_sideHtml(sp) {
 function wkt_viewHtml(sp, tag) {
   const ps = wkt_tagPages(sp, tag), c = wkt_local(sp) ? null : WKT.pages[sp + '\n' + tag.toLowerCase()];
   const rows = ps == null ? loadingHtml('sec') : c?.err ? errorState({title: c.err, size: 'sec', retry: () => { c.v = -1; wk_redraw(); }})  // 2.1161.0 (#6088): the shared blocks
-    : ps.length ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${ps.map(p => `<li class="wkrow"><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>`
+    : ps.length ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${ps.map(p => `<li class="wkrow"><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_pathHtml(p.path)}</a></li>`).join('')}</ul>`  /* 2.1161.0 (#6090): name + folders */
     : emptyState({icon: 'tag', title: tr('No page has this tag.'), size: 'sec'});
   return `<div class="nthead"><div class="wktitle"><nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a><span aria-hidden="true">/</span><span>${esc(tr('Tags'))}</span></nav><h2 class="wktagh">${ic('tag', 's')}#${esc(tag)}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${rows}</nav>`;
 }

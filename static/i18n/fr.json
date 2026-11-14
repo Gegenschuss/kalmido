@@ -17233,8 +17233,6 @@
   "Own file name template: each part only once": "Modèle personnalisé : chaque partie une seule fois",
   "Applies to: {0}": "S’applique à : {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown : # titre, - liste, [[Page]] lie une page, [[#123]] une tâche",
-  "Write … ([[Page]], [[#123]])": "Écrire … ([[Page]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Écrire … ([[Page]], [[#123]], / pour les commandes)",
   "This poll belongs to an agent that changed hands: it stays in the trash": "Ce sondage appartient à un agent qui a changé de propriétaire : il reste dans la corbeille",
   "is": "est",
   "is not": "n’est pas",
@@ -18593,5 +18591,8 @@
   "The template could not be loaded": "Le modèle n'a pas pu être chargé",
   "The reading style could not be saved": "Le style de lecture n'a pas pu être enregistré",
   "The shares could not be loaded": "Les partages n'ont pas pu être chargés",
-  "The tags could not be loaded": "Les étiquettes n'ont pas pu être chargées"
+  "The tags could not be loaded": "Les étiquettes n'ont pas pu être chargées",
+  "Daily notes": "Notes du jour",
+  "Write …": "Écrivez …",
+  "Write … (/ for commands)": "Écrivez … (/ pour les commandes)"
 }
