@@ -46,14 +46,16 @@ function newsGroupHtml(g, pop, calm) {  // 2.1037.0 (#5807): calm = a bundle of 
   const open = g.items.length === 1 ? (pop ? 'data-bp="open"' : 'data-act="news-open"') + ` data-i="${g.items[0][1]}"` : `data-act="news-group" data-g="${esc(g.key)}"`;
   const exp = S.nf.openG === g.key;
   return `<div class="ngroup ${g.unread && !calm ? 'unread' : 'read'} ${g.needs ? 'needs' : ''}" data-gk="${esc(g.key)}">
-    <div class="nghead"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
+    <div class="nghead${g.unread && !calm ? ' ngrd' : ''}"><div class="ngav">${actors.map(a => av(a, uname(a, U), 'avatar sm')).join('')}</div>
       <div class="ngmain" role="button" tabindex="0" ${open} ${g.items.length > 1 ? `aria-expanded="${exp}"` : ''}><div class="ngt">${title}${newsWsLabel(first) /* 2.331.0 A (#3300) */}${g.items.length > 1 && g.unread && !calm ? `<span class="ngn" title="${esc(tr('Unread'))}">${g.unread}</span>` : ''}</div><div class="ngs muted">${esc(newsSummaryLine(g)) ? esc(newsSummaryLine(g)) + ' · ' : ''}<time>${esc(relTime(g.at))}</time></div>${/*html-ok*/ (() => {  // 2.25.0 (newsExcerpt escapes) (UX-45): what was written, one line
         const ex = g.items.map(([it]) => it).find(it => (it.kind === 'mention' || it.kind === 'comment' || it.kind === 'chatmention') && it.excerpt)  // 2.1052.0 (#5808): a team chat mention's words too (the plain list showed them)
           || (g.items.length === 1 && g.items[0][0].excerpt && !g.items[0][0].enc ? g.items[0][0] : null);  // 2.1088.0 (#5938): a single entry shows its note (e.g. a status change's), like the plain row did
         return ex ? `<div class="nexc ngex">${newsExcerpt(ex.excerpt, U)}</div>` : ''; })()}</div>
-      ${g.unread && !calm ? `<button type="button" class="iconbtn" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
+      ${g.unread && !calm ? `<button type="button" class="iconbtn ms-phsr" data-act="news-gread" data-ids="${ids.join(',')}" title="${esc(tr('Mark read'))}" aria-label="${esc(tr('Mark read') + ': ' + title.replace(/<[^>]+>/g, ''))}">${ic('check', 's')}</button>` : ''}</div>
     ${exp && g.items.length > 1 ? `<div class="nlist ngitems">${g.items.map(([it, i]) => newsItemHtml(it, i, pop)).join('')}</div>` : ''}</div>`;
 }
+// 2.1151.0 C (#3835): on a phone an unread bundle shows no tick; a long press opens "Mark read" as its menu
+domReady(() => ms_rowMenu('.nghead.ngrd', r => ms_btnMenu(r, '[data-act="news-gread"]', r.querySelector('.ngt')?.textContent)));  // multisel.js loads after this file
 function newsBundledHtml(vis, pop, pre = '', noMe = false) {
   // 2.18.0 (#652): the sections are h2 (the page's h1 is the header title; the bell's panel has no heading above them)
   // 2.138.2 D (#2405): For you (unread + to me, the bell's number) first. 2.1037.0 (#5807): For you always shows (empty: "Nothing
