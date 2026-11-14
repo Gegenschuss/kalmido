@@ -284,3 +284,14 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
   #view .wkfiles li,#view .wshfh{position:relative;-webkit-touch-callout:none}
   #view .wkfiles a.wkfile{-webkit-touch-callout:none}
 }
+/* 2.1151.0 D (#5524): a page of a space with the lock printed alone ("Download as PDF", wkdoc.js wdxPrint) in its reading style */
+.wdxprint{display:none}
+@media print{
+  body.wdxprinting>*:not(.wdxprint){display:none!important}
+  body.wdxprinting,html:has(body.wdxprinting){background:#fff!important;height:auto;overflow:visible}
+  body.wdxprinting .wdxprint{display:block;color:#000;background:#fff;padding:0}
+  .wdxprint .wkmd{max-width:none;border:0;background:none}
+  .wdxprint :is(pre,table,img,blockquote){break-inside:avoid}
+  .wdxprint :is(h1,h2,h3,h4){break-after:avoid}
+  @page{margin:20mm 22mm}
+}

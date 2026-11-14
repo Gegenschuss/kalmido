@@ -309,6 +309,7 @@ ORDER = (
     "wiki.wkfshare",  # 2.200.0 B (#2747): pages reached through folder / page shares (Shared with me, new pages in a shared folder)
     "wiki.wkarea",  # 2.1045.0 (#5823): a whole knowledge area shared with an agent (the dialog's facts; the share is the file store's)
     "wiki.wkstyle",  # 2.371.3 (#3152): the reading style of a knowledge space (PUT /api/wiki/style)
+    "wiki.wkdoc",  # 2.1151.0 D (#5524): one knowledge page as a PDF / .docx (GET /api/wiki/pages/<id>/export)
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsviews",  # 2.429.0 (#3580): the file store shows only its own folders; "From <area>" collections (read-only)

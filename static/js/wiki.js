@@ -551,7 +551,7 @@ function wk_pageHtml(p) {
     <div class="wktitle">${wk_crumbs(p)}${/*html-ok*/ mob ? (typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : '') /* 2.1108.0 (#5965): the title is in the head bar */ : `<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2>`}</div>
     ${tch && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
-    ${may || mob ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
+    ${may || mob || S.me?.kind !== 'agent' /* 2.1151.0 D (#5524): reading people get PDF / Word there */ ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
     ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${/*html-ok*/ wk_bodyStrip(p.body).trim() ? wk_dupTitle(wk_render(p), p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
@@ -1103,7 +1103,7 @@ document.addEventListener('click', async e => {
 // only read shows just those
 function wk_pmenuItems(p) {
   const may = WK.idx[p.space]?.mayWrite !== false, top = isMobile() && typeof topMoreItems === 'function' ? topMoreItems() : [];
-  if (!may) return top;
+  if (!may) return [...wk_docItems(p), ...(top.length ? ['-', ...top] : [])];  // 2.1151.0 D (#5524): reading people download the page too
   return [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
     ...wk_smvItems(p),  // 2.96.0 B (#1941)
@@ -1111,6 +1111,7 @@ function wk_pmenuItems(p) {
     ...(typeof wkh_items === 'function' ? wkh_items(p) : []),  // 2.123.0 A (#2102): the page history (wkhist.js)
     {label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#wiki/${p.id}`).then(() => toast(tr('Link copied'))); }},
     {label: tr('Copy as [[link]]'), icon: 'copy', fn: () => { navigator.clipboard?.writeText(`[[${p.path}]]`).then(() => toast(tr('Link copied'))); }},
+    ...wk_docItems(p),  // 2.1151.0 D (#5524): the page as PDF / Word
     ...wk_modeItems(p),  // 2.554.0 (#4052): Edit as Markdown (the way out) / Read only
     ...(typeof wkst_items === 'function' ? wkst_items(p) : []),  // 2.371.3 (#3152): reading style (mine / the space's)
     ...(typeof pgw_items === 'function' ? pgw_items('wiki', p.id) : []),  // 2.599.0 (#4808): the page's width (Read / Wide / Full)
@@ -1120,6 +1121,18 @@ document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
 });
+// 2.1151.0 D (#5524): the page as a file for texts that go out, in the reading style it is shown in (the server makes it:
+// GET /api/wiki/pages/<id>/export; a space with the lock makes it in the browser, wkdoc.js loaded on demand)
+function wk_docItems(p) {
+  if (S.me?.kind === 'agent') return [];
+  const get = fmt => async () => {
+    if (WK.dirty) await wk_flush();
+    if (wk_e2e(p.space)) { loadModule('wkdoc').then(() => wdx_local(p, fmt)).catch(e => { if (e?.message) toast(e.message); }); return; }
+    const st = typeof wkst_of === 'function' ? wkst_of(p.space) : '';
+    const a = document.createElement('a'); a.href = `/api/wiki/pages/${p.id}/export?format=${fmt}&style=${encodeURIComponent(st)}`; a.download = ''; document.body.append(a); a.click(); a.remove();
+  };
+  return [{label: tr('Download as PDF'), icon: 'download', fn: get('pdf')}, {label: tr('Download as Word (.docx)'), icon: 'download', fn: get('docx')}];
+}
 // 2.554.0 (#4052): the page's "…" entries of the editor: the plain Markdown field as the way out, and the lock "Read-only"
 function wk_modeItems(p) {
   const asMd = WK.mdFor === p.id, ro = wk_ro(), sw = fn => async () => { await wk_flush(); fn(); renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); };
