@@ -135,7 +135,7 @@ check({"[Content_Types].xml", "_rels/.rels", "word/document.xml", "word/styles.x
       f"#5524: the parts of a Word file {sorted(names)}")
 doc = z.read("word/document.xml").decode()
 check("Offer for Lindenhof" in doc and 'w:val="Heading1"' in doc, "#5524: the heading as Heading1 in document.xml")
-check('w:val="Title"' not in doc, "#5524: no second title when the text starts with the page's own heading -- the first heading counts")
+check('w:val="Title"' in doc and "Lindenhof letter" in doc, "#5524: the page's name as the title above a different first heading")
 check("<w:b/>" in doc and "Mr Sample" in doc and "<w:i/>" in doc and "<w:strike/>" in doc, "#5524: bold / italic / struck runs")
 check("Visit the site" in doc and "<w:numId" in doc and "<w:tbl>" in doc and "Survey" in doc, "#5524: list and table")
 check("☒" in doc and "☐" in doc, "#5524: the ticks of a task list")
@@ -143,6 +143,12 @@ check("<w:hyperlink" in doc and "https://example.com/plan" in z.read("word/_rels
 check("Other page" in doc, "#5524: a [[page]] link as its text")
 check(any(n.startswith("word/media/") for n in names) and "<w:drawing>" in doc, "#5524: the page's picture is in the Word file")
 check("Arial" in z.read("word/styles.xml").decode(), "#5524: the Clear style's font")
+
+# ---- a text that starts with the page's own name as its heading gets no second title
+P3 = page(A, "Notes/Plan Oak", "# Plan Oak\n\nTwo rooms.")
+doc = zipfile.ZipFile(io.BytesIO(export(A, P3, "docx").content)).read("word/document.xml").decode()
+check('w:val="Title"' not in doc and doc.count("Plan Oak") == 1 and 'w:val="Heading1"' in doc, "#5524: no second title when the text starts with the page's name")
+check(pdf_text(export(A, P3, "pdf").content).count("Plan Oak") == 1, "#5524: ... also in the PDF")
 
 # ---- title when the text has no heading of the page's name; the reading style
 P2 = page(A, "Notes/Short memo", "Just one line with a [link](javascript:alert(1)).")
