@@ -296,7 +296,11 @@ const isMobile = () => td_rc('mob', () => matchMedia('(max-width:767px)').matche
 const VP_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // the layout width 900 keeps the iOS zoom stop of #453 too (iOS ignores interactive-widget, harmless)
-const VP_900 = 'width=900, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
+// 2.1145.0 (#6075): with the scale spelled out (screen width / 900, also the floor of pinch zoom). The meta is switched
+// after load (the page starts with initial-scale=1): without its own scale Chrome kept 1, so an unfolded Fold (840 px
+// landscape) showed 840 of the 900 px and the account button sat 60 px off screen. w = the width of the screen as held
+const VP_900 = w => { const z = w > 0 && w < 900 ? Math.floor(w / 900 * 1000) / 1000 : 1;
+  return `width=900, initial-scale=${z}, minimum-scale=${z}, viewport-fit=cover, interactive-widget=resizes-content` + (VP_IOS ? ', maximum-scale=1' : ''); };
 const VP_767 = 'width=767, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
 // query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
@@ -326,12 +330,12 @@ function vpWant() {
     // 2.364.0 B (#3040): "Phone" chosen on a touch screen of 768-899 px keeps the phone layout (laid out 767 px wide)
     if (coarse && mode === 'phone' && w >= 768 && w < 900) return VP_767;
     if (!coarse || w >= 900 || mode === 'phone') return VIEWPORT;
-    if (mode === 'desktop' || square) return VP_900;
+    if (mode === 'desktop' || square) return VP_900(w);
     // 2.24.0 (#908): an unfolded foldable held sideways gets the desktop layout: the page is laid out 900 px wide and scaled
     // down a little. 2.310.0 (#3270): not only at 860-899 px (a Fold 8 reports less): every touch screen in landscape whose
     // short side is at least 600 px (phones are 360-430) - the narrow desktop view of #3163 (sidebar + list, a task as a
     // drawer). Portrait stays the tablet layout, phones in landscape stay the phone layout.
-    if (land && lo >= 600) return VP_900;
+    if (land && lo >= 600) return VP_900(w);
   } catch { /* no screen info: keep the default */ }
   return VIEWPORT;
 }
