@@ -276,3 +276,16 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkdpbar>.muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wkdpbar .spacer{flex:1}
 .wkdpmd{max-width:var(--w-lesen)}
+/* 2.1153.0 (#5525): a page as a presentation (wklive.js wkp_open): the slide in the middle of the screen in large type, the bar below */
+.wkp{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;background:var(--bg);color:var(--text);outline:none}
+.wkpstage{flex:1;min-height:0;overflow:hidden auto;display:flex;padding:calc(1.5rem + var(--safe-t)) 1.5rem 1.5rem;position:relative}
+.wkpslide{margin:auto;width:100%;max-width:60rem;font-size:clamp(1.125rem,.875rem + 1.25vw,2rem);line-height:var(--lh)}
+.wkp .wkpslide :is(h4,h5,h6){line-height:var(--lh-tight);margin:0 0 1rem}
+.wkp .wkpslide h4{font-size:clamp(1.75rem,1rem + 3vw,3.5rem)}
+.wkp .wkpslide h5{font-size:clamp(1.5rem,1rem + 2vw,2.75rem)}
+.wkp .wkpslide h6{font-size:clamp(1.25rem,.875rem + 1.5vw,2.25rem)}
+.wkp .wkpslide img{max-height:70vh}
+.wkpbar{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem calc(.5rem + var(--safe-b));border-top:1px solid var(--line);background:var(--bg2);font-size:var(--fs-m)}
+.wkpno{min-width:4rem;text-align:center;font-variant-numeric:tabular-nums;color:var(--text2)}
+.wkpttl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;color:var(--text2)}
+@media (max-width:767px){ .wkpstage{padding:calc(1rem + var(--safe-t)) 1rem 1rem} .wkpttl{visibility:hidden} }
