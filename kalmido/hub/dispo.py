@@ -173,6 +173,8 @@ def dsp_public(r, conf=None):
     k = r.keys()
     if "offer_root" in k:  # 2.589.0 (#4571): from a quotation (its crew function, a mark a newer version left)
         d.update(offer=bool(r["offer_root"]), offer_mark=r["offer_mark"] or "", slot=r["slot_name"] or "")
+    if "qty" in k:  # 2.1158.0 (#4566 A): the quantity of a device from a quotation (1 for anything else)
+        d["qty"] = r["qty"] or 1
     if conf is not None:
         d.update(conflicts=conf.get("double", []), away=conf.get("away", False))
     return d

@@ -198,6 +198,8 @@ def _msg(c, run, src, d, ctx):
 # 2.671.0 (#5097): the place key of a booking the disposition made from a quotation (office/offerdispo.py odp_days):
 # d:<part origin id>:<crew row uid>:<n>; the crew row uid is carried over as it is (only the part id is mapped)
 _OI_BOOK_POS = re.compile(r"d:([1-9][0-9]{0,17}):([^\n]{0,200}):([1-9][0-9]{0,3})")
+# 2.1158.0 (#4566 A): a device of the quotation's equipment set: d:<part origin id>:g:<equipment id> (the device is mapped too)
+_OI_GEAR_POS = re.compile(r"d:([1-9][0-9]{0,17}):g:([1-9][0-9]{0,17})")
 
 
 def _booking_offer(run, src, d, ctx):
@@ -209,6 +211,16 @@ def _booking_offer(run, src, d, ctx):
         return
     doc = run.m("office_docs", src.get("offer_doc"))
     root = run.m("office_docs", src.get("offer_root")) or doc
+    gm = _OI_GEAR_POS.fullmatch(str(src.get("offer_pos") or ""))  # 2.1158.0 (#4566 A)
+    if gm:
+        part = _oi_origins(run, ctx.data).get(("office_doc_parts", int(gm.group(1)))) if root else None
+        eq = run.m("office_equipment", int(gm.group(2))) if part else None
+        if not eq:
+            d.update(offer_root=None, offer_doc=None, offer_pos="", offer_mark="")
+            return
+        mark = src.get("offer_mark") if src.get("offer_mark") in ("changed", "gone") else ""
+        d.update(offer_root=root, offer_doc=doc or root, offer_pos=f"d:{part}:g:{eq}", offer_mark=mark)
+        return
     m = _OI_BOOK_POS.fullmatch(str(src.get("offer_pos") or ""))
     part = _oi_origins(run, ctx.data).get(("office_doc_parts", int(m.group(1)))) if m and root else None
     if not part:
@@ -240,13 +252,18 @@ def _callsheet(c, run, src, d, ctx):
     target area) and only once per job (the unique index); its details through cs_clean like a save, a sketch that is no
     PNG / JPEG picture is left out (the upload checks of hub/callsheet.py run for new pictures only)."""
     job = _txt(src.get("job"), 64)
-    if not job or not c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? LIMIT 1", (run.org, job)).fetchone():
+    sp = run.org or getattr(run, "pb", None)  # 2.1158.0 (#4566 A): into the private space the person's own office (oi_space)
+    if not job or not sp or not c.execute("SELECT 1 FROM hub_bookings WHERE org_id=? AND job=? LIMIT 1", (sp, job)).fetchone():
         return False
-    if c.execute("SELECT 1 FROM hub_callsheets WHERE org_id=? AND job=?", (run.org, job)).fetchone():
+    if c.execute("SELECT 1 FROM hub_callsheets WHERE org_id=? AND job=?", (sp, job)).fetchone():
         return False
     try:
-        raw = json.loads(src.get("data") or "{}")
-        d["data"] = json.dumps(cs_clean(raw), ensure_ascii=False)
+        raw = cs_clean(json.loads(src.get("data") or "{}"))
+        if raw.get("pack"):  # 2.1158.0 (#4566 A): a ticked device (e:<equipment id>) / set on its new id, a device that did not come along drops
+            tb = {"e": "office_equipment", "s": "office_sets"}  # a set (s:<id>, its line for a person without the equipment area)
+            keys = [k if k[:2] not in ("e:", "s:") else (f"{k[0]}:{n}" if (n := run.m(tb[k[0]], int(k[2:]))) else "") for k in raw["pack"]]
+            raw["pack"] = sorted({k for k in keys if k})
+        d["data"] = json.dumps(raw, ensure_ascii=False)
     except (ValueError, TypeError, BadInput):
         d["data"] = "{}"
     sk, mime = str(src.get("sketch") or ""), str(src.get("sketch_mime") or "")

@@ -1492,6 +1492,7 @@ ROUTES = {
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
     # 2.537.0 C (#3433): tasks with a time budget from a quotation: the office's document, the project only when seen (p3433_c_offer_tasks_test.py)
     "GET /api/office/docs/{}/tasks": "office", "POST /api/office/docs/{}/tasks": "office",
+    "GET /api/office/docs/{}/postcalc": "office", "POST /api/office/docs/{}/postcalc": "office",  # 2.1158.0 (#4566 B): the post-calculation as an invoice draft (p21158_b_nachkalk_test.py, tenant-matrix: office)
     # 2.299.0 D (#3193): hide / show the hints of the receipt check (people with edit on the document; p2299_d_api_test.py)
     "POST /api/docs/{}/checks": "document",
     "GET /api/docs/{}/title-suggest": "document",  # 2.783.0 (#4882): p2783_b_doctitle_test.py

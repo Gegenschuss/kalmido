@@ -51,3 +51,9 @@
   .pcs .pcsopen .pcsl { grid-column: 1 / -1; }
   .pcs .pcsrow .btn span { display: none; }
 }
+/* 2.1158.0 (#4566 A): the packing list of the shoot day (callsheet.js cs_formHtml) */
+.csmd .cspack { list-style: none; margin: 0; padding: 0; }
+.csmd .cspack li { border-bottom: 1px solid var(--line); }
+.csmd .cspack label { display: flex; align-items: center; gap: .375rem; flex-wrap: wrap; min-height: 2.75rem; padding: .25rem 0; cursor: pointer; }
+.csmd .cspack .cspq { min-width: 2.5rem; text-align: right; font-variant-numeric: tabular-nums; }
+.csmd .cspack input:checked ~ .cspn { text-decoration: line-through; color: var(--muted); }

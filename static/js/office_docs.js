@@ -645,7 +645,9 @@ function kvaNextHtml(d, lk, ro) {
   const inv = `<button type="button" class="btn sm${acc ? ' pri' : ' ofd2m'} ofdnext ofdtoinv" data-ofd="to-invoice" aria-label="${esc(tr('Create invoice'))}" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
   if (d.status === 'sent') return st('accepted', 'check', N_('Accepted|document'), ' pri') + st('declined', 'x', N_('Rejected')) + inv;
   if (d.status === 'draft' && (lk || ro)) return st('sent', 'send', N_('Mark as sent'), ' pri') + inv;
-  return inv;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
+  // 2.1158.0 (#4566 B): an accepted quotation with tasks: the invoice draft with the tracked hours (office_postcalc.js)
+  const pc = acc && d.offer_tasks > 0 && !d.flat_print ? `<button type="button" class="btn sm ofd2m ofdnext ofdpostcalc" data-ofd="postcalc" aria-label="${esc(tr('Post-calculation'))}" title="${esc(tr('An invoice draft with the tracked hours of the linked tasks'))}">${ic('clock', 's')}<span>${tr('Post-calculation')}</span></button>` : '';
+  return inv + pc;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
 }
 async function kvaToInvoice(d, row) {
   if (row) try { d = await api('GET', `/api/office/docs/${d.id}`); } catch (x) { ofcErr(x); return; }  // 2.144.7 (#2572): a list row lacks parts / currency
@@ -1011,6 +1013,7 @@ async function ofdClick(e) {
   if (a === 'pdf-ask') { await ofdPdfAskGo(OFD.doc, !!b.dataset.dl); return; }  // 2.138.2 A (#2393)
   if (a.startsWith('tp-') && typeof tpClick === 'function') { await tpClick(a, b); return; }  // 2.47.0 (#1215): the parts
   if (a === 'to-invoice') { await kvaToInvoice(OFD.doc); return; }
+  if (a === 'postcalc') { loadModule('postcalc').then(() => opc_open(OFD.doc), x => ofcErr(x)); return; }  // 2.1158.0 (#4566 B)
   if (a === 'ofe-ext') { ofe_extendDialog(d); return; }  // 2.1064.0 (#5818)
   if (a === 'ofe-follow') { if (d.trial) { toast(tr('A trial document cannot be sent by e-mail; create a real document for your client')); return; } ofdSendDialog(d, {follow: true}); return; }
   if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc

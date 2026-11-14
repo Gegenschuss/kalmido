@@ -645,13 +645,14 @@ def tp_flat_items(c, oid, r, title=None):
                     "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 1}]
 
 
-def tp_inv_items(c, oid, r, mode=None, title=None):
+def tp_inv_items(c, oid, r, mode=None, title=None, tag=False):
     """The positions of an invoice from quotation r with parts (None: it has none). mode (else the office setting
     parts_invoice_mode, app default "full"): "title" = the title page with its positions, a part line becomes a position
     with its amount (one per tax rate when the part mixes rates); "summary" = one position per tax rate titled title (default
     from the settings, else the word "Services" in the document's language: tp_sum_title); "full" = the title page's direct positions plus, per printed
     part, a heading and its positions (qty x part qty, producing / raw data / discount as positions); a part that is not
-    printed stays one line. Net and gross equal the quotation's in every mode. Rates in EUR like inv_items_from_offer."""
+    printed stays one line. Net and gross equal the quotation's in every mode. Rates in EUR like inv_items_from_offer.
+    2.1158.0 (#4566): tag = the rows of quotation positions carry "_key" (i:<origin item>), a part's amount row "_part"."""
     if not tp_has_parts(c, oid, r["id"]):
         return None
     s = office_settings(c, oid)
@@ -690,7 +691,8 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
         for n, k in enumerate(k for k in TAX_KEYS if k in bs):
             res.append(pos(ln["title"], qty, it.get("unit") or "piece", bs[k], k, detail=tax_word(k) if len(bs) > 1 else (it.get("detail") or ""),
                            cost=pc.get("costs") if n == 0 else 0))
-        return f8b_fix_cents(res, ln.get("taxes"), lang, hc_home(s)) or [pos(ln["title"], qty, it.get("unit") or "piece", 0, "standard")]
+        res = f8b_fix_cents(res, ln.get("taxes"), lang, hc_home(s)) or [pos(ln["title"], qty, it.get("unit") or "piece", 0, "standard")]
+        return [{**x, "_part": 1} for x in res] if tag else res  # 2.1158.0 (#4566)
 
     def auto(lines, factor=Decimal(1), with_disc=True):
         res = []
@@ -721,6 +723,8 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
             row.update(raw_fee=0, producing=0, discountable=1)
             if ln.get("pct") is not None:  # 2.47.0 (#1649): a percent position becomes its amount (as invoices.inv_items_from_offer)
                 row.update(qty=1, unit="flat", rate=ln["total"])
+            elif tag and (it.get("kind") or "service") == "service" and it.get("id"):
+                row["_key"] = f"i:{it.get('origin_id') or it['id']}"  # 2.1158.0 (#4566)
             out.append(row)
             continue
         p = pmap.get(ln["part_id"])
@@ -749,7 +753,8 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
             out.append({"kind": "service", "service_id": pit.get("service_id"), "title": pit.get("title") or "", "detail": pit.get("detail") or "",
                         "qty": _num(dec(pit.get("qty"), "1") * qty), "unit": pit.get("unit") or "day", "rate": pit.get("rate"), "tax": pit.get("tax") or "standard",
                         "intext": pit.get("intext") or "intern", "cost": pit.get("cost") or 0, "raw_fee": 0, "producing": 0, "discountable": 1,
-                        "discount_pct": pit.get("discount_pct") or 0})  # 2.1042.0 (#5815)
+                        "discount_pct": pit.get("discount_pct") or 0,  # 2.1042.0 (#5815)
+                        **({"_key": f"i:{pit.get('origin_id') or pit['id']}"} if tag and pit.get("id") else {})})  # 2.1158.0 (#4566)
         dl = next((x for x in pc["lines"] if x["kind"] == "discount"), None)
         if dl is not None:  # the part's discount per tax rate (office_calc keeps one line; the bases tell the rates)
             raw_lines = [x for x in pc["lines"] if x["kind"] != "discount"]

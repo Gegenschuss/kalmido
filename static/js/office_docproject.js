@@ -104,17 +104,25 @@ function otk_dline(x, i) {
   const cnt = {};
   for (const p of x.places || []) cnt[p.name] = (cnt[p.name] || 0) + 1;
   const places = Object.entries(cnt).map(([n, k]) => k > 1 ? `${k} × ${n}` : n).join(', ');
+  // 2.1158.0 (#4566 A): the devices of the part's equipment set (pencilled in too), the rows without a device (packing list only)
+  const gq = g => g.qty > 1 ? `${g.qty} × ${g.name}` : g.name;
+  const gear = (x.gear || []).map(gq).join(', '), busy = (x.gear || []).filter(g => g.busy).map(g => g.name).join(', ');
+  const loose = (x.loose || []).map(gq).join(', ');
+  const gearHtml = (gear ? `<small class="muted otktx">${esc(tr('Equipment: {0}', gear))}</small>` : '')
+    + (busy ? `<small class="otktx otkdwarn">${ic('alert', 's')} ${esc(tr('Already booked in this period: {0}', busy))}</small>` : '')
+    + (loose ? `<small class="muted otktx">${esc(tr('Only on the packing list (no device in the master data): {0}', loose))}</small>` : '')
+    + (x.gear_off ? `<small class="muted otktx">${esc(tr('Equipment is not booked: you have no access to the equipment area.'))}</small>` : '');
   const when = x.state === 'gone' ? `<span class="muted">${esc(x.start ? fmtDayAbs(x.start) : '')}</span>`
     : dateIn(`${id}-d`, x.start || '', {label: tr('Date') + ': ' + x.title, ro: !ck, clear: false, empty: tr('Select a date')});
   const firm = x.firm ? `<small class="muted">${esc(trn('{0} firm or filled booking is only marked', '{0} firm or filled bookings are only marked', x.firm))}</small>` : '';
   return `<tr class="otk-${x.state}${x.need_date ? ' otkd-need' : ''}"><td>${ck ? `<input type="checkbox" id="${id}" data-otkdp="${esc(x.key)}" data-otkdi="${i}" ${x.pick ? 'checked' : ''}>` : ''}</td>
-    <td><label for="${id}"><b>${esc(x.title)}</b></label>${places ? `<small class="muted otktx">${esc(tr('Open places: {0}', places))}</small>` : ''}</td><td>${when}</td>
+    <td><label for="${id}"><b>${esc(x.title)}</b></label>${places ? `<small class="muted otktx">${esc(tr('Open places: {0}', places))}</small>` : ''}${/*html-ok*/ gearHtml}</td><td>${when}</td>
     <td class="muted">${esc(trn('{0} day', '{0} days', x.days))}</td><td><span class="otkst">${esc(tr(OTK_DSTATE[x.state] || x.state))}</span>${firm}</td></tr>`;
 }
 function otk_dispoHtml(dp) {
   if (!dp || (!dp.hint && !(dp.days || []).length)) return '';
   if (dp.hint) return `<p class="muted otkdhint">${ic('info', 's')} ${esc(dp.hint)}</p>`;
-  return `<h4 class="otkdh">${tr('Shoot days in the disposition')}</h4><p class="muted">${esc(tr('Each shoot part becomes a shoot day pencilled in as an option, with one open place per person of each crew function.'))}</p>
+  return `<h4 class="otkdh">${tr('Shoot days in the disposition')}</h4><p class="muted">${esc(tr('Each shoot part becomes a shoot day pencilled in as an option, with one open place per person of each crew function.'))} ${esc(tr('The devices of its equipment set are pencilled in too and make the packing list of the call sheet.'))}</p>
     <div class="scroll otkwrap"><table class="tbl otktbl otkdtbl"><thead><tr><th></th><th>${tr('Shoot day')}</th><th>${tr('Date')}</th><th>${tr('Duration')}</th><th></th></tr></thead><tbody>${dp.days.map(otk_dline).join('')}</tbody></table></div>`;
 }
 async function otk_open() {
@@ -157,7 +165,8 @@ async function otk_open() {
     if (typeof modulesOnToast === 'function') modulesOnToast(r.modules_on);
     const dr = r.dispo || {};  // 2.589.0 (#4571)
     toast([r.created ? tr('Tasks created: {0}', r.created) : '', r.updated ? tr('Budgets updated: {0}', r.updated) : '', r.marked ? tr('Tasks marked: {0}', r.marked) : '',
-      dr.booked ? tr('Open places pencilled in: {0}', dr.booked) : '', dr.adapted ? tr('Shoot day bookings adapted: {0}', dr.adapted) : '', dr.marked ? tr('Bookings marked: {0}', dr.marked) : ''].filter(Boolean).join(' · ') || tr('Saved'));
+      dr.booked - (dr.gear || 0) ? tr('Open places pencilled in: {0}', dr.booked - (dr.gear || 0)) : '', dr.gear ? tr('Equipment pencilled in: {0}', dr.gear) : '',  // 2.1158.0 (#4566 A)
+      dr.warnings ? tr('Double booked equipment: {0}', dr.warnings) : '', dr.adapted ? tr('Shoot day bookings adapted: {0}', dr.adapted) : '', dr.marked ? tr('Bookings marked: {0}', dr.marked) : ''].filter(Boolean).join(' · ') || tr('Saved'));
     await ofdLoadDoc(d.id, true);
   });
 }

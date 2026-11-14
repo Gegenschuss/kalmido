@@ -1908,6 +1908,20 @@ changed by hand is kept) and positions no longer there (only marked, never delet
 Who may: people with office rights for quotations; creating or changing the tasks also needs the right to change the project.
 Routes: `GET` / `POST /api/office/docs/<id>/tasks` (web session).
 
+#### The post-calculation as an invoice draft
+
+*Since 2.1158.0 (#4566 B).* An accepted quotation whose positions became tasks shows *Post-calculation* next to *Create
+invoice*. It opens a preview: per position the quoted quantity (planned), the quantity the invoice would get (actual) and
+the difference, below the net sums planned / actual. A position in hours with a linked task carries the hours tracked on
+the task and its subtasks (finished entries of everyone, rounded to a quarter hour) at the quotation's rate; a position in
+another unit (day, piece, flat rate) stays as quoted and is marked "not by time" (its tracked hours are shown); a position
+without a task stays; a part with one amount (a shoot part) stays one amount; producing, raw data and discount keep the
+quotation's amounts. *Create invoice draft* makes an ordinary invoice draft (like *Create invoice*, a quotation with parts
+in the form "full"); nothing is finalised. A flat price quotation and one with progress invoices are refused.
+Who may: people with office rights for quotations and for the times to bill who see the quotation's project and everyone's
+times in it (its owner or admins, the organisation's admins); only tasks and entries of that project count.
+Routes: `GET` / `POST /api/office/docs/<id>/postcalc` (web session; kalmido/office/postcalc.py).
+
 ### Finalised documents in the database
 
 *Since 2.542.0 (#4598).* Next to the app's own checks (`409` "This document is finalised ..."), the database trigger

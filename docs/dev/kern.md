@@ -710,6 +710,9 @@ core, the call sheet a part of its shoot day with the same rights and a history 
   `obj_rows(callsheet)` (the core decides each row) narrowed to the shoot days of the project; "New call sheet" makes the shoot
   day (one open place of the disposition, titled "Shoot day") and the call sheet's row (`cs_make`: the core's columns, history
   "create"), no list of its own beside the core.
+- The packing list (2.1158.0, #4566 A) is no store of its own: its lines come from the shoot day's device bookings
+  (`hub/callsheet.py cs_pack`, the quotation's devices booked by `office/offerdispo.py` with `hub_bookings.qty`), what is
+  ticked off is the key list `data.pack` of the day details, saved with them through `obj_write` (history, undo step).
 - The trash: the shoot day's last live booking deleted -> `obj_trash` of the call sheet, a booking back (the route, or the
   step list's undo / redo through `dsu_need`'s fix) -> `obj_restore` (`dsk_sync`); the core's run deletes it after the period
   (`trash_prune=True`), the bookings' trash run deletes a call sheet without any booking the core's way (`dsk_orphans`).

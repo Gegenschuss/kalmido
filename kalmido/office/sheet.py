@@ -283,7 +283,8 @@ def dk_pack_public(d, lang="de"):
 # ---------------------------------------------------------------- clean (request -> stored sheet)
 def _uid(v):
     s = str(v or "")
-    return s if re.match(r"^[A-Za-z0-9_-]{1,24}$", s) else secrets.token_hex(5)
+    # 2.1158.0 (#4566 review F3): never "g" -- d:<part>:g:<n> is the disposition's key of a quotation's device (offerdispo.py)
+    return s if re.match(r"^[A-Za-z0-9_-]{1,24}$", s) and s != "g" else secrets.token_hex(5)
 
 
 def _n(v, default, lo=Decimal(0), hi=Decimal(100000)):

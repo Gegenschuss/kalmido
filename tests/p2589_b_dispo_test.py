@@ -142,7 +142,8 @@ def scenario(S, who, oid, cam, lig, other=None, other_s=None):
     check(b2.get("state") == "gone" and b2.get("pick"), f"{who}: Hamburg no longer in the quotation {b2}")
     r = S.post(B + f"{D}/{Q2}/tasks", json={"pick": [], "dispo": {"pick": [d1["key"], d2["key"]]}})
     res = r.json().get("dispo", {}) if r.ok else {}
-    check(r.ok and res == {"booked": 0, "adapted": 3, "marked": 2}, f"{who}: adapted 1 + 2 gone, 2 marked {r.text[:200]}")
+    # 2.1158.0 (#4566): the answer carries the devices too (gear, warnings) - none in this quotation
+    check(r.ok and res == {"booked": 0, "adapted": 3, "marked": 2, "gear": 0, "warnings": 0}, f"{who}: adapted 1 + 2 gone, 2 marked {r.text[:200]}")
     after = {b[0]: b for b in bookings(oid, Q)}
     kam2 = kam1[:-2] + ":2"
     check(set(after) == {kam1, kam2, lig1}, f"{who}: the empty Beleuchter place and Hamburg's place went {sorted(after)}")

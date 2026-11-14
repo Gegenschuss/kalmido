@@ -148,6 +148,10 @@ check(N_LINKS == 4, f"four links {N_LINKS}")
 
 # 2.671.0 (#5097, review F1): a mark the disposition never writes does not come along (it would count the day as done)
 sql("UPDATE hub_bookings SET offer_mark='xyz' WHERE org_id=? AND resource_kind='slot' AND title<>'Fremd'", (ORG,))
+# 2.1158.0 (#4566 A): a ticked device of the call sheet's packing list (data.pack e:<equipment id>) comes along on the new id
+EQ = ok(A.post(B + O + "/equipment", json={"name": "Kamera Alpha", "category": "Kamera", "daily_rate": 50}), "a device")["id"]
+SJOB = sql("SELECT job FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND title<>'Fremd' AND deleted_at IS NULL", (ORG,))[0][0]
+ok(A.put(B + f"/api/team/dispo/callsheet/{SJOB}?org={ORG}", json={"data": {"pack": [f"e:{EQ}", "e:987654321"]}}), "the packing list ticked")
 OX, RK = export(A, ORG)
 
 
@@ -197,6 +201,11 @@ def moved(s, who, lid, docs_where, docs_args):
     r = ok(s.post(B + f"{D}/{nq2}/tasks", json={"pick": [], "dispo": {"pick": [x["key"] for x in dp["days"]]}}), f"{who}: one click on every shoot day")
     n = sql("SELECT COUNT(*) FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND deleted_at IS NULL", (sp,))[0][0]
     check(r.get("dispo", {}).get("booked") == 0 and n == 2, f"{who}: no shoot day twice {r} {n}")
+    # 2.1158.0 (#4566 A): the ticked device on its new id, the device that did not come along drops
+    eq = sql("SELECT id FROM office_equipment WHERE org_id=? AND name='Kamera Alpha'", (sp,))
+    jb = sql("SELECT job FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND title<>'Fremd' AND deleted_at IS NULL", (sp,))
+    cs = ok(s.get(B + f"/api/team/dispo/callsheet/{jb[0][0]}", params={"org": sp}), f"{who}: the call sheet").get("callsheet") or {}
+    check(eq and (cs.get("data") or {}).get("pack") == [f"e:{eq[0][0]}"], f"{who}: the packing list on the new device {eq} {cs.get('data')} {sql('SELECT id, job FROM hub_callsheets WHERE org_id=?', (sp,))} {jb}")
 
 
 # ---------------------------------------------------------------- import into the empty organisation
