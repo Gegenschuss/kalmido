@@ -178,7 +178,8 @@ def wiki_move_space():
              trn("{0} page links files of the file store: the files stay in the old workspace",
                  "{0} pages link files of the file store: the files stay in the old workspace", files) if files else ""]
     from .wkshare import wsh_end_moved
-    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder, dry=True)
+    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder, dry=True,
+                           pids=[r["id"] for r, _ in moves + tmoves])  # 2.1145.0 (#6062): + the open shares by address
     trash = len(tmoves) + trash_stays
     all_ids = ids + [r["id"] for r, _ in tmoves]
     vers = wkm_vers_dropped(c, all_ids, to)
@@ -209,7 +210,8 @@ def wiki_move_space():
     try:
         wka_move_files(c, all_ids, to, uid, new_paths, old_paths)  # 2.99.0 (#2182): the pages' files go along, sealed with the target's key
         # 2.123.0 B (#2104): their shares end (a share never changes its space)
-        wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder)
+        wsh_end_moved(c, src, None if src else uid, [r["path"] for r, _ in moves + tmoves], folder,
+                      pids=[r["id"] for r, _ in moves + tmoves])  # 2.1145.0 (#6062)
         relinked = 0
         # 2.123.0 A (#2102, #2106): the history sealed for the target, the index anew; 2.360.0 D (#2496): not into an organisation
         wkh_move(c, [r for r, _ in moves + tmoves], to, uid, keep=to is None)
@@ -279,7 +281,7 @@ def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths, strict=True):
     for r, n in moves:
         c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
     wka_move_files(c, ids, None, uid, new_paths, old_paths, strict=strict)  # 2.528.0 (#4306 B25): strict = a broken file stops it
-    wsh_end_moved(c, oid, owner, [r["path"] for r in rows])
+    wsh_end_moved(c, oid, owner, [r["path"] for r in rows], pids=[r["id"] for r in rows])  # 2.1145.0 (#6062)
     wkh_move(c, rows, None, uid)
     for r, n in moves:
         nb = wkm_relink(plain[r["id"]], ren)
@@ -390,7 +392,7 @@ def wkr_move(c, uid, src, to, b, dry):
     e2e = {"from": sst, "to": tst}
     notes = [trn("{0} page moves", "{0} pages move", len(rows)), tr(WKR_PLAIN) if sst["mode"] and not tst["mode"] else ""]
     from .wkshare import wsh_end_moved  # 2.273.0 B (#3042): shares that end and a history that cannot go along are named
-    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True)
+    shares = wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], dry=True, pids=[r["id"] for r in rows])  # 2.1145.0 (#6062)
     vers = obj_version_count(c, WKM_VKIND, ids) if tst["mode"] else 0  # 2.958.0 (#5281): the core's versions
     notes += [wkm_share_note(shares), trn("{0} earlier version is deleted: a workspace with the lock keeps no history",
                                           "{0} earlier versions are deleted: a workspace with the lock keeps no history", vers) if vers else "",
@@ -452,7 +454,7 @@ def wkr_move(c, uid, src, to, b, dry):
         c.rollback()
         return jsonify(error=tr("A page with this name already exists"), taken=[]), 409
     # 2.123.0 B (#2104): their shares end (a locked source has none)
-    wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows])
+    wsh_end_moved(c, src, None if src else uid, [r["path"] for r in rows], pids=[r["id"] for r in rows])  # 2.1145.0 (#6062)
     # 2.123.0 A (#2102): no history across a lock; 2.273.0 B (#3042): into an open space the history goes along -- 2.360.0 D
     # (#2496): into the private space only (wkm_vers_note)
     wkh_move(c, rows, to, uid, keep=not tst["mode"] and to is None)
