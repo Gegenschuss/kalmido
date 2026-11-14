@@ -220,7 +220,7 @@ function wkp_go(/** @type {number} */ i, swiped = false) {
   $('.wkpno', m).textContent = `${WKP.i + 1} / ${WKP.sl.length}`;
   $('[data-wkp="-1"]', m).disabled = WKP.i === 0;
   $('[data-wkp="1"]', m).disabled = WKP.i >= WKP.sl.length - 1;
-  if (typeof dg_draw === 'function') dg_draw(st);  // formulas / diagrams of the slide (diagram.js, loaded by wk_render when the page has any)
+  if (typeof dg_draw === 'function') dg_draw(/** @type {any} */ (st));  // formulas / diagrams of the slide (diagram.js, loaded by wk_render when the page has any)
 }
 function wkp_close() {
   const m = WKP.el; if (!m) return;
