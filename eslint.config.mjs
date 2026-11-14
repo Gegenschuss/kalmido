@@ -18,7 +18,7 @@ const BROWSER = [
   'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams', 'XMLHttpRequest', 'AbortController', 'HTMLElement', 'Node',
   'IDBRequest', 'IDBKeyRange', 'BroadcastChannel',
 ];
-const WORKER = ['self', 'caches', 'clients', 'registration', 'fetch', 'console', 'URL', 'URLSearchParams', 'Response',
+const WORKER = ['self', 'caches', 'clients', 'registration', 'fetch', 'console', 'URL', 'URLSearchParams', 'Response', 'MessageChannel' /* 2.1130.0 (#6057) */,
   'Request', 'Headers', 'setTimeout', 'clearTimeout', 'atob', 'indexedDB', 'BroadcastChannel'];
 const ro = names => Object.fromEntries(names.map(n => [n, 'readonly']));
 const RULES = {
