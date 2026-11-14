@@ -15,7 +15,7 @@
 /* 2.1151.0 C (#3835): the sidebar on a phone: a folder's "…" and a person's message bubble are hidden; the long press opens the
    folder's menu (areas.js sbb_tmenu) / the person's menu with "Message" (favtiles.js fv2_rowMenu). Sort mode keeps its buttons */
 @media (max-width:767px){
-  #side .fhead .fmenu{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0;transform:none}
+  #side .fhead .fmenu{opacity:0;pointer-events:none}  /* keeps its place: the share icons of folders and lists stay in one column (#1730) */
   #side .sbpw>.srow{padding-right:.5rem}
 }
 /* 2.1151.0 C (#3835): settings / dialog rows on a phone: .ms-phacts = a box of row buttons that is hidden as a whole except its

@@ -170,9 +170,8 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
     check(Math.abs(a.hF - a.hL) <= 1 && a.hF >= 43, `${tag}: #1643: folder row as high as a list row (44 px) ` + JSON.stringify(a));
     check(a.fcar > a.cR && a.sic - a.fL <= 12, `${tag}: #3492: the folder icon at the row's start, the arrow at its end (was first, #1607) ` + JSON.stringify(a));  // 2.406.0 (#3492)
     // 2.144.2 (#1730): the share icon lines up with the lists' share icon
-    // 2.1151.0 (#3835): on the phone the folder's "…" is hidden like .sr (the long press opens the folder's menu), was visible at the end
-    const fmw = await ev(`document.querySelector('#side .fhead[data-folder="Family"] .fmenu').getBoundingClientRect().width`);
-    check(Math.abs(a.fshrR - a.shrR) <= 1.5 && fmw <= 1, `${tag}: #1730 / #3835: phone - the folder's share icon in the column of the lists' share icon, no "…" ` + JSON.stringify({a, fmw}));
+    // 2.1151.0 (#3835): on the phone the folder's "…" is invisible and takes no tap (the long press opens the folder's menu), was visible at the end
+    check(Math.abs(a.fshrR - a.shrR) <= 1.5 && a.menuOp === 0, `${tag}: #1730 / #3835: phone - the folder's share icon in the column of the lists' share icon, no visible "…" ` + JSON.stringify(a));
     // a tap on the arrow folds, a tap on the name opens the folder
     await ev(`(() => { document.querySelector('#side .fhead[data-folder="Family"]').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(200);  // 2.196.0 (#2737): the drawer's fixed top is taller, the folder may sit below the screen
     const hit = await ev(`(() => { const r = document.querySelector('#side .fhead[data-folder="Family"] .fcar').getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!el.closest('[data-act="folder-toggle"]') && !el.closest('.fgo, .sbbtn, .iconbtn'); })()`);  // 2.352.0 (#2748): + .sbbtn (the name on the sidebar tree)
