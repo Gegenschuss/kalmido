@@ -133,7 +133,7 @@ function tcRoomHtml() {
   // 2.139.0 B (#2128): the microphone takes room in the composer: the placeholder's name gets shorter beside it
   // 2.147.2 (#2523): the touch button "Insert reference" takes the same room again: the name gets shorter once more ("Web…" beside the microphone)
   const rfb = typeof rf_btnHtml === 'function' ? rf_btnHtml('tc-in') : '';
-  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', ph = isMobile(), cut = ph ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
+  const mic = typeof tvc_micHtml === 'function' ? tvc_micHtml(room, rid) : '', ph = isMobile(), cut = tc_mid() ? 18 : (mic ? 14 : 18) - (rfb ? 10 : 0);  // 2.213.0 (#2788): phones: the tools sit in the plus menu
   const head = `<div class="tcrhead"><button type="button" class="iconbtn tcback" data-act="tc-back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>
     ${r ? roomIcon(r) : ''}<div class="tcrt"><b>${esc(name)}</b>${room && room.kind !== 'dm' ? `<span class="muted">${esc(room.members.map(m => m.name).slice(0, 6).join(', '))}${room.members.length > 6 ? ' +' + (room.members.length - 6) : ''}</span>` : ''}</div>
     <span class="spacer"></span>${msgSearchBtn('t', rid)}${!ph && room && room.kind === 'list' ? `<button type="button" class="iconbtn" data-act="tc-list" data-id="${room.list_id}" title="${esc(tr('Open the project'))}" aria-label="${esc(tr('Open the project'))}">${ic('list')}</button>` : ''}
@@ -404,7 +404,10 @@ document.addEventListener('click', e => {
 // CW_TF). Answers stay out of the main list; the first message shows "3 replies · last 14:05" with the faces of the last
 // writers and a dot while I have unread answers there (threads I take part in). Edit / delete / reactions / pins / quotes /
 // Save as task work there like in the main list (tcMsgMenu & co. find the message in either). No files in a thread's box.
-const tth_wide = () => !isMobile() && !(typeof cw_ren !== 'undefined' && cw_ren) && !S.cw?.lt;
+// 2.1163.0 (#6094): 768-899 px is no third mixed form: the team chat there behaves like the phone (thread full size, the
+// composer's tools behind the plus, round Send - app.css .tccomp), the thread pane beside the conversation only from 900 px
+const tc_mid = () => td_rc('tcmid', () => matchMedia('(max-width:899px)').matches);
+const tth_wide = () => !tc_mid() && !(typeof cw_ren !== 'undefined' && cw_ren) && !S.cw?.lt;
 const tth_all = () => S.tc.th ? [S.tc.th.root, ...S.tc.th.msgs].filter(Boolean) : [];
 const tth_msg = mid => S.tc.msgs.find(x => x.id === mid) || tth_all().find(x => x.id === mid);
 const tth_each = (mid, fn) => { for (const m of [...S.tc.msgs, ...tth_all()]) if (m.id === mid) fn(m); };  // a first message lives in both lists

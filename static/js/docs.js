@@ -226,19 +226,23 @@ function viewDocs() {
 // 2.752.0 (#4887): the documents' bar, also on top of a folder with recognition (fold = its node, abdocs.js abd_foldHtml): there
 // "Add documents" and "Scan" put the files into that folder (the file store's upload and scan, ONE way), no "All | To review"
 // (the sidebar has them; on phones the switch stays in the documents' own list, #4472)
+const dc_wide = (h, ...a) => typeof ab_wideHtml === 'function' ? ab_wideHtml(h, ...a) : h;  // 2.1163.0 (#6111): ablage.js
 function dc_headHtml(fold) {
   const active = dc_fEntries().length > 0;  // 2.122.0 B (#2294): the filters are drawn by dc_fltHtml / dc_fbarHtml
   const seg = fold || (typeof sbb_on === 'function' && sbb_on()) ? '' : `<div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}" class="${DC.f.review ? '' : 'on'}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}" class="${DC.f.review ? 'on' : ''}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>`;
   const add = !fold ? (!dc_upOk() ? '' /* 2.1162.0 (#6108) */ : `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
-      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`)
-    : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span></button><input type="file" id="ab-file" multiple hidden>
-      <button type="button" class="btn sm" data-ab="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>` : '';
+      ${/*html-ok*/ dc_wide(`<button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`, tr('Scan'), 'camera')}`)
+    : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Upload'))}">${ic('upload', 's')} <span>${tr('Upload')}</span></button><input type="file" id="ab-file" multiple hidden>
+      ${/*html-ok*/ dc_wide(`<button type="button" class="btn sm" data-ab="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`, tr('Scan'), 'camera')}` : '';
+  // 2.1163.0 (#6111): a phone shows search, (All | To review,) Filter, Sorting, "+" and "…"; the saved views, the card size,
+  // Scan, Select, the lists and the settings are in "…" (ablage.js ab_wideHtml / ab_moreMenu, the folder's tools with them)
+  const dv = DC.dv && typeof dcv_get === 'function' ? dcv_get(DC.dv) : null, tsOn = typeof ts_barHtml === 'function' && !fold?.list;
   return `
     <div class="dc-bar">
       <div class="ctsearch">${ic('search', 's')}<input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(fold ? tr('Search in this folder…') : tr('Search in the documents…'))}" aria-label="${esc(fold ? tr('Search in this folder') : tr('Search in the documents'))}" autocomplete="off"></div>
       ${seg}
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcv_barHtml === 'function' ? dcv_barHtml() : '' /* 2.579.0 (#4802) */}${typeof ts_barHtml === 'function' && !fold?.list ? ts_barHtml() : '' /* 2.583.0 (#4812); 2.769.0 (#5340): no card size above the list */}
-      <span class="dc-acts2">${add}${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${/*html-ok*/ typeof dcv_barHtml === 'function' ? dc_wide(dcv_barHtml(), dv ? dv.title : tr('Save view'), 'bookmark', '[data-dcv="menu"], [data-dcv="save"]') : '' /* 2.579.0 (#4802) */}${/*html-ok*/ tsOn ? dc_wide(ts_barHtml(), '') + (typeof ab_tsWide === 'function' ? ab_tsWide() : '') : '' /* 2.583.0 (#4812); 2.769.0 (#5340): no card size above the list */}
+      <span class="dc-acts2">${add}${/*html-ok*/ dc_wide(dc_smvBtn(), tr('Select'), 'check')}${/*html-ok*/ dc_wide(`<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button>`, tr('Senders, types and fields'), 'list')}${/*html-ok*/ dc_wide(`<button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button>`, tr('Settings of the documents'), 'gear')}${/*html-ok*/ typeof ab_mbtnHtml === 'function' ? ab_mbtnHtml() : ''}</span>
     </div>
     ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_learnBar() /* 2.607.0 (#4872) */}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
@@ -279,7 +283,7 @@ function dc_card(d, o = {}) {
   const big = d.file || d.thumb_l ? dc_thumbUrl(d, true) : '';  // 2.583.0 (#4812): the sharp preview of big cards (tilesize.js)
   const thumb = d.thumb ? (typeof ts_img === 'function' ? ts_img(dc_thumbUrl(d), big) : `<img src="${esc(dc_thumbUrl(d))}" alt="" loading="lazy">`) : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
-  const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
+  const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || tr('Archive no.') /* 2.1163.0 (#6112) */} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
   const on = AB.selOn && AB.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last; 2.768.0 (#4888): the area's one selection
   return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(dc_title(d))}">
@@ -626,7 +630,7 @@ function dc_mdDraw(md) { if (md && DC.doc && typeof dcv_draw === 'function') dcv
 // 2.591.0 B (#4863): a code on the document carries an archive number another document has already (docs/web.py asn_taken_view)
 function dc_asnTakenHtml(d) {
   const t = d.asn_taken; if (!t || d.asn) return '';
-  const no = `${DC.set?.asn_prefix || 'ASN'} ${+t.asn}`, o = t.doc;
+  const no = `${DC.set?.asn_prefix || tr('Archive no.') /* 2.1163.0 (#6112) */} ${+t.asn}`, o = t.doc;
   const who = !o ? esc(tr('a document you cannot open')) : o.trash ? `<b>${esc(o.name)}</b> ${esc(tr('(in the trash)'))}` : `<a href="#docs/${+o.id}">${esc(o.name)}</a>`;
   return `<p class="dc-asnt muted" role="note">${ic('info', 's')} ${esc(tr('Archive number {0} found, already used by', no))} ${who}</p>`;
 }

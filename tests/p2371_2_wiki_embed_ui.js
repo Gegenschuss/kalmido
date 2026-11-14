@@ -90,7 +90,8 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(jb === `# ${today}\n\nvon Frida Test\n\n\n\nEnde`, 'from Templates/Tagesnotiz, placeholders filled ' + JSON.stringify(jb));
   check(await until(() => w.location.hash === '#wiki/' + jp?.id && w.eval('WK.edit') && w.eval('WK.pg && WK.pg.id') === jp?.id), 'the note opens for writing ' + w.location.hash);
   w.eval('WK.edit = false; WK.fresh = 0; renderView()');  // 2.554.0 (#4052): back to the read view of the lock (a page just made opens for writing despite it)
-  d.querySelector('#view [data-wk="today"]')?.click();
+  w.location.hash = '#wiki';  // 2.1163.0 (#6089): "Today" is in the list's bar (an open page has no area bar any more)
+  (await until(() => d.querySelector('#view [data-wk="today"]')))?.click();
   await sleep(800);
   const js = ((await call(CF, 'GET', '/api/wiki?space=private')).pages || []).filter(p => p.path.startsWith('journal/'));
   check(js.length === 1 && w.location.hash === '#wiki/' + jp?.id, 'Today again: the same page, no second one ' + js.length);

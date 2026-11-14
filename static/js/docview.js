@@ -222,7 +222,7 @@ function dcv_headHtml(d, w) {
   const fromAb = /^#ablage/.test(DVW.back?.hash || '');
   // 2.780.0 (#5389): three columns 1fr auto 1fr -- left back + title, middle the arrows (always at the same place), right keys + saved + actions
   const ti = d.file ? d.name : dc_title(d);
-  return `<header class="dv-head"><div class="dv-hl"><button type="button" class="btn dv-back" data-dc="close" aria-keyshortcuts="Escape" title="${esc(tr('Back to the list (Esc)'))}">${ic('back', 's')} <span>${esc(fromAb ? tr('File store') : tr('Documents'))}</span></button>
+  return `<header class="dv-head"><div class="dv-hl"><button type="button" class="btn dv-back" data-dc="close" aria-keyshortcuts="Escape" title="${esc(tr('Back to the list (Esc)'))}">${ic('back', 's')} <span>${esc(fromAb ? tr('Files') : tr('Documents'))}</span></button>
     <h2 id="dc-h" class="dv-title" title="${esc(ti)}">${esc(ti)}</h2></div><span class="dv-navslot">${dc_navHtml(d)}</span>
     <div class="dv-hr"><span class="dv-keys muted" aria-hidden="true">${esc(tr('Arrow keys ← → leaf through, Esc back'))}</span><span class="spacer"></span>
     <span class="dv-saved" role="status" data-fl-fill></span><span class="dv-hacts">${dcv_actsHtml(d, w)}</span></div></header>`;
@@ -230,7 +230,7 @@ function dcv_headHtml(d, w) {
 // 2.497.0 A (#4046) moved to the head: Download, the rarer actions behind "Actions", Delete apart as the last
 // 2.1011.0 (#5688): "Actions" is the shared menu() (a sheet with title and X on a phone) instead of a fold-out of its own
 function dcv_actsHtml(d, w) {
-  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a><button type="button" class="btn sm" data-dc="actsmore" aria-haspopup="menu">${tr('Actions')}${ic('chev', 's dc-chev')}</button>${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
+  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a><button type="button" class="btn sm" data-dc="actsmore" aria-haspopup="menu">${tr('Actions')}${ic('chev', 's dc-chev')}</button>${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Move to the trash'))}" title="${esc(tr('Move to the trash'))}">${ic('trash', 's')} <span>${tr('Move to the trash')}</span></button>` : '' /* 2.1163.0 (#6112): it goes to the trash */}`;
 }
 // a link of the menu as a download (no <a> in a menu)
 const dcv_dlGo = url => { const a = document.createElement('a'); a.href = url; a.download = ''; document.body.append(a); a.click(); a.remove(); };

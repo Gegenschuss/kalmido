@@ -10,7 +10,7 @@ const upFiles = fd => [...fd.values()].filter(v => v instanceof Blob);
 const upWanted = fd => !/** @type {any} */ (fd).upQuiet && upFiles(fd).reduce((n, f) => n + f.size, 0) >= UP_MIN;
 function upLabel(fd) {
   const fs = upFiles(fd), names = fs.map(f => /** @type {any} */ (f).name).filter(n => n && n !== 'encrypted.kenc');  // an encrypted file has no name to show
-  return fs.length > 1 ? tr('Uploading {0} files…', fs.length) : names[0] || tr('Uploading…');
+  return fs.length > 1 ? trn('Uploading {0} file…', 'Uploading {0} files…', fs.length) /* 2.1163.0 (#6112): the file store's words */ : names[0] || tr('Uploading…');
 }
 function upBox() {
   let b = document.getElementById('upbars');

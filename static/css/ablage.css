@@ -18,6 +18,24 @@
    icons on a narrow screen (the switch List | Cards is icons there already, docs.css .abviewseg) */
 .abtools.abfoldtools{flex-wrap:nowrap;min-width:0}
 @media (max-width:540px){.abfoldtools .abtl{display:none}}
+/* 2.1163.0 (#6111): the phone's ONE tool row (ablage.js ab_wideHtml / ab_mbtnHtml): a wrapped tool stands in the row on a
+   computer (display: contents, the row as before); a phone (up to 767 px, like isMobile) hides it and offers it in "…". The
+   row of a recognising folder goes into the documents' bar below it (its "…"). The path: one line, the folders further up
+   behind "…" (ab_crumbMenu), the open folder's name as the heading below it (abcurh) */
+.abwide,.abcseg{display:contents}
+.abmbtn,.abcell,.abcurh{display:none}
+@media (max-width:767px){
+  .abwide,.abtools.abfoldtools{display:none}
+  .abtools{flex-wrap:nowrap;min-width:0}
+  .abtools .abmbtn{display:inline-flex;margin-left:auto;flex:none}
+  .abcrumbs{flex-wrap:nowrap;overflow:hidden;white-space:nowrap;margin-bottom:0}
+  .abcrumbs .abcseg{display:inline-flex;align-items:center;gap:.25rem;min-width:0}
+  .abcrumbs .abcseg.abcfar,.abcrumbs .abcseg.abcsegcur,.abcrumbs .linkbtn.abcfar{display:none}
+  .abcrumbs .abcell{display:inline-flex;align-items:center;flex:none}
+  .abcrumbs .linkbtn{flex:0 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .abcrumbs>.linkbtn{flex:none;max-width:45%}
+  .abcurh{display:block;margin:.125rem 0 .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
 /* 2.1151.0 A (#3835): phones: no symbols in the file rows, the name gets the width; a long press opens the row menu (ablage.js
    AB_LP / AB_CARDLP, "Select" on top). The buttons stay for screen readers (like .sr), as the office rows (#3834) */
 @media (max-width:767px){

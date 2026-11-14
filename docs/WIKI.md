@@ -88,7 +88,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   text. Typing `[[datei:` or `[[tabelle:` suggests them. A reader without access sees plain text. The file details in the
   file store list the pages under *Mentioned in*. The export keeps these links as they are.
 - **Check boxes as tasks (2.123.0).** In reading mode an open check box line `- [ ] …` has a **+** button; with several
-  open lines *Open items as tasks* takes them all. The dialog chooses the list (the basket first); dates, `#tags` and
+  open lines *Open items as tasks* in the page's "…" menu (since 2.1163.0; before a button above the text) takes them all. The dialog chooses the list (the basket first); dates, `#tags` and
   priorities in the line are read like in quick add. The line then ends with the task link `[[#123]]`, which shows the task's
   state (struck through when done); ticking the box in the page does not change the task. Creating the tasks and changing
   the line are one undo step. In an encrypted space this works as well, but the task titles are stored with the lock of
@@ -135,7 +135,15 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   suggestions, Ctrl/Cmd+K and Ctrl/Cmd+Shift+7 / 8 / 9 and the formatting bar work as before, undo / redo is the
   editor's. On a phone a page opens read first; the pen opens the editor, the tick goes back to reading. The page's "…"
   menu has *Edit as Markdown* (the plain text field, the way out, e.g. for a very long page) and *Read-only* (a lock on
-  this device). The page stays one Markdown string: saving, conflicts, the offline outbox, the history and encrypted
+  this device).
+- **The open page (2.1163.0, #6087 / #6089).** An open page has one head: the path (starting at the workspace's name,
+  *Private* or the organisation's), the title, *Share*, "…" and *Close*; the bar of the list (Find a page, New page, Today,
+  New folder, the workspace's "…") stays with the list. The page scrolls as a whole, files and *Linked from* follow the
+  text. Its "…" is grouped: *Page* (rename, move, share, history, links, open items as tasks), *Folder* (rename, move,
+  share the page's folder), *View on this device* (Edit as Markdown, Read-only, reading style, page width), *Delete* last.
+  Who may only read a workspace sees no New page / Today / New folder and gets a "…" with History, Copy link,
+  Copy as [[link]] and the view entries. On a phone the list has one row: Find a page, New page and "…" (Today,
+  New folder, Select, the workspace's entries). The page stays one Markdown string: saving, conflicts, the offline outbox, the history and encrypted
   spaces are unchanged, and a page opened without typing is saved back byte for byte. Without a connection before the
   editor was ever loaded the plain text field is used.
 

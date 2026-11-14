@@ -17,7 +17,7 @@
 const ZLE = {d: {}, busy: {}, more: false, f: {}};  // 2.880.0 (#5561): f = the chosen filter of the page per area
 const ZLE_N = 20, ZLE_HOME_N = 8;
 // area -> [icon, name, the view's route]
-const ZLE_AREA = {wiki: ['note', N_('Knowledge|area')], files: ['file', N_('File store')], reading: ['bookmark', N_('Read later')]};
+const ZLE_AREA = {wiki: ['note', N_('Knowledge|area')], files: ['file', N_('Files')], reading: ['bookmark', N_('Read later')]};
 const zle_key = (sp, n) => sp + '|' + n;
 async function zle_load(sp, n) {
   const k = zle_key(sp, n); if (ZLE.busy[k]) return;

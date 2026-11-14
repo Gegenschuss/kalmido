@@ -65,7 +65,8 @@ const day = n => require('./testclock').day(n);
   check(row && /Scrapbook/.test(row.textContent) && /Alice/.test(row.textContent) && /1 task/.test(row.textContent), 'the row: name, by whom, 1 task ' + (row?.textContent || ''));
   check(!d.querySelector(`#view .trow[data-id="${T}"]`), 'its task is not a row of the task trash');
   // 2.223.3 (#2877): the deletion runs are off on the test server: the note says the trash keeps instead of a period
-  check(/stay in the trash until the deletion runs of the server are switched on/.test(d.querySelector('#view .otrnote')?.textContent || ''), 'the note says the trash keeps');
+  // 2.1163.0 (#6112): the trash note without server words
+  check(/stay in the trash for now: emptying it automatically is not switched on/.test(d.querySelector('#view .otrnote')?.textContent || ''), 'the note says the trash keeps');
   click(w, row.querySelector('[data-otra="restore"]'));
   check(await until(async () => (await st()).lists.some(l => l.id === L), 60), 'Restore: the list is back');
   check(await until(() => !d.querySelector(`#view .otrlists [data-otr="${L}"]`)), 'Restore: gone from the trash section');

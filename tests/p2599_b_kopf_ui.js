@@ -113,13 +113,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     }
 
     // ---- #4808 at 2560 and 1440: the knowledge page
-    const SHEET = `(() => { const a = document.querySelector('#view article.wkpage'), bar = document.querySelector('#view .wkbar'); if (!a || !a.offsetWidth || !document.querySelector('#wk-md')) return null;
+    const SHEET = `(() => { const a = document.querySelector('#view article.wkpage'), v = document.querySelector('#view'), vs = getComputedStyle(v), vr = v.getBoundingClientRect(); if (!a || !a.offsetWidth || !document.querySelector('#wk-md')) return null;
       const s = getComputedStyle(a), b = a.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize), bg2 = (() => { const p = document.createElement('i'); p.style.color = 'var(--bg2)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })();
       // 2.783.0 (#5376): the card is the full width, the text column is the inside of #wk-md (its padding centres it)
       const md = document.querySelector('#wk-md'), ms = getComputedStyle(md), col = md.clientWidth - parseFloat(ms.paddingLeft) - parseFloat(ms.paddingRight), mr = {width: col};
-      const pre = md.querySelector(':scope > pre.mdpre, :scope > .mdcode'), tb = md.querySelector(':scope > .mdtbl'), br = bar?.getBoundingClientRect();
+      const pre = md.querySelector(':scope > pre.mdpre, :scope > .mdcode'), tb = md.querySelector(':scope > .mdtbl');
       return {bg: s.backgroundColor, bg2, bw: parseFloat(s.borderTopWidth), rad: parseFloat(s.borderTopLeftRadius), pad: parseFloat(s.paddingLeft), col, w: b.width, l: b.left, r: b.right, rem,
-        bar: br ? [Math.round(br.left), Math.round(br.right)] : null, pre: pre ? [Math.round(pre.getBoundingClientRect().width), Math.round(mr.width)] : null, tbl: tb ? [Math.round(tb.getBoundingClientRect().width), tb.scrollWidth > tb.clientWidth] : null}; })()`;
+        area: Math.round(v.clientWidth - parseFloat(vs.paddingLeft) - parseFloat(vs.paddingRight)), l0: Math.round(vr.left + parseFloat(vs.paddingLeft)), noBar: !document.querySelector('#view .wkbar'), pre: pre ? [Math.round(pre.getBoundingClientRect().width), Math.round(mr.width)] : null, tbl: tb ? [Math.round(tb.getBoundingClientRect().width), tb.scrollWidth > tb.clientWidth] : null}; })()`;
     for (const vw of [1440, 2560]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vw === 1440 ? 900 : 1440}});
       await nav(B + '?w=' + vw + '#wiki/' + WP.id);
@@ -128,12 +128,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       if (vw === 1440) {
         check(s.bw === 0 && s.pad === 0, `#4808 1440px: no sheet (as before) ` + JSON.stringify(s));
         // 2.783.0 (#5376): the card takes the full width, the text keeps the reading column (before: the page was 46rem wide)
-        check(Math.abs(s.col - 46 * s.rem) <= 2 && s.bar && Math.abs(s.bar[0] - s.l) <= 2 && Math.abs(s.bar[1] - s.r) <= 2, `#4808/#5376 1440px: the card as wide as the bar, the text in the reading column ` + JSON.stringify(s));
+        // 2.1163.0 (#6089): no area bar above an open page any more: the card's edges are the main area's
+        check(Math.abs(s.col - 46 * s.rem) <= 2 && s.noBar && s.w >= 0.8 * s.area && Math.abs(s.l - s.l0) <= 8, `#4808/#5376 1440px: the card the main area's width, the text in the reading column ` + JSON.stringify(s));
         continue;
       }
       check(s.bg === s.bg2 && s.bw >= 1 && s.rad > 0 && s.pad >= s.rem, `#4808 2560px: the page lies as a sheet (surface, border, radius, inner space) ` + JSON.stringify(s));
       check(Math.abs(s.col - 46 * s.rem) <= 2, `#4808 2560px: Read = the text column --w-lesen ` + JSON.stringify(s));
-      check(s.bar && Math.abs(s.bar[0] - s.l) <= 2 && Math.abs(s.bar[1] - s.r) <= 2, `#4808/#5376 2560px: the bar (Find a page, New page) and the sheet share their edges (both the full width, 2.783.0) ` + JSON.stringify(s));
+      check(s.noBar && s.w >= 0.8 * s.area && Math.abs(s.l - s.l0) <= 8, `#4808/#5376 2560px: the sheet takes the main area's width (2.783.0; 2.1163.0 #6089: no bar above it) ` + JSON.stringify(s));
       check(s.pre && s.pre[0] > s.pre[1] + s.rem, `#4808 2560px: Read: the code block reaches beyond the text column into the sheet ` + JSON.stringify(s));
       check(s.tbl && s.tbl[0] > s.col + s.rem && s.tbl[0] <= s.w, `#4808 2560px: Read: the table reaches into the sheet, not beyond it ` + JSON.stringify(s));
       for (const theme of ['light', 'dark']) {

@@ -174,7 +174,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#view .pov .povs'));
   check(d.querySelector('#top [data-act="view-overview"]').title === 'Projektseite', 'de: Projektseite (2.25.0)');
-  check(/Projektablage/.test(d.querySelector('#pov-files h3').textContent) && /Anhänge aus Aufgaben/.test(d.querySelector('.povtf summary').textContent)
+  // 2.1163.0 (#6112): "Projektdateien" (no "Ablage" in the interface)
+  check(/Projektdateien/.test(d.querySelector('#pov-files h3').textContent) && /Anhänge aus Aufgaben/.test(d.querySelector('.povtf summary').textContent)
     && /Wichtige Links/.test(d.querySelector('#pov-links h3').textContent) && /Meilensteine/.test(d.querySelector('#pov-ms h3').textContent), 'de: section names');
   check(w.eval(`tr('Where is it stuck?')`) !== 'Projektübersicht', 'the global overview keeps its own name');
   w.close();
