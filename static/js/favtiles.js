@@ -360,7 +360,8 @@ function fv2_rowMenu(r) {
   const key = fv2_rowKey(r); if (!key) return false;
   if (key.startsWith('tag:')) { tagMenu(r, key.slice(4)); return true; }  // a tag has its menu (render.js), the star is in it
   const name = r.querySelector('.n')?.textContent || r.getAttribute('aria-label') || '';
-  menu(r, [...(name ? [{label: name, dis: true, cls: 'mhead'}, '-'] : []), ...fv2_menuRow(key), ...sbp_menuRow(r)]);  // 2.99.0 E (#2187): + pin a person
+  const own = isMobile() && r.parentElement?.classList.contains('sbpw') ? ms_btnItems(r.parentElement, ':scope > .iconbtn') : [];  // 2.1151.0 C (#3835): the person's hidden "Message" on a phone
+  menu(r, [...(name ? [{label: name, dis: true, cls: 'mhead'}, '-'] : []), ...own, ...fv2_menuRow(key), ...sbp_menuRow(r)]);  // 2.99.0 E (#2187): + pin a person
   return true;
 }
 const FV2_ROWS = '#side .srow:not([data-list]):not(.reorder):not(.smore):not(.sfavmore):not(.sset):not(.fv2-row)';
