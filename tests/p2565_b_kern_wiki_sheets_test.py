@@ -186,8 +186,9 @@ check(W4 in shared(Fi) and Fi.get(B + f"/api/wiki/shared/pages/{W4}").json().get
 check(W5 not in shared(Fi), "#4668: the new page of the old name is not shared")
 
 # revoke and Undo
-sid4 = "p%d" % dbx("SELECT f.id FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE n.ref_kind='wiki' AND n.ref_id=? AND f.user_id=?",
-                   (W4, FIO))[0][0]  # 2.937.0 (#5244): the dialog's id of a person share
+# 2.1115.0 (#5967): W4 was shared by address - its dialog id is the sealed "e<..>" (wsh_eid), "p<n>" is refused for it
+sid4 = next((x["id"] for x in Fr.get(B + "/api/wiki/shares", params={"page": W4}).json().get("shares", [])
+             if x["kind"] == "person" and not x["folder"] and x.get("path") == "Note (2)"), "e0")
 check(Fr.delete(B + f"/api/wiki/shares/{sid4}").ok and not core("wiki", W4, FIO), "revoked: the core share is gone")
 check(Fi.get(B + f"/api/wiki/shared/pages/{W4}").status_code == 404, "... fiona reads nothing at once")
 check(Fr.post(B + f"/api/wiki/shares/{sid4}/restore").ok and core("wiki", W4, FIO) == ["view"], "Undo: the core share is back")
