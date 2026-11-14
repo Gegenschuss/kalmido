@@ -421,6 +421,9 @@
     // the receipts still in the documents (office_receipts.js amv_load, #4434) - none in the demo
     'GET /api/ticket-types': () => ({space: 'private', can_edit: false, max: 20, types: [], suggestions: [], builtin: []}),
     'GET /api/docs/office-move': () => ({n: 0, hidden: false, undo: null, office: null, items: [], more: 0}),
+    // 2.1154.0 (#5037 #5039, CI red p2125_d_demo / p274_b_demo): the poll asks for the chat pop-up (liveparts.js mp_check,
+    // agents/msgpop.py, #6057) - nobody else writes in the demo
+    'GET /api/msgpop': () => ({t: 0, a: 0, items: []}),
     // 2.575.0 (#3778 #4802, #3506 CI red): own module cards (Settings > Modules) and saved document views - none in the demo
     'GET /api/modcards': () => ({space: 'private', admin: true, cap: null, cards: []}), 'GET /api/docs/views': () => ({items: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo

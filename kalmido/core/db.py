@@ -1081,8 +1081,13 @@ def init_db(guard=True):
         from ..office.costs import ek_producing_migrate
         ek_producing_migrate(c)  # 2.47.0 (#1645): producing per document, older documents keep how they compute
         clk("ek_producing_migrate")
+        # 2.1154.0 (job/4465, CI red p23674_a_office): only the defaults still missing - an INSERT ... ON CONFLICT on a key
+        # the running server is just writing waits for that transaction while it may wait for this start (DeadlockDetected
+        # when a helper runs `import app` next to the server); a plain read takes no lock
+        have = {r[0] for r in c.execute("SELECT key FROM settings").fetchall()}
         for k, v in GLOBAL_DEFAULTS.items():
-            c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
+            if k not in have:
+                c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT DO NOTHING", (k, v))
         from ..admin.hosting import quota_backfill
         quota_backfill(c)  # 2.24.0 (#910): who uploaded the files from before
         clk("quota_backfill")

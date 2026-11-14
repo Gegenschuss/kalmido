@@ -217,7 +217,9 @@ for dump in DUMPS:
         print("   gap:", g)
     if extra:
         print(f"   info: {len(extra)} column(s) only in the upgraded database: {', '.join(extra[:30])}")
-    after = kt.dbx(OLD_TASKS)[0][0]  # 2.509.0 (#4285): the fill's rows aside (a step turns its old milestone into a task of its own)
+    # 2.509.0 (#4285): the fill's rows aside (a step turns its old milestone into a task of its own); 2.1154.0 (#6059): the
+    # office's inbox tasks of the first ticks aside as well (upgrade_views.OFFICE_INBOX - the dumps hold none)
+    after = kt.dbx(OLD_TASKS + " AND COALESCE(url, '') NOT LIKE '%/#office/%'")[0][0]
     check(after == before, f"{tag}: no task lost by the migrations: {before} -> {after}")
     users = data_checks(E, tag)
     A, Fr = users["alice"], users["frida"]

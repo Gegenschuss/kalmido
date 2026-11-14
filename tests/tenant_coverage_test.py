@@ -1324,6 +1324,7 @@ ROUTES = {
     "GET /api/team/dispo/callsheets": "hub", "POST /api/team/dispo/callsheets": "hub",  # 2.988.0 (#5651): a project's call sheets (p2988_a_callsheets_test.py)
     "GET /api/team/dispo/callsheet/{}/logo": "hub", "GET /api/team/dispo/callsheet/{}/photo/{}": "hub",  # 2.993.0 (#5650): p2993_a_cslogos_test.py
     "PUT /api/team/dispo/callsheet/{}/photo/{}": "hub",  # 2.993.0 (#5650): p2993_a_cslogos_test.py
+    "GET /api/team/dispo/callsheet/{}/mail": "hub", "POST /api/team/dispo/callsheet/{}/mail": "hub",  # 2.1155.0 (#5652): p21155_a_csmail_test.py
     # 2.51.0 C (#1352 #1353 #1355): agents on the pin board, time check / proposals, the disposition + shoot proposals (p251_c_api_test.py)
     "GET /api/v1/lists/{}/notepads": "list", "POST /api/v1/lists/{}/notepads": "list", "PATCH /api/v1/notepads/{}": "list",
     "DELETE /api/v1/notepads/{}": "list", "PUT /api/v1/lists/{}/status-pad": "list", "GET /api/v1/lists/{}/weekly-status": "list",

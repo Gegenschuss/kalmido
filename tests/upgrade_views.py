@@ -49,12 +49,23 @@ def state_all(s):
     return st
 
 
-def view(s):
+# 2.1154.0 (#6059, CI red p2192_c_upgrade): the office's own inbox tasks (office/recurring.py rin_task, link into #office/...)
+# come from the server's ticks after the start, not from the data: the 2.101.0 dump's invoice of 23.10.2026 is overdue past
+# the dunning grace since 14.11.2026 and the first tick suggests a payment reminder - right behaviour, no migration's doing
+OFFICE_INBOX = "SELECT id FROM tasks WHERE url LIKE '%/#office/%'"
+
+
+def office_inbox_ids():
+    return {int(r[0]) for r in kt.dbx(OFFICE_INBOX)}
+
+
+def view(s, office=False):
     st = state_all(s)
+    skip = office_inbox_ids() if office else set()  # read after the state: a task the state holds is in the table by then
     lists = {x["id"]: x["name"] for x in st["lists"]}
     tasks = sorted([lists.get(t["list_id"], "?"), t["title"], t.get("due") or "", t.get("due_time") or "", t.get("repeat") or "",
                     bool(t.get("parent_id")), t.get("status") or 0, sorted(a["name"] for a in t.get("attachments") or [])]
-                   for t in st["tasks"])
+                   for t in st["tasks"] if t["id"] not in skip)
     return {"lists": sorted(lists.values()), "tasks": tasks}
 
 
@@ -88,7 +99,7 @@ def data_checks(E, tag):
     if not check(all(users.values()), f"{tag}: the old accounts sign in with their passwords"):
         raise SystemExit(f"{tag}: no login for {[u for u, s in users.items() if s is None]}")  # the views below need all three
     for u, s in users.items():
-        v = view(s)
+        v = view(s, office=True)
         exp = E["users"][u]
         same(v["lists"], exp["lists"], f"{tag}: {u}'s lists as before")
         same(v["tasks"], [list(t) for t in exp["tasks"]], f"{tag}: {u}'s tasks (due, repeat, subtasks, done, attachments) as before")
