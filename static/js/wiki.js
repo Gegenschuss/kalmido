@@ -551,7 +551,7 @@ function wk_pageHtml(p) {
     <div class="wktitle">${wk_crumbs(p)}${/*html-ok*/ mob ? (typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : '') /* 2.1108.0 (#5965): the title is in the head bar */ : `<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2>`}</div>
     ${tch && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
-    ${may || mob ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
+    ${may || mob || wk_bodyStrip(p.body).trim() /* 2.1153.0 (#5525): a reader has Present there */ ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
     ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${/*html-ok*/ wk_bodyStrip(p.body).trim() ? wk_dupTitle(wk_render(p), p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
@@ -1101,8 +1101,9 @@ document.addEventListener('click', async e => {
 // only read shows just those
 function wk_pmenuItems(p) {
   const may = WK.idx[p.space]?.mayWrite !== false, top = isMobile() && typeof topMoreItems === 'function' ? topMoreItems() : [];
-  if (!may) return top;
-  return [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
+  const pres = typeof wkp_items === 'function' ? wkp_items(p) : [];  // 2.1153.0 (#5525): Present (wklive.js), also for who may only read
+  if (!may) return [...pres, ...(pres.length && top.length ? ['-'] : []), ...top];
+  return [...pres, {label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     ...(p.path.includes('/') ? [{label: tr('Rename folder…'), icon: 'folder', fn: () => wk_moveFolder(p)}] : []),
     ...wk_smvItems(p),  // 2.96.0 B (#1941)
     ...(typeof wsh_menuItems === 'function' ? wsh_menuItems(p) : []),  // 2.123.0 B (#2104): Share… / Share folder…

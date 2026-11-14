@@ -173,7 +173,8 @@ const ROUND = '---\ntags: demo\n---\n# Title  \n\nSome **bold** word and `code`.
     await signin('rita');
     await nav(B + `#wiki/${OP}`);
     check(await until(`!!document.querySelector('#wk-md') && document.querySelector('#wk-md').textContent.includes('Read me')`), 'no right: the page is read');
-    check(await ev(`!document.querySelector('#wk-cm') && !document.querySelector('[data-wk="pmenu"]') && !document.querySelector('[data-wk="pen"]')`), 'no right: no editor, no menu, no pen');
+    // 2.1153.0 (#5525): a reader has the "…" now, it holds only "Present" (nothing that writes)
+    check(await ev(`!document.querySelector('#wk-cm') && !document.querySelector('[data-wk="pen"]') && JSON.stringify(wk_pmenuItems(WK.pg).map(x => x.label)) === JSON.stringify(['Present'])`), 'no right: no editor, no pen, the "…" holds only Present');
   }, false);
   console.log(`p2554_c_wikicm_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

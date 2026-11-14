@@ -166,6 +166,13 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   The page with the block and the templates are never listed; a line that is not understood is named below the result. The
   reader sees only pages they may read (through a share only the shared ones). In an encrypted space the browser runs the
   query over the pages it opened. Route: `GET /api/wiki/query?page=<id>&q=<the block's text>`.
+- **Present a page** (2.1153.0, #5525): **Present** in the page's "…" menu shows the page as a presentation over the whole
+  screen (full screen where the browser allows it). Every `#` and `##` heading starts a slide; a `###` stays on its slide
+  (a page whose top heading is `###` cuts there); text before the first heading becomes a title slide with the page's
+  name. Leaf with the arrow keys, Page Up / Down, Space, Home / End, the ‹ › buttons below or a swipe sideways; Esc, ×
+  or the phone's Back end it, and a link on a slide ends it and opens. It is only a view: nothing is stored, a checkbox on
+  a slide ticks nothing, and who may only read a page can present it too. A page of an encrypted space is shown as the
+  browser decrypted it for reading.
 
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
 the bytes under `files/wiki/`). Agents are not part of the export; they reach knowledge pages only through a share made for them (see [AGENTS.md](AGENTS.md#knowledge-pages)), never in an encrypted space.
