@@ -20,7 +20,7 @@ async function wki_limits() {
 function wki_sheet() {
   if (WKI.md?.isConnected) return WKI.md;
   /** @type {any} */
-  const md = modal(`<h3>${esc(tr('Import'))}</h3><div class="wki-box" role="status" aria-live="polite"></div>
+  const md = modal(`<h3>${esc(tr('Import pages'))}</h3><div class="wki-box" role="status" aria-live="polite"></div>
     <div class="foot"><button type="button" class="btn" data-wki="stop">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-wki="bg">${esc(tr('In the background'))}</button></div>`);
   md.addEventListener('click', async e => {
     const b = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-wki]')); if (!b) return;
@@ -131,11 +131,9 @@ function wki_fail(msg) {
   WKI.up = ''; WKI.cur = null; wki_mark(); if (WKI.md?.isConnected) modalClose(WKI.md);
   toast(msg);
 }
-function wki_tooBig(file, max) {
-  const md = modal(`<h3>${esc(tr('Import'))}</h3><p>${esc(tr('{0} is {1}, the import takes ZIP files up to {2} MB.', file.name, fmtSize(file.size), max))}</p>
-    <p class="muted">${esc(tr('Split the archive into several ZIP files and import them one after the other.'))}</p>
-    <div class="foot"><button type="button" class="btn" data-m="close">${esc(tr('OK'))}</button></div>`);
-  md.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest('[data-m="close"]')) modalClose(md); });
+function wki_tooBig(file, max) {  // 2.1168.0 (#6092): the shared dialog (wiki.js wk_info)
+  wk_info(tr('File too large'), `<p>${esc(tr('{0} is {1}, the import takes ZIP files up to {2} MB.', file.name, fmtSize(file.size), max))}</p>
+    <p class="muted">${esc(tr('Split the archive into several ZIP files and import them one after the other.'))}</p>`);
 }
 async function wki_stop() {
   const c = WKI.cur; WKI.up = '';
@@ -186,8 +184,15 @@ async function wki_e2e(sp, file) {
     const r = await wkeImport(sp, file, (done, total) => { Object.assign(cur, {done, total}); wki_show(done, total, tr('{0} of {1} pages', done, total)); wki_mark(); return !cur.abort; });  // 2.350.0 C (#2744): + the note
     if (!cur.abort) return r;
     // review L7: a cancelled import leaves nothing behind -- the pages made so far go to the trash
-    if (r?.created?.length) await rawFetch('POST', '/api/wiki/trash', {ids: r.created, files: []}).catch(() => {});
-    wk_after(sp); toast(tr('Import cancelled'));
+    // 2.1168.0 (#6092): it says how many went to the trash, with Undo (the pages come back as if the import had finished)
+    const ids = r?.created || [];
+    if (ids.length && await rawFetch('POST', '/api/wiki/trash', {ids, files: []}).then(() => true, () => false)) {
+      wk_after(sp);
+      histToast(trn('Import cancelled: {0} imported page moved to the trash', 'Import cancelled: {0} imported pages moved to the trash', ids.length),
+        histAdd({label: tr('Import cancelled'), ids: [], snaps: [], lids: [], wsp: sp,
+          undo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids, files: []}); wk_after(sp); return {skipped: []}; },
+          redo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids, files: []}); wk_after(sp); return {skipped: []}; }}));
+    } else { wk_after(sp); toast(tr('Import cancelled')); }
     return null;
   } finally { WKI.cur = null; wki_mark(); if (WKI.md?.isConnected) modalClose(WKI.md); }
 }

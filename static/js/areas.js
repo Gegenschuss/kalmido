@@ -66,7 +66,7 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 // 2.489.0 (#2664, decision #2647): the address book is no part of Sell any more but an entry of its own (group 'book', [3] = 1:
 // no heading, never folded), below the groups and right above its folders
 /** @type {Array<[string, string, string, number?]>} */
-const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')], ['book', 'users', N_('Address book'), 1]];
+const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')], ['book', 'users', N_('Contacts'), 1]];  // 2.1168.0 (#6118): the page is called Contacts, as in the main menu
 const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
 const ofm_cc = () => typeof OFC !== 'undefined' && !!OFC.info?.cards;  // 2.444.0 (#3447): the person holds a card here
@@ -75,7 +75,7 @@ const OFM_ITEMS = [
   {key: 'offers', go: 'office/offers', icon: 'file', name: N_('Quotations'), group: 'sell', on: ofm_ofc},  // 2.380.0 B (#3409): quotations and invoices are two points
   {key: 'invoices', go: 'office/invoices', icon: 'receipt', name: N_('Invoices'), group: 'sell', on: ofm_ofc, lvk: 'offers'},  // the rights of the quotations' area
   {key: 'clients', go: 'clients', icon: 'brief', name: N_('Clients'), group: 'sell', on: () => clientsOn()},
-  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Address book'), group: 'book', on: () => feat('contacts')},  // 2.489.0 (#2664): own entry
+  {key: 'contacts', go: 'contacts', icon: 'users', name: N_('Contacts'), group: 'book', on: () => feat('contacts')},  // 2.489.0 (#2664): own entry; 2.1168.0 (#6118): Contacts (was Address book)
   {key: 'cashflow', go: 'office/cashflow', need: 'money.cashflow', icon: 'trend', name: N_('Cash flow'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'kpi', go: 'office/kpi', need: 'money.kpi', icon: 'chart', name: N_('Figures'), group: 'money', on: ofm_ofc, adm: 1},
   {key: 'travel', go: 'office/travel', need: 'money.travel', icon: 'plane', name: N_('Travel expenses'), group: 'money', on: ofm_ofc, adm: 1},
@@ -255,7 +255,7 @@ const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key ==
 function ofm_detail(mod) {
   let p = null;
   if (mod === 'clients' && S.route.client && S.route.client !== 'mailhub' && typeof CLV !== 'undefined' && CLV.id === S.route.client && CLV.data?.name) p = [tr('Clients'), CLV.data.name];
-  else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card) p = [tr('Address book'), CT.card.fn || CT.card.org || '?'];
+  else if (mod === 'contacts' && typeof CT !== 'undefined' && CT.sel && CT.card && !lsd_one()) p = [tr('Contacts'), CT.card.fn || CT.card.org || '?'];  // 2.1168.0 (#6118): one column (phone): the card's back arrow and name are the path, no second one
   else if (mod === 'office' && S.route.id && typeof ofd_openDoc === 'function' && ofd_openDoc()?.id === S.route.id && !(typeof ofd_phoneDoc === 'function' && ofd_phoneDoc())) p = [tr(ofd_openDoc().kind === 'offer' ? 'Quotations' : 'Invoices'), `${ofdKindName(ofd_openDoc().kind, true)} ${ofd_openDoc().number || tr('Draft')}`];  // 2.356.0 C (#3004): the open document, never the one before
   else if (mod === 'office' && S.route.tab === 'travel' && typeof RK !== 'undefined' && RK.open && typeof rk_trip === 'function' && rk_trip(RK.open)) p = [tr('Travel expenses'), rk_trip(RK.open).dest || tr('Trip')];
   return p ? `<nav class="ofmcrumb" aria-label="${esc(tr('Path'))}">${p.map(x => `<span>${esc(x)}</span>`).join('<span aria-hidden="true">›</span>')}</nav>` : '';

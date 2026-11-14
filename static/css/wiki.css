@@ -33,6 +33,12 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkhlist{list-style:none;margin:0;padding:0}
 .wkhitem{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.375rem .5rem;border:0;border-radius:var(--r-s);background:none;color:inherit;text-align:left;cursor:pointer}
 .wkhitem:hover,.wkhitem:focus-visible{background:var(--bg3)}
+/* 2.1168.0 (#6092): the current version is no button (nothing to compare) */
+.wkhitem.wkhnow,.wkhitem.wkhnow:hover{cursor:default;background:none}
+/* 2.1168.0 (#6092): the conflict window - both versions with their own lines marked, one below the other on a phone */
+.ntdiff.wkcf>div{min-width:0}
+.ntdiff.wkcf .wkhdiff{margin-top:.25rem}
+@media (max-width:767px){.ntdiff.wkcf{grid-template-columns:1fr}}
 .wkhwhen{flex:1;min-width:0}
 .wkhcur{padding:.0625rem .5rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-size:var(--fs-s)}
 .wkhhead{display:flex;align-items:center;gap:.5rem;margin-bottom:.25rem}

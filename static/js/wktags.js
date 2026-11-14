@@ -65,13 +65,13 @@ function wkt_tagPages(sp, tag) {
 function wkt_panelNode(sp) {
   const tags = WK.idx[sp]?.pages ? wkt_spaceTags(sp) : null; if (!tags?.length) return null;
   const at = S.route.mod === 'wiki' && wk_open() === sp ? (S.route.wtag || '').toLowerCase() : '';
-  return {k: 'wkt:' + sp, name: tr('Tags'), icon: 'tag', go: wkt_go(tags[0].tag, sp), on: false, kids: true, open: !!at,
+  return {k: 'wkt:' + sp, name: tr('Tags|wiki'), icon: 'tag', go: wkt_go(tags[0].tag, sp), on: false, kids: true, open: !!at,
     sub: () => tags.map(t => ({k: 'wkt:' + sp + ':' + t.tag.toLowerCase(), name: '#' + t.tag, icon: 'tag', go: wkt_go(t.tag, sp), on: at === t.tag.toLowerCase(), kids: false}))};
 }
 // a phone: the tags below the space's pages
 function wkt_sideHtml(sp) {
   const tags = WK.idx[sp]?.pages ? wkt_spaceTags(sp) : null; if (!tags?.length) return '';
-  return `<nav class="wktags" aria-label="${esc(tr('Tags'))}"><h4>${ic('tag', 's')}${esc(tr('Tags'))}</h4><p>${tags.slice(0, 60).map(t => `<a href="#${esc(wkt_go(t.tag, sp))}" class="wktag">#${esc(t.tag)}</a>`).join(' ')}</p></nav>`;
+  return `<nav class="wktags" aria-label="${esc(tr('Tags|wiki'))}"><h4>${ic('tag', 's')}${esc(tr('Tags|wiki'))}</h4><p>${tags.slice(0, 60).map(t => `<a href="#${esc(wkt_go(t.tag, sp))}" class="wktag">#${esc(t.tag)}</a>`).join(' ')}</p></nav>`;
 }
 // the open tag (#wiki/t/<tag>): its pages as rows like a folder's
 function wkt_viewHtml(sp, tag) {
@@ -79,7 +79,7 @@ function wkt_viewHtml(sp, tag) {
   const rows = ps == null ? `<div class="muted mhint">${tr('Loading…')}</div>` : c?.err ? `<div class="muted mhint">${esc(c.err)}</div>`
     : ps.length ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${ps.map(p => `<li class="wkrow"><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>`
     : `<div class="empty">${tr('No page has this tag.')}</div>`;
-  return `<div class="nthead"><div class="wktitle"><nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a><span aria-hidden="true">/</span><span>${esc(tr('Tags'))}</span></nav><h2 class="wktagh">${ic('tag', 's')}#${esc(tag)}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${rows}</nav>`;
+  return `<div class="nthead"><div class="wktitle"><nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a><span aria-hidden="true">/</span><span>${esc(tr('Tags|wiki'))}</span></nav><h2 class="wktagh">${ic('tag', 's')}#${esc(tag)}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${rows}</nav>`;
 }
 // the #tags of a rendered text as links (not inside code / pre / links; the html is the app's Markdown)
 function wkt_linkHtml(h, sp) {

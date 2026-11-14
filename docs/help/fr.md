@@ -170,7 +170,7 @@ d'application, jamais ton mot de passe Kalmido.
 <!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
 ## Écrire une page de connaissances
 
-1. Ouvre **Pages de connaissances** dans la barre latérale et touche **Nouvelle page**.
+1. Ouvre **Savoir** dans la barre latérale et touche **Nouvelle page**.
 2. Saisis le nom de la page dans **Nom**. Un `/` crée des dossiers : « Processus/Liste » arrive dans le dossier *Processus*.
 3. Écris le texte. Avec `[[`, tu relies une autre page.
 

@@ -86,7 +86,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
         check(ct.l.w / ct.p.w > .33 && ct.l.w / ct.p.w < .45, `${vw}: the list takes about 40 % of the pair ` + JSON.stringify(ct));
         // 2.583.0 (#4840): no 160rem limit any more, the pair uses the full width
         check(ct.p.w > 96 * ct.rem, `${vw}: the pair is wider than 96rem ` + JSON.stringify(ct));
-      } else check(ct.l.w <= 22 * ct.rem + 1 && ct.c.l >= ct.l.r, `${vw}: the narrow list beside the card as before (at most 22rem) ` + JSON.stringify(ct));
+      } else check(ct.l.w <= 26 * ct.rem + 1 && ct.c.l >= ct.l.r, `${vw}: the list beside the card (at most 26rem) ` + JSON.stringify(ct));  // 2.1168.0 (#6117): the list grows to about a third (was 22rem)
       await shots(`contacts-${vw}`);
       if (wide) {
         await ev(ESC);

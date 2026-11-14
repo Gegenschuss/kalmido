@@ -166,7 +166,7 @@ Kalmido-wachtwoord.
 <!-- help: wiki#how-to-write-a-knowledge-page src=122a76cda7 -->
 ## Een kennispagina schrijven
 
-1. Open **Kennispagina's** in de zijbalk en tik op **Nieuwe pagina**.
+1. Open **Kennis** in de zijbalk en tik op **Nieuwe pagina**.
 2. Typ de naam van de pagina bij **Naam**. Een `/` maakt mappen: "Processen/Checklist" komt in de map *Processen*.
 3. Schrijf de tekst. Met `[[` link je een andere pagina.
 

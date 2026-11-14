@@ -71,6 +71,7 @@ const PATHS = ['Audio', 'Audio/Mix', 'Audio/Mix/Mastering/Loudness/Targets/Strea
   w.eval(`WK.idx.private.more = false; viewSafeRender()`);
   check(await until(() => !d.querySelector('#view .wkcapped')), 'no hint for a complete index');
   // the import report: shortened names apart from skipped ones
+  w.__dialogs = 'manual';  // 2.1168.0 (#6092): the report is the shared askDialog now - the suite's bridge would answer it at once
   w.eval(`wka_report({created: [1, 2], files_n: 0, skipped: ['x.exe'], skipped_detail: [{name: 'x.exe', reason: 'no'}], skipped_n: 1, shortened: [{name: 'Very/long.md', path: 'Very/lo~abc123~ng'}], shortened_n: 1})`);
   const rep = await until(() => [...d.querySelectorAll('.modal, [role="dialog"]')].find(m => /shortened/.test(m.textContent)));
   check(rep && /1 name shortened/.test(rep.textContent) && /Very\/lo~abc123~ng/.test(rep.textContent) && /1 skipped/.test(rep.textContent), 'the report lists shortened and skipped names apart');

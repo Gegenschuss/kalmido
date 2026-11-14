@@ -6,15 +6,37 @@
 // the floating bar (like the tasks' selection bar): the count, then the buttons [key, icon, label, class?] with
 // data-<attr>="key" (disabled while nothing is ticked, except "all"), then the close button (Esc).
 // 2.428.0 A (#3581): every selection uses it (documents, file store, knowledge, users, trip receipts): class mselbar = its look
-function ms_barHtml(id, attr, n, hint, btns) {
+function ms_barHtml(id, attr, n, hint, btns, o = {}) {
   // 2.66.0 A (#1835): min = the ticks a button needs (Merge: 2)
-  const btn = ([k, i, lab, cls = '', min = 1]) => `<button type="button" class="mbb ${cls}" data-${attr}="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n >= min || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
+  const btn = ([k, i, lab, cls = '', min = 1]) => `<button type="button" class="mbb ${cls} ${k === 'all' ? 'mball' : ''}" data-${attr}="${k}" data-msi="${esc(i)}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n >= min || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(ms_fitAll);  // 2.1168.0 (#6118): once the bar is on the page
   // 2.1162.0 (#6107): four buttons and more do not fit with words on a narrow phone (German: "Herunterladen"): ms4 / ms5 show
-  // only their symbols there (app.css), the word stays in title / aria-label
-  return `<div id="${id}" class="mselbar${btns.length >= 5 ? ' ms4 ms5' : btns.length === 4 ? ' ms4' : ''}" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? trh('{0} selected', n) : hint}</span>
-    ${btns.map(btn).join('')}
+  // only their symbols there (app.css), the word stays in title / aria-label. 2.1168.0 (#6118): o.words = the words stay
+  // (contacts, clients): what does not fit goes into the bar's "..." (ms_fit)
+  const sym = o.words ? '' : btns.length >= 5 ? ' ms4 ms5' : btns.length === 4 ? ' ms4' : '';
+  return `<div id="${id}" class="mselbar${/*html-ok*/ sym}" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? trh('{0} selected', n) : hint}</span>
+    ${btns.map(btn).join('')}<button type="button" class="mbb mbdots" data-msmore hidden aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}<span class="mbl">${esc(tr('More'))}</span></button>
     <button type="button" class="iconbtn mbx" data-${attr}="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
 }
+// 2.1168.0 (#6118): a button keeps its sign on top and its whole word below (no "Bearbe…"): what does not fit in the bar's row
+// (a phone: the row wraps, app.css) goes into its "…" (More) - first the plain ones from the end, then All, Delete last
+function ms_fit(bar) {
+  const bs = $$(':scope > .mbb:not(.mbdots)', bar), dots = $(':scope > .mbdots', bar), x = $(':scope > .mbx', bar); if (!dots || !x) return;
+  for (const b of bs) b.hidden = false; dots.hidden = true;
+  const one = () => [...bs, dots].every(b => b.hidden || (b.offsetTop < x.offsetTop + x.offsetHeight && b.offsetTop + b.offsetHeight > x.offsetTop));  // on the close button's line
+  if (one()) return;
+  dots.hidden = false;
+  const rank = b => b.classList.contains('danger') ? 2 : b.classList.contains('mball') ? 1 : 0;
+  for (const b of [...bs].reverse().sort((a, c) => rank(a) - rank(c))) { if (one()) break; b.hidden = true; }
+}
+function ms_fitAll() { for (const b of $$('.mselbar')) ms_fit(b); }
+if (typeof addEventListener === 'function') addEventListener('resize', () => requestAnimationFrame(ms_fitAll));
+document.addEventListener('click', e => {
+  const d = /** @type {any} */ (e.target).closest?.('.mselbar [data-msmore]'); if (!d) return;
+  const bar = d.closest('.mselbar');
+  menu(d, $$(':scope > .mbb[hidden]:not(.mbdots)', bar).map(b => ({label: b.getAttribute('aria-label') || '', icon: b.dataset.msi, cls: b.classList.contains('danger') ? 'danger' : '', dis: b.disabled,
+    fn: () => (b.isConnected ? b : $(`#${bar.id} [data-msi="${b.dataset.msi}"]`) || b).click()})));
+});
 // the phone: a long press on a row (selector sel) starts the selection with it, unless active() (the mode is on already);
 // st.done = the time it fired: the click that ends the press does nothing (ms_lpRecent)
 function ms_longPress(sel, active, start) {

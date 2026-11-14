@@ -132,7 +132,7 @@ from ..accounts.orgretain import obj_share_gone  # 2.924.0 (#5069)
 from .objhooks import BOUNDARY  # 2.649.0 (#5051)
 from .objexport import OEX_KEYS, obj_export  # 2.1093.0 (#5289): export= of a kind
 from .undogroups import ug_drop  # 2.747.0 (#5249): a person's step groups go where their undo rows go
-from .objhooks import FOLLOW, OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
+from .objhooks import FOLLOW, OBJ, REVOKE, UNSHARE  # 2.1168.0 (#4782): + UNSHARE; kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
 OBJ_REVOKED_DAYS = 30  # rows taken away stay restorable this long (obj_revoked)
@@ -1275,6 +1275,7 @@ def obj_public(c, uid, kind, row, role=None):
 BOUNDARY.append(obj_boundary_take)  # 2.649.0 (#5051): accounts/tenancy.py boundary_repair
 REVOKE.append(obj_revoke_person)  # core/objhooks.person_revoked (accounts calls it without importing the domain layer)
 FOLLOW.append(obj_node_follow)  # 2.566.0 (#4712, review F1): accounts/orgretain.py obj_nodes_follow
+UNSHARE.append(obj_node_unshare)  # 2.1168.0 (#4782, Fable review F2): accounts/orgs.py _obj_expired_drop
 
 
 def _probe_register():

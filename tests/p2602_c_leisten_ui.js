@@ -78,7 +78,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await nav(B + '?w=1440#contacts');
     check(await until(`!!S.booted && !!document.querySelector('#view .ctrow[data-ctopen]')`), '1440: the contacts show');
     { const c = await ev(`(() => { const l = ${R('#view .ctlistw')}; return l ? {...l, rem: ${REM}} : null; })()`);
-      check(c && Math.abs(c.w - 15 * c.rem) <= 2, '1440: the contact list is --w-leiste wide ' + JSON.stringify(c)); }
+      // 2.1168.0 (#6117): contacts / clients (.lsd2.lsdfill) grow their list with the content area (about a third, 14-26rem), names are not cut
+      check(c && c.w > 15 * c.rem + 2 && c.w <= 26 * c.rem + 2, '1440: the contact list is wider than --w-leiste, at most 26rem ' + JSON.stringify(c)); }
 
     // ================= a phone: unchanged, list and note one after the other in the page
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});

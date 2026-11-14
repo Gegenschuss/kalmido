@@ -44,7 +44,7 @@ const stub = (w, id, code, status = 409) => w.eval(`(() => { const real = rawFet
   const box = await until(() => d.querySelector('#view .wklost'), 60);
   check(box && box.textContent.includes('otherwise it can only be deleted') && box.getAttribute('role') === 'alert', 'the page shows the message with its way out');
   const del = box?.querySelector('[data-wk="lostdel"]');
-  check(del && /Delete page/.test(del.textContent), 'a "Delete page" button beside the message');
+  check(del && /Move to the trash/.test(del.textContent), 'a "Move to the trash" button beside the message');  // 2.1168.0 (#6092): was Delete page
   del?.click();
   const gone = await until(async () => (await call('GET', '/api/wiki?space=private')).pages?.every(p => p.id !== P1), 40);
   check(gone, 'the button deletes the unreadable page');

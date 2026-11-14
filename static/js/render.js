@@ -776,12 +776,26 @@ if (typeof ResizeObserver !== 'undefined') {
 // office_books.js docks a receipt beside its list). Below it everything stays as before (the detail in place of the list).
 const LSD_REM = 100;
 const lsd_wide = () => !!$('#view')?.classList.contains('lsdw');
+// 2.1168.0 (#6117): list beside detail (contacts, clients) only while the CONTENT area (#view, not the window) holds the
+// list (14rem) and a readable detail (28rem): below LSD_PAIR_REM #view gets the class lsdnar and the pair .lsd2 is one column
+// (start-lsd-4553.css). lsd_one() = one column (phone or narrow content): the views draw the list or the detail, never both.
+const LSD_PAIR_REM = 43;
+const lsd_one = () => isMobile() || !!$('#view')?.classList.contains('lsdnar');
 function lsd_sync() {
   const v = $('#view'); if (!v) return;
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, on = v.clientWidth >= LSD_REM * rem - 0.5 && !matchMedia('(max-width:767px)').matches;
   if (on !== v.classList.contains('lsdw')) {
     v.classList.toggle('lsdw', on);
     if (typeof ofdDraw === 'function') ofdDraw();  // a quotation / invoice: with or without its list beside it
+  }
+  // 2.1168.0 (#6117): too narrow a content area for list AND detail (a window of 820 px with the side panel open left the
+  // card 196 px): lsdnar = one column like a phone - the list, then the whole detail with its way back (lsd_one)
+  const nar = v.clientWidth < LSD_PAIR_REM * rem - 0.5;
+  if (nar !== v.classList.contains('lsdnar')) {
+    v.classList.toggle('lsdnar', nar);
+    const m = S.route?.mod;
+    if (m === 'contacts' && typeof ctDraw === 'function') ctDraw();
+    else if (m === 'clients' && typeof ms_clDraw === 'function') ms_clDraw();
   }
   if (typeof rcl_dockSync === 'function') rcl_dockSync();  // a docked receipt follows the size of the area
 }
@@ -805,12 +819,15 @@ function lw_sync() {
 }
 if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (!v) return; lwRO = new ResizeObserver(() => dragRest('lw', lw_sync)); new MutationObserver(() => lw_watch()).observe(v, {childList: true, subtree: true}); lw_watch(); });
 // Esc (events.js, nothing else open) closes the detail of the pair, the list stays
+// 2.1168.0 (#6117): contacts and clients at any width (their pair below 100rem, one column on a phone / narrow content: the
+// card closes back to the list); quotations / invoices only in the wide pair as before
 function lsd_esc() {
-  if (!lsd_wide() || S.sel) return false;
   const r = S.route || {};
+  if (S.sel || (!lsd_wide() && r.mod !== 'contacts' && r.mod !== 'clients')) return false;
   const back = sel => requestAnimationFrame(() => $(sel)?.focus());  // the row of the closed detail keeps the keyboard
-  if (r.mod === 'contacts' && typeof CT !== 'undefined' && CT.card && !CT.pick) { const id = CT.sel; CT.sel = null; CT.card = null; if (location.hash !== '#contacts') go('contacts'); else ctDraw(); back(`#view .ctrow[data-ctopen="${id}"]`); return true; }
-  if (r.mod === 'clients' && +r.client && !(typeof MSC !== 'undefined' && MSC.pick)) { const id = r.client; go('clients'); back(`#view .ctrow[data-clopen="${id}"]`); return true; }
+  const up = to => { if (lsd_one()) navUp(to); else go(to); };
+  if (r.mod === 'contacts' && typeof CT !== 'undefined' && CT.card && !CT.pick && !CT.trash) { const id = CT.sel; CT.sel = null; CT.card = null; if (location.hash !== '#contacts') up('contacts'); else ctDraw(); back(`#view .ctrow[data-ctopen="${id}"]`); return true; }
+  if (r.mod === 'clients' && +r.client && !(typeof MSC !== 'undefined' && MSC.pick)) { const id = r.client; up('clients'); back(`#view .ctrow[data-clopen="${id}"]`); return true; }
   if (r.mod === 'office' && r.id && ['offers', 'invoices'].includes(r.tab) && $('#view .lsd2')) { $('#view .lsd2 [data-ofd="back"]')?.click(); return true; }
   return false;
 }

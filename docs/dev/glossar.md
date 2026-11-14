@@ -1,7 +1,7 @@
 # Hauswörter (deutsche Oberfläche)
 
 Ein Wort hat genau eine Bedeutung, eine Sache genau einen Namen. Gilt für Listen/Projekte (#5441),
-Kalender (#5467) und Büro (#5454). Neue Texte halten sich daran; abweichende Alt-Texte werden beim
+Kalender (#5467), Büro (#5454) und Wissen (#6091). Neue Texte halten sich daran; abweichende Alt-Texte werden beim
 Anfassen angeglichen. Geändert wird die Übersetzung in `static/i18n/de.json`; ein Schlüssel mit zwei
 Bedeutungen bekommt einen Kontext (`Event|calendar`, `People|event`).
 
@@ -30,6 +30,16 @@ Bedeutungen bekommt einen Kontext (`Event|calendar`, `People|event`).
 | Eigenschaften ohne eigene Abweichung | Wie vom Projekttyp vorgegeben | Wie der Projekttyp |
 | Entfernen mit Rückgängig | Löschen (Papierkorb: „In den Papierkorb“) | Entfernen, Gelöscht/Archiviert für dasselbe |
 | Neues Element | Hinzufügen (in Listen mit Feld: „hinzufügen“, mit Knopf: „anlegen“ nur für Konten/Projekte) | übernehmen |
+| Bereich mit den Seiten (Seitenleiste, Titel, Pfad) | Wissen | Wissensseiten, Wiki |
+| Eine Seite darin | Seite (quer über Bereiche: Seite unter Wissen) | Wissensseite |
+| Privat / Organisation unter Wissen | Arbeitsbereich | Bereich, Wissensbereich |
+| Alle Seiten eines Arbeitsbereichs für einen Agenten | alle Seiten (teilen) | gesamter Wissensbereich |
+| Gespeicherter Stand einer Seite, Konfliktseite | Version | Fassung |
+| Stichwort einer Seite (#…) | Schlagwort | Tag |
+| Nur dieses Gerät bearbeitet nicht | Bearbeiten sperren (dieses Gerät) | Nur ansehen (das ist die Rolle) |
+| Darstellung der Seiten | Lesestil, Stil „Schlicht“ | Lese-Stil, Klar |
+| Im Browser verschlüsselter Arbeitsbereich | verschlüsselt (im Browser) | Ende-zu-Ende, gesperrt |
+| Markdown-Feld / ZIP-Export | Als reinen Text bearbeiten / Alle Seiten herunterladen, aus einem Archiv importieren | Markdown, ZIP |
 
 Fachwörter (Kanban, Swimlanes, WIP, Backlog) stehen nur dort, wo die Funktion eingeschaltet ist: die Ansicht
 „Kanban“ erscheint nur mit dem Modul Kanban, WIP-Grenzen nur an Spalten mit Grenze, Backlog nur mit Sprints und als Abschnitt im Software-Projekt.

@@ -35,6 +35,18 @@ function wkh_diffHtml(a, b) {
   // 2.1068.0 (#5831): the rows are drawn by the shared txtDiffHtml (choicecard.js), also used by the approval card
   return `<div class="muted wkhsum">${esc(tr('Lines: {0} added, {1} removed', add, del))}</div>${/*html-ok*/ /* txtDiffHtml escapes every line */ txtDiffHtml(rows)}`;
 }
+// 2.1168.0 (#6092): the conflict window (wiki.js wk_conflict): both versions, in each the lines only it has marked like in the
+// history (wkh_diff + txtDiffHtml, the same lines left out with "…"); side by side, on a phone one below the other (wiki.css .wkcf)
+function wkh_bothHtml(mine, theirs) {
+  const d = wkh_diff(theirs, mine);
+  if (!d.some(x => x[0] !== ' ')) return wkh_diffHtml(theirs, mine);  // the texts are the same: "No differences."
+  const col = (own, label) => {
+    const r = d.filter(x => x[0] === ' ' || x[0] === own).map(x => x[0] === ' ' ? x : ['+', x[1]]), rows = [];
+    r.forEach((x, i) => { if (r.slice(Math.max(0, i - 2), i + 3).some(y => y[0] !== ' ')) rows.push(x); else if (rows[rows.length - 1]?.[0] !== '…') rows.push(['…', '']); });
+    return `<div><b>${esc(label)}</b>${/*html-ok*/ /* txtDiffHtml escapes every line */ txtDiffHtml(rows)}</div>`;
+  };
+  return `<p class="muted">${esc(tr('Marked: what only this version has.'))}</p><div class="ntdiff wkcf">${/*html-ok*/ col('+', tr('Yours')) + col('-', tr('Theirs'))}</div>`;
+}
 // ---- the page menu entry and the dialog
 const wkh_items = p => S.me?.kind === 'agent' ? [] : [{label: tr('History'), icon: 'clock', fn: () => wkh_dlg(p)}];
 async function wkh_dlg(p) {
@@ -46,7 +58,7 @@ async function wkh_dlg(p) {
   const box = $('#wkh-b', md), may = WK.idx[p.space]?.mayWrite !== false;
   let vs = [], rn = [];  // 2.571.0 (#4766): rn = the page's renames (the core's history)
   const list = () => {
-    box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li><button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.agent ? `<span class="muted wkhagent">${esc(tr('Agent'))}</span>` : ''}${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}</button></li>`).join('')}</ul>`
+    box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li>${/*html-ok*/ v.current ? '<div class="wkhitem wkhnow" aria-current="true">' : `<button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">` /* 2.1168.0 (#6092): the current version opens nothing (it showed "No differences") */}${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.agent ? `<span class="muted wkhagent">${esc(tr('Agent'))}</span>` : ''}${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}${v.current ? '</div>' : '</button>'}</li>`).join('')}</ul>`
       : `<div class="muted mhint">${esc(tr('No earlier versions yet.'))}</div>`;
     if (rn.length) box.insertAdjacentHTML('beforeend', `<p class="shint">${esc(tr('Renamed'))}</p><ul class="wkhlist">${rn.map(x => `<li class="muted">${ic(x.agent ? 'bot' : 'edit', 's')} ${esc(fmtWhen(x.at))} · ${esc(x.by_name || '')}: ${esc(wk_base(x.from))} → ${esc(wk_base(x.to))}</li>`).join('')}</ul>`);  // 2.571.0 (#4766)
   };
@@ -65,9 +77,9 @@ async function wkh_dlg(p) {
       f8d_step(md, list);  // 2.962.0 (#5232): the version is a step of Back, the list comes back
       box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`;
       let d; try { d = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions/${v.id}`); } catch (er) { box.innerHTML = `<div class="muted mhint">${esc(er.message)}</div>`; return; }
-      const cur = WK.pg?.id === p.id ? WK.pg : p;
+      const cur = WK.pg?.id === p.id ? WK.pg : p;  // 2.1168.0 (#6092): the hint below in plain words (green comes back, red goes)
       box.innerHTML = `<div class="wkhhead"><button type="button" class="iconbtn" data-wkh="list" aria-label="${esc(tr('Back'))}" title="${esc(tr('Back'))}">${ic('back')}</button><div><b>${esc(fmtWhen(d.updated_at))}</b>${d.by_name ? ` · ${esc(d.by_name)}` : ''}${d.path !== cur.path ? `<div class="muted">${esc(d.path)}</div>` : ''}</div><span class="spacer"></span>${may && !v.current ? `<button type="button" class="btn pri" data-wkh="restore" data-id="${v.id}">${ic('undo', 's')}${esc(tr('Restore'))}</button>` : ''}</div>
-        <p class="muted">${esc(tr('Compared with the current text: + comes back with Restore, − goes.'))}</p>${wkh_diffHtml(cur.body, d.body)}`;
+        <p class="muted">${esc(tr('Green comes back with Restore, red goes.'))}</p>${wkh_diffHtml(cur.body, d.body)}`;
     } else if (k === 'restore') {
       a.disabled = true;
       if (await wkh_restore(p, +a.dataset.id)) modalClose(md); else a.disabled = false;
