@@ -21,7 +21,15 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1134.0] - 2026-11-14
+## [2.1135.0] - 2026-11-14
+
+Package 2.1121 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ).
+
+### Fixed
+- The start-up check of the yes / no columns compares as text, so it works on a number column and on one already BOOLEAN; the known exception for it in the prepare check is gone (#4949, #6044, #6045).
+- Start page: the tappable one-line quote has a 44 px touch target, the text stays on one line (#5477).
+- Knowledge page on a phone: the editing field fills the free height again since the page title moved into the head bar (#4725).
+- Tests follow the BOOLEAN / JSONB columns, the shortest exact time form, the new start page title, the phone page menu and the split view title, and wait for the page's requests before going offline (#5682, #6040, #6041, #6042, #6043, #5909, #6031, #6032).
 
 Package 2.1127 (Bündel: CI: überholte Merge-Queue-Läufe selbst abbrechen ().
 
@@ -74,6 +82,10 @@ Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1134.0] - 2026-11-14
+
+Not released (the CI of this version was red); its changes are listed under 2.1135.0.
 
 ## [2.1131.0] - 2026-11-14
 
@@ -381,7 +393,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1134.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1135.0...HEAD
+[2.1135.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1135.0
 [2.1134.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1134.0
 [2.1131.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1131.0
 [2.1128.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1128.0
