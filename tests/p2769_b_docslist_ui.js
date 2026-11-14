@@ -128,7 +128,7 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
       const m = await ev(`(() => { const vis = e => !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0;
         const r = document.querySelector('.abdl .abdlrow[data-abid="${D1}"]'), sub = r?.querySelector('.abdlsub');
         return {head: vis(document.querySelector('.abdl .abdlhead')), type: vis(r?.querySelector('.abdl-type')), sub: vis(sub), subTxt: sub?.textContent || '',
-          seg: vis(document.querySelector('.abview [data-abdv="list"]')), menu: vis(r?.querySelector('[data-ab="menu"]')),
+          seg: vis(document.querySelector('.abview [data-abdv="list"]')), menu: vis(r?.querySelector('[data-ab="menu"]')), menuW: Math.round(r?.querySelector('.abdl-act')?.getBoundingClientRect().width || 0),
           sw: document.documentElement.scrollWidth, vw: innerWidth, right: Math.round(document.querySelector('.abdl').getBoundingClientRect().right),
           // 2.783.0 (#5356): the folder's tools in ONE line - every visible item on the same row, none past the right edge
           tools: (() => { const t = document.querySelector('.abview .abtools'), it = t ? [...t.children].filter(vis).map(e => e.getBoundingClientRect()) : [];
@@ -137,6 +137,8 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
       if (W >= 768) check(m.head && m.type && !m.sub, `${W}: the header and the column Type, no second line ${JSON.stringify(m)}`);
       else check(!m.head && !m.type && m.sub && /Invoice/.test(m.subTxt), `${W}: the type as a second line below the name, no header ${JSON.stringify(m)}`);
       check(m.seg && m.menu, `${W}: the switch and the row's menu are there`);
+      // 2.1151.0 (#3835): a phone hides the row's "…" (kept for screen readers, a long press opens the menu); a computer shows it
+      check(W >= 768 ? m.menuW >= 40 : m.menuW <= 1, `${W}: the row's "…" ${W >= 768 ? 'shown' : 'hidden on a phone'} ${m.menuW}`);
       check(m.sw <= m.vw && m.right <= m.vw, `${W}: nothing runs over the side ${JSON.stringify(m)}`);
       const T = m.tools;  // 2.783.0 (#5356): New folder, List | Cards, Share, ... - one line at 1280, 460 and 320
       check(T.n >= 3 && T.ovl && T.h <= T.maxH + 4 && T.right <= Math.min(T.tr, m.vw) + 1, `${W}: the folder's tools stay one line ${JSON.stringify(T)}`);
