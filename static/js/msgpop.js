@@ -14,7 +14,7 @@
 
 const MP_MS = 6000;  // how long the card stays
 const MP_SWIPE = 60;  // px sideways that close it
-let mp_timer = 0, mp_items = [];  // the messages the card shows now (newest first)
+let mp_items = [];  // the messages the card shows now (newest first)
 
 // the chat of a message is open right now (the team view / its window in the side panel / the agent's chat)
 function mp_isOpen(m) {
@@ -67,9 +67,12 @@ function mp_draw() {
   announce(mp_items.length > 1 ? `${t.who}${t.where ? ' · ' + t.where : ''}: ${txt}` : `${tr('New message from {0}', t.who)}: ${txt}`);
   mp_run(MP_MS);
 }
-function mp_run(ms) { clearTimeout(mp_timer); mp_timer = setTimeout(mp_hide, ms); }
+// its time: the full one after drawing, half of it after a pointer / the focus left it (core.js debounce, no timer pair of its own)
+const mp_hideFull = debounce(() => mp_hide(), MP_MS), mp_hideHalf = debounce(() => mp_hide(), MP_MS / 2);
+const mp_keep = () => { mp_hideFull.cancel(); mp_hideHalf.cancel(); };
+function mp_run(ms) { mp_keep(); (ms < MP_MS ? mp_hideHalf : mp_hideFull)(); }
 function mp_hide() {
-  clearTimeout(mp_timer); mp_items = [];
+  mp_keep(); mp_items = [];
   const el = $('#msgpop'); if (!el) return;
   el.classList.add('mpgone');
   setTimeout(() => { if (el.classList.contains('mpgone')) el.remove(); }, 200);
@@ -84,7 +87,7 @@ function mp_wire(el) {
   });
   el.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); mp_hide(); } });
   // kept while a pointer / the focus is on it, its time runs again after
-  const keep = () => clearTimeout(mp_timer), go = () => mp_run(MP_MS / 2);
+  const keep = mp_keep, go = () => mp_run(MP_MS / 2);
   el.addEventListener('mouseenter', keep); el.addEventListener('focusin', keep);
   el.addEventListener('mouseleave', go); el.addEventListener('focusout', e => { if (!el.contains(/** @type {Node} */ (e.relatedTarget))) go(); });
   // a swipe sideways closes it (the finger moves it along)
