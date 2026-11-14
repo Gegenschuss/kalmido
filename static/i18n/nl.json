@@ -18573,5 +18573,8 @@
   "+{0} more sheet": ["+{0} blad meer", "+{0} bladen meer"],
   "{0} day after {1}": ["{0} dag na {1}", "{0} dagen na {1}"],
   "Saved as version {0} with {1} - the original stays as version {2}": "Opgeslagen als versie {0} met {1} - het origineel blijft als versie {2}",
-  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} documenten samengevoegd in ‘{1}’ ({2}) - de andere staan in de prullenbak"
+  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} documenten samengevoegd in ‘{1}’ ({2}) - de andere staan in de prullenbak",
+  "More tools": "Meer hulpmiddelen",
+  "Folders above": "Bovenliggende mappen",
+  "Only you see this folder": "Alleen jij ziet deze map"
 }

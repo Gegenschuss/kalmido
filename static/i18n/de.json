@@ -18573,5 +18573,8 @@
   "+{0} more sheet": ["+{0} weiteres Blatt", "+{0} weitere Blätter"],
   "{0} day after {1}": ["{0} Tag nach {1}", "{0} Tage nach {1}"],
   "Saved as version {0} with {1} - the original stays as version {2}": "Als Version {0} mit {1} gespeichert - das Original bleibt als Version {2}",
-  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} Dokumente zu „{1}“ zusammengefügt ({2}) - die anderen liegen im Papierkorb"
+  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} Dokumente zu „{1}“ zusammengefügt ({2}) - die anderen liegen im Papierkorb",
+  "More tools": "Weitere Werkzeuge",
+  "Folders above": "Ordner darüber",
+  "Only you see this folder": "Nur du siehst diesen Ordner"
 }

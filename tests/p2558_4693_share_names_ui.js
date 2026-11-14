@@ -87,7 +87,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= a folder without shares: "Only you"
   w.eval(`go('ablage/${QUIET}')`);
-  check(await until(() => (d.querySelector('#view .abshline')?.textContent || '').trim() === 'Only you'), 'a folder without shares: "Only you"');
+  // 2.1163.0 (#6111): the line says what it means ("Only you see this folder")
+  check(await until(() => (d.querySelector('#view .abshline')?.textContent || '').trim() === 'Only you see this folder'), 'a folder without shares: "Only you see this folder"');
   w.close();
 
   // ================= the receiver

@@ -110,8 +110,14 @@ function viewAblage() {
   // 2.752.0 (#4887): a folder with recognition shows the documents' view (abdocs.js abd_foldHtml: their bar, the documents' cards,
   // its subfolders before them); every other folder its list as before
   const fold = !!(r.nid && d?.node && typeof abd_recogHere === 'function' && abd_recogHere(key) && typeof abd_foldHtml === 'function');
-  const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
-  const tools = trash ? ab_trashTools(d) : fold ? ab_foldTools(d, canAdd) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_selTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  // 2.1163.0 (#6111): a phone shows the path in ONE line - "…" (the folders further up, a menu), the parent - and the open
+  // folder's name as the heading below it (abcfar / abcell / abcurh, ablage.css); a computer the whole path as before
+  const cn = (d?.crumbs || []).length, far = cn >= 2;
+  const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn${far ? ' abcfar' : ''}" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${far ? `<button type="button" class="linkbtn abcell" data-ab="crumbs" aria-haspopup="menu" aria-label="${esc(tr('Folders above'))}" title="${esc(tr('Folders above'))}">…</button>` : ''}${(d.crumbs || []).map((c, i, a) => `<span class="abcseg${i < a.length - 2 ? ' abcfar' : ''}${i === a.length - 1 ? ' abcsegcur' : ''}"><span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}" title="${esc(c.name)}">${esc(c.name)}</button>`}</span>`).join('')}</nav>${cn ? `<h3 class="abtitle abcurh" title="${esc(d.crumbs[cn - 1].name)}">${esc(d.crumbs[cn - 1].name)}</h3>` : ''}` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
+  // 2.1163.0 (#6111): a phone shows ONE row: Upload and "…" (ab_wideHtml / ab_moreMenu); a computer the row as before
+  const cards = !!d?.items?.length && typeof abd_cardsOn === 'function' && abd_cardsOn(key);
+  const tools0 = trash ? ab_trashTools(d) : fold ? ab_foldTools(d, canAdd) : `<div class="abtools">${canAdd ? `${ab_wideHtml(`<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button>`, tr('New folder'), 'folder')}<button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : ab_wideHtml(`<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`, tr('Scan'), 'camera')}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_wideHtml(ab_selTools(d), tr('Select'), 'check')}${ab_wideHtml(typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : '', tr('Tags'), 'tag')}${!trash && d && typeof abd_toolsHtml === 'function' ? ab_wideHtml(abd_toolsHtml(d, key), cards ? tr('List') : tr('Cards'), cards ? 'list' : 'grid', cards ? '[data-abdv="list"]' : '[data-abdv="cards"]') + (cards ? ab_tsWide() : '') : ''}${r.nid && d?.node?.share_with ? ab_wideHtml(`<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>`, d.node.role === 'owner' ? '' /* its menu has Share… */ : tr('Share…'), 'users') : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? ab_wideHtml(`<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`, '' /* "…" of the phone lists its items */) : ''}</div>`;
+  const tools = trash || fold || !(tools0.includes('data-mlab') || (r.nid && d?.node)) ? tools0 : tools0.replace(/<\/div>$/, ab_mbtnHtml() + '</div>');  // "…" only with something in it
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_selBox), not in the trash / tag filter / search
   AB.selHere = !!d?.items?.length && !fold &&  /* 2.589.0 (#4875): the trash too */ !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
@@ -135,8 +141,37 @@ function viewAblage() {
 function ab_foldTools(d, canAdd) {
   const n = d.node;
   // 2.783.0 (#5356): one line at 320 px too - on a narrow screen New folder and Share as icons (ablage.css .abfoldtools)
-  return `<div class="abtools abfoldtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder" title="${esc(tr('New folder'))}">${ic('folder', 's')}<span class="abtl"> ${tr('New folder')}</span></button>` : ''}${typeof abd_foldSeg === 'function' ? abd_foldSeg(d) : '' /* 2.769.0 (#5340): List | Cards */}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share'))}">${ic('users', 's')}<span class="abtl"> ${tr('Share')}</span></button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+  // 2.1163.0 (#6111): a phone hides this row; its tools are in the "…" of the documents' bar below (ab_moreMenu)
+  const cards = typeof abd_cardsOn === 'function' && abd_cardsOn('n:' + n.id);
+  return `<div class="abtools abfoldtools">${canAdd ? ab_wideHtml(`<button type="button" class="btn sm" data-ab="new-folder" title="${esc(tr('New folder'))}">${ic('folder', 's')}<span class="abtl"> ${tr('New folder')}</span></button>`, tr('New folder'), 'folder') : ''}${ab_wideHtml(typeof abd_foldSeg === 'function' ? abd_foldSeg(d) : '' /* 2.769.0 (#5340): List | Cards */, cards ? tr('List') : tr('Cards'), cards ? 'list' : 'grid', cards ? '[data-abdv="list"]' : '[data-abdv="cards"]')}${n.share_with ? ab_wideHtml(`<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share'))}">${ic('users', 's')}<span class="abtl"> ${tr('Share')}</span></button>`, n.role === 'owner' ? '' : tr('Share…'), 'users') : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
 }
+// 2.1163.0 (#6111): the phone's one tool row (like Office > Receipts, #5453): a tool wrapped here stays in the row on a computer
+// (display: contents) and is hidden on a phone (ablage.css, up to 767 px like isMobile); "…" (ab_mbtnHtml) offers every wrapped
+// tool of the page in its order (lab = the menu's word, '' = only hidden; click = the element inside to press), then the open
+// folder's own menu. The real buttons keep working (a press on them), so the menu never needs its own way.
+const ab_wideHtml = (html, lab, icon = '', click = '') => html ? `<span class="abwide"${lab ? ` data-mlab="${esc(lab)}" data-mic="${esc(icon)}"` : ''}${click ? ` data-mclick="${esc(click)}"` : ''}>${html}</span>` : '';
+const ab_tsWide = () => typeof ts_set === 'function' ? `<span class="abwide" data-mlab="${esc(tr('Card size'))}" data-mic="grid" data-mts="1"></span>` : '';  // the menu's card size (the slider itself: ab_wideHtml without a word)
+// 2.1163.0 (#6111): "…" of the path on a phone: the space and the folders above the parent, the nearest last (as in the path)
+function ab_crumbMenu(b) {
+  const d = AB.data, cs = (d?.crumbs || []).slice(0, -2), sp = d?.space || 'shared';
+  menu(b, [{label: ab_spaceName(sp), icon: 'folder', fn: () => { ab_pick(sp); AB.key = ''; go(ab_all() ? ab_home(sp) : 'ablage'); }},
+    ...cs.map(c => ({label: c.name, icon: 'folder', fn: () => go('ablage/' + c.id)}))], null, null, tr('Folders above'));
+}
+const ab_mbtnHtml = () => `<button type="button" class="iconbtn abmbtn" data-abmore="1" aria-haspopup="menu" aria-label="${esc(tr('More tools'))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
+function ab_moreMenu(b) {
+  const box = b.closest('.abmain') || b.closest('.dc-view') || document, items = [];
+  for (const w of box.querySelectorAll('.abwide[data-mlab]')) {
+    if (w.dataset.mts && typeof ts_set === 'function') {  // the card size: three steps (the slider and a pinch stay on the cards)
+      const v = typeof ts_get === 'function' ? ts_get() : 0, st = [[tr('Small'), 8], [tr('Medium'), typeof ts_std === 'function' ? ts_std() : 11], [tr('Large'), 14]];
+      items.push({label: w.dataset.mlab, icon: w.dataset.mic, more: st.map(([label, x]) => ({label, on: Math.abs(v - x) < 0.5, fn: () => { ts_set(x); }}))}); continue;
+    }
+    const t = /** @type {HTMLElement|null} */ (w.querySelector(w.dataset.mclick || 'button, label, a')); if (!t) continue;
+    items.push({label: w.dataset.mlab, icon: w.dataset.mic || undefined, on: t.getAttribute('aria-pressed') === 'true', next: t.getAttribute('aria-haspopup') ? 1 : undefined, fn: () => t.click()});
+  }
+  const n = S.route.mod === 'ablage' && S.route.nid && AB.data?.node?.id === S.route.nid ? AB.data.node : null;
+  menu(b, [...items, ...(n ? ['-', ...ab_menuItems(n)] : [])], null, null, n?.name || tr('Files'));
+}
+document.addEventListener('click', e => { const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-abmore]'); if (b) { e.preventDefault(); e.stopPropagation(); ab_moreMenu(b); } });
 // 2.752.0 (#4887): ONE area "Files": below the folders "All documents" and "To review" (the documents' saved filters, routes
 // #ablage/docs and #ablage/review, docs.js). Phones / tablets without the panel: as buttons in the bar of the spaces on top;
 // in the documents' own list its switch "All | To review" stays the only "To review" there (#4472)
@@ -274,7 +309,7 @@ function ab_shText(sw) {
 }
 const ab_shShort = sw => { const x = sw.map(ab_shName); return x.length > 2 ? x[0] + ' ' + tr('+{0}', x.length - 1) : x.join(', '); };  // from three on "Anna +2"
 // the line of a folder's head / the scan's end: "Shared with …" / "Only you" (who may share), "Shared by <owner>" (a receiver)
-const ab_shLineTxt = n => n.share_with ? (n.share_with.length ? tr('Shared with {0}', ab_shText(n.share_with)) : tr('Only you')) : n.owner && n.owner_id !== S.me?.id ? tr('Shared by {0}', n.owner) : '';
+const ab_shLineTxt = n => n.share_with ? (n.share_with.length ? tr('Shared with {0}', ab_shText(n.share_with)) : tr('Only you see this folder') /* 2.1163.0 (#6111): says what it means */) : n.owner && n.owner_id !== S.me?.id ? tr('Shared by {0}', n.owner) : '';
 // the names in a row / on a card instead of the bare symbol; a click opens the Share dialog (fsshare.js)
 function ab_shChip(n, own) {
   if (n.share_with?.length) { const t = tr('Shared with {0}', ab_shText(n.share_with)); return `<button type="button" class="abbadge abshw" data-ab="share" data-id="${n.id}" title="${esc(t)}" aria-label="${esc(t)}">${n.share_with.some(e => e.k === 'a') && !n.share_with.some(e => e.k !== 'a') ? ic('bot', 's') : ic('users', 's')}<span>${esc(ab_shShort(n.share_with))}</span></button>`; }
@@ -293,12 +328,12 @@ function ab_rowHtml(n, trash) {
   const badges = (trash ? (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '') : ab_shChip(n, AB.data?.node?.owner_id))  // 2.558.0 (#4693): the names
     + (n.agent_id ? `<span class="abbadge" title="${esc(tr('Folder of an agent'))}">${ic('bot', 's')}</span>` : '')
     + (n.version > 1 ? `<span class="abver" title="${esc(tr('Version {0}', n.version))}">v${n.version}</span>` : '')
-    + upMarkHtml(n.up)  // 2.61.0 (#1818): not checked by the virus scanner yet / locked
+    + upMarkHtml(n.up?.text ? {...n.up, text: undefined} : n.up)  // 2.61.0 (#1818): not checked by the virus scanner yet / locked; 2.1163.0 (#6111): not "Text recognised" / "No text found" (the file's view says it), the name gets the room
     + (typeof xl_badge === 'function' ? xl_badge(n) : '')  // 2.112.1 B (#2058): a live external link
     + (typeof abd_badge === 'function' ? abd_badge(n) : '')  // 2.353.0 D (#2759): a document (being recognised / to review)
     + (typeof dsc_folderBadge === 'function' ? dsc_folderBadge(n) : '');  // 2.1048.0 (#5821): a folder with a scan inbox
-  const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
-    : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
+  const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname" title="${esc(n.name)}">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
+    : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname" title="${esc(n.name)}">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete permanently')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button data-rowmenu="abrow" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
   return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? (rowd_touch() ? 'data-abmv="1"' : 'draggable="true"') : '' /* 2.627.0 (#4961): a finger by drag.js */}>${ab_selBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
@@ -607,6 +642,7 @@ document.addEventListener('click', e => {
   const n = ab_item(b.dataset.id), a = b.dataset.ab;
   if (a === 'space') { ab_pick(b.dataset.sp); AB.key = ''; if (ab_all()) go(ab_home(b.dataset.sp)); else if (S.route.nid || S.route.aus) go('ablage'); else ab_load(); return; }  // 2.540.0 (#4575): under "All" its address  // 2.429.0 (#3580): + from a collection
   if (a === 'new-folder') { ab_newFolder(); return; }
+  if (a === 'crumbs') { ab_crumbMenu(b); return; }  // 2.1163.0 (#6111): the phone's "…" of the path
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
   if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_selPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)

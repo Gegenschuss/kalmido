@@ -18573,5 +18573,8 @@
   "+{0} more sheet": ["+{0} autre feuille", "+{0} autres feuilles"],
   "{0} day after {1}": ["{0} jour après {1}", "{0} jours après {1}"],
   "Saved as version {0} with {1} - the original stays as version {2}": "Enregistré comme version {0} avec {1} - l'original reste en version {2}",
-  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} documents fusionnés dans « {1} » ({2}) - les autres sont dans la corbeille"
+  "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} documents fusionnés dans « {1} » ({2}) - les autres sont dans la corbeille",
+  "More tools": "Autres outils",
+  "Folders above": "Dossiers au-dessus",
+  "Only you see this folder": "Toi seul vois ce dossier"
 }
