@@ -7,7 +7,7 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'setreset', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js; 2.593.0 (#4590): setreset.js
+  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'setreset', 'move', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js; 2.593.0 (#4590): setreset.js; 2.1166.0 (#4742): move.js (Settings > Data > "Move and export everything", settings.js draws it, so it loads before settings.js)
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
   office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree
@@ -112,11 +112,12 @@ const LD_MODS = {
   // 2.1030.0 (#5785): the quote's own texts of one interface language (after quotes, LD_NEED); only that language loads
   quotes_es: ['quotes_dada_es'], quotes_fr: ['quotes_dada_fr'], quotes_it: ['quotes_dada_it'], quotes_nl: ['quotes_dada_nl'],
   helpview: ['helpview'],  // 2.1086.0 (#5820): the view "Help" (#help), the user's how-to sections
+  meetprop: ['meetprop'],  // 2.1166.0 (#4742): "Tasks from notes" (the request dialog, the chat's proposal cards); the agent chat loads it first (LD_NEED), the list menu through mtg_request (LD_CALL)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {pdf: ['swipenav'], settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop', 'swipenav'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage'],
+const LD_NEED = {pdf: ['swipenav'], settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'family'], agentchat: ['integrations', 'meetprop'] /* 2.1166.0 (#4742) */, wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop', 'swipenav'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage'],
   quotes_es: ['quotes'], quotes_fr: ['quotes'], quotes_it: ['quotes'], quotes_nl: ['quotes']};  // 2.1030.0 (#5785): a language's quote texts fill QD_TR of quotes_dada.js  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop; 2.652.0 (#5071): pdf -> swipenav (the swipe of the full screen); 2.882.0 (#5557): docs -> swipenav (the swipe of the document view)
 // 2.599.0 (#4907): settings no longer name ablage: their sharing defaults load it themselves (settings.js); docs still needs it
 // 2.501.0 (#4198): module ablage: docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
@@ -150,7 +151,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu'],  // 2.149.0 F (#2518)
   undolist: ['ul_open'],  // 2.773.0 (#5250): the window of the ← button
   ofwalk: ['wlk_open'],  // 2.778.0 (#5383)
-  callsheet: ['cs_open']};  // 2.855.0 (#1956): the button "Call sheet" (dispo.js)
+  callsheet: ['cs_open'],  // 2.855.0 (#1956): the button "Call sheet" (dispo.js)
+  meetprop: ['mtg_request']};  // 2.1166.0 (#4742): "Tasks from notes" of the list menu / the proposal kind extract (agents.js propRequest)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
   timesheet: ['tsl_printNote'],  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)

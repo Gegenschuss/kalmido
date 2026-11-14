@@ -730,6 +730,8 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `msvview` | `msvview.js` | 2.149.0 F: only with a linked server (the start asks `/api/servers` once) or a list of one; `S.msvv` and the stand-ins in `render.js` |
 | `hubmail` | `hubmail.js` | 2.149.0 F: the e-mail filing; the mail link of a task / event stays at start (`lazyload.js` since 2.563.0, before in `clientpage.js`) |
 | `clientpage` | `clientpage.js` | 2.563.0 (#4742): Office > Clients (the list, the client's card); the office, the contacts and the trash dialogs load it first (`LD_NEED`) |
+| `settings` + `move.js` | 2.1166.0 (#4742) | Settings > Data > "Move and export everything" (`settings.js` draws it, so `move.js` loads before it) |
+| `meetprop` | `meetprop.js` | 2.1166.0 (#4742): "Tasks from notes"; the agent chat loads it first (`LD_NEED`), the list menu through the stand-in `mtg_request` (`LD_CALL`) |
 | `timesheet` | `timesheet.js` | 2.149.0 F: the time page's card, Settings (`LD_NEED`); News texts / lock mark in `time.js` |
 | `team` | `absence.js`, `leave.js`, `dispo.js` | 2.149.0 F: the tabs Absences / Disposition, vacation, Settings (`LD_NEED`); tabs, `dp_on`, day hint in `clients.js` |
 | `listprint`, `evinvite`, `projtime`, `envs` | one file each | 2.149.0 F: "Print", the event editor, the "Tracked" figure (its click stays in `projects.js`), a project's environments (row texts in `quickadd.js`) |
@@ -751,6 +753,9 @@ desktop switch of the chat, the pop-up button, reaction rows, `patchKids`, the t
   module stylesheet comes after `app.css` in the cascade: only rules whose every selector names a class / id that only the
   module's scripts use move there, and none that a later rule of `app.css` for the same class would override. Suites that
   read rules use `allCss()` / `allCssSync()` of `tests/boot.js` (app.css + the module stylesheets).
+  2.1166.0 (#4742): the care job moved such rules of `app.css` into `life.css`, `office.css`, `settings.css`, `wiki.css`,
+  `contacts.css` and `ablage.css`, and also left out every rule whose element carries another class (in the module's
+  `class="…"`) that a later rule of `app.css` or a `start-*.css` with the same weight styles in the same property.
 - Idle preload: 5 s after the start, one per idle moment, Settings (with what it needs), then the areas this person has
   switched on (calendar, timeline, knowledge pages, documents, home & life); not office, contacts, statistics, PDF.
 
