@@ -340,7 +340,7 @@ def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False, pids=()):
         return n
     pset = {int(x) for x in pids or ()}
     if pset:  # Fable review 2.1145 F3: a page in the trash -- its bound share is not counted / ended either (wsh_rows)
-        pset = {r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL", (sorted(pset),))}
+        pset = {r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[])) AND {live_sql()}", (sorted(pset),))}
     for x in c.execute("SELECT * FROM obj_addr_shares WHERE kind='wiki' AND owner_id=? ORDER BY id LIMIT 500", (owner,)).fetchall():
         try:
             b = json.loads(x["body"] or "{}")
