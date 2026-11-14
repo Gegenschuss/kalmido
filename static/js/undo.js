@@ -384,7 +384,7 @@ function histWhen(e) {
 // the areas of a step: the app's views (S.route.mod) and the server's areas (core/db.py LV_AREAS, undo_groups.area)
 const HIST_AREAS = {tasks: N_('Tasks'), home: N_('Tasks'), comments: N_('Comments'), office: N_('Office'), clients: N_('Office'), calendar: N_('Calendar'), cal: N_('Calendar'),
   sheets: N_('Tables'), wiki: N_('Knowledge|area'), budget: N_('Budget'), team: N_('Team'), time: N_('Time tracking'), contacts: N_('Contacts'), docs: N_('Documents'),
-  ablage: N_('File store'), notes: N_('Notes'), family: N_('Family'), news: N_('News'), agentchat: N_('Agent chat'), agents: N_('Agents'), self: N_('Settings'), other: N_('Other')};
+  ablage: N_('Files'), notes: N_('Notes'), family: N_('Family'), news: N_('News'), agentchat: N_('Agent chat'), agents: N_('Agents'), self: N_('Settings'), other: N_('Other')};
 const histAreaName = a => a ? tr(HIST_AREAS[a] || N_('Other')) : '';
 // 2.773.0 (#5250): the name of this browser in the list "Recent steps" of the person's other devices (header
 // X-Kalmido-Device-Name of a write, core.js rawFetch0; kalmido/core/undogroups.py ug_device): browser + system + a short

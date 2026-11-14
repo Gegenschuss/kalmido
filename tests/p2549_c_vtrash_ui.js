@@ -45,7 +45,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(/Kept cut/.test(t2) && /New home/.test(t2), '#4536: the review at its project names the project: ' + t2);
   check(/Approvals/.test(d.querySelector('#view .vtrlist .ghead')?.textContent || ''), '#4536: the section is called "Approvals"');  // 2.623.0 (#4765): was Video sign-offs
   const note = d.querySelector('#view .vtrlist .otrnote')?.textContent || '';
-  check(/stay in the trash until the deletion runs of the server are switched on/.test(note), '#4536: the hint of the trash period (runs off on the test server): ' + note);
+  // 2.1163.0 (#6112): the trash note without server words
+  check(/stay in the trash for now: emptying it automatically is not switched on/.test(note), '#4536: the hint of the trash period (runs off on the test server): ' + note);
   w.eval('S.trashPurge = true; VTR.purge = true; renderView()');
   await until(() => /Deleted permanently in 30 days/.test(row(V1)?.textContent || ''));
   check(/Deleted permanently in 30 days/.test(row(V1)?.textContent || '') && /deleted permanently after 30 days/.test(d.querySelector('#view .vtrlist .otrnote')?.textContent || ''),

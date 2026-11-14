@@ -6,7 +6,7 @@
 // unshares only through the existing routes (fs_shares of the file store, the project's members); no share way of its own.
 // The office stays the known exception (a permission without a share) and gets no line.
 // html-ok below: rm / rows / more / ex are templates of this file whose own ${} are escaped (esc, Number, ic).
-const AGS_HINTS = [['wiki', ['wiki:read', 'wiki:write'], N_('Knowledge pages')], ['files', ['files:read', 'files:write'], N_('File store')],
+const AGS_HINTS = [['wiki', ['wiki:read', 'wiki:write'], N_('Knowledge pages')], ['files', ['files:read', 'files:write'], N_('Files')],
   ['project', ['tasks:write', 'sheets:read', 'sheets:write'], N_('Tasks and tables')]];
 const AGS_KIND = {project: N_('Project'), wiki: N_('Knowledge|area'), files: N_('Files')};
 const AGS_ROLE = {view: N_('can view'), edit: N_('can edit')};

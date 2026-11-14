@@ -11,7 +11,7 @@ function dfl_list(v) { return Array.isArray(v) ? v.join(', ') : (v || ''); }
 function dfl_ruleHtml(r, can) {  // one flow in the list: trigger, filters, actions
   const kinds = typeof DC_KINDS !== 'undefined' ? DC_KINDS : [];
   const trig = r.trigger || 'received';
-  const when = trig === 'scheduled' ? tr('{0} days after {1}', r.days || 0, tr(DFL_FROM.find(x => x[0] === r.from)?.[1] || 'Date'))
+  const when = trig === 'scheduled' ? trn('{0} day after {1}', '{0} days after {1}', r.days || 0, tr(DFL_FROM.find(x => x[0] === r.from)?.[1] || 'Date'))
     : tr(DFL_TRIGGERS.find(x => x[0] === trig)?.[1] || trig) + (trig === 'changed' && r.on?.length ? ` (${r.on.map(o => tr(DFL_ON.find(x => x[0] === o)?.[1] || o)).join(', ')})` : '');
   const ifs = [r.match && `${tr(kinds.find(k => k[0] === r.kind)?.[1] || r.kind || '')} <b>${esc(r.match)}</b>${r.case ? ` (${tr('case-sensitive')})` : ''}`,
     r.sources?.length && `${tr('Source')}: ${esc(r.sources.map(s => tr(DFL_SOURCES.find(x => x[0] === s)?.[1] || s)).join(', '))}`,
