@@ -1531,13 +1531,6 @@ def init_db(guard=True):
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")
             gset(c, "migr_offerlist4586", "1")
-        if gsetting(c, "migr_addrlog6062") != "1":  # 2.1145.0 (#6062): one way -- old history lines naming the account of a share
-            # by e-mail address go once (files/store.py fs_addr_log_purge; since 2.1138.0 such a share writes none)
-            from ..files.store import fs_addr_log_purge
-            n = fs_addr_log_purge(c)
-            gset(c, "migr_addrlog6062", "1")
-            if n:
-                print(f"history lines naming the account of a share by address removed {n}", flush=True)
         # 2.1029.0 (#5537, migr_liststate5537): every start, the projects' state marker agrees with archived / deleted_at
         # (migrations.d/5537_a.py; the trigger kalmido_list_state keeps it so; this reconcile covers the rows of before, a
         # restored dump and a rollback that dropped the trigger -- review of 2.1029; touches only rows that differ)

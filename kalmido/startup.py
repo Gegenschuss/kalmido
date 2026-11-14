@@ -2,7 +2,7 @@
 import os
 
 from .core.config import UPDATE_CHECK_ENV
-from .core.db import connect, init_db, mig_flags_sync
+from .core.db import connect, gset, gsetting, init_db, mig_flags_sync
 from .core.instance import update_loop
 from .notify.push import watchdog
 from .notify.alerts import aa_secret_key
@@ -20,6 +20,7 @@ from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
 from .office.okern import ofk_trash_retire  # 2.1005.0 (#5415); 2.1073.0 (#5865): the copies back, then the table goes
 from .office.cfstart import cfs_start_fix  # review 2.1067.0 (F1, #5789)
+from .files.store import fs_addr_log_purge  # 2.1145.0 (#6062)
 
 
 # 2.42.0 (#828): `python -m kalmido.admin.orgcrypt_cli ...` loads the package too: no background threads in that process
@@ -31,6 +32,18 @@ _c = connect()
 try:
     migrate_family_events(_c)  # 2.21.0 (#659), once: the family events of 2.19 (tasks with people) become events
     # 2.924.0 (#5069): the one-shot of #4712 (ev_kern_copy) is part of events/evkern.py ev_kern_drop (core/db.init_db START)
+    if gsetting(_c, "migr_addrlog6062") != "1":  # 2.1145.0 (#6062): one way, once -- old history lines naming the account of a
+        # share by e-mail address go (files/store.py fs_addr_log_purge; since 2.1138.0 such a share writes none). Here and not in
+        # init_db: core may not import the file store (tools/check_layers.py)
+        try:
+            _n = fs_addr_log_purge(_c)
+            gset(_c, "migr_addrlog6062", "1")
+            _c.commit()
+            if _n:
+                print(f"history lines naming the account of a share by address removed {_n}", flush=True)
+        except Exception as _e:  # noqa: BLE001  never stops the start; tried again at the next one
+            _c.rollback()
+            print(f"history lines of shares by address: clean-up FAILED ({type(_e).__name__}: {_e})", flush=True)
     mig_flags_sync(_c)  # 2.102.0 D (#1996): a one-shot of just now (its flag) into kalmido_migrations
     _c.commit()
     # 2.1005.0 (#5415, one way, every start): the office trash's copies of the kinds on the core's trash back as rows of it
