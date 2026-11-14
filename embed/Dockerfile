@@ -1,7 +1,7 @@
 # kalmido-embed (2.59.0, #1375): the optional text embedding service for "Related tasks" (docker compose --profile embed).
 # The model is downloaded once while building (fixed revision, SHA-256 checked); the running container needs no network.
 # 2.360.3 (#2915): the base image by digest, every package with version and hashes (requirements.in + .lock, tools/pins.py --update)
-FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 COPY requirements.lock /tmp/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
 # the model: multilingual-e5-small (intfloat, MIT) as the int8 ONNX export of Xenova/multilingual-e5-small (118 MB; measured
