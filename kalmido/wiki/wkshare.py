@@ -62,6 +62,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..files.fslock import fl_is_locked
 from ..files.scan import sc_guard
 from ..files.store import fs_version_row
+from ..files.store import FS_NOT_ADDR  # 2.1145.0 (#6062)
 from .wkembed import wem_visible
 from .wkhist import WikiUnreadable
 from .wikie2e import wke_mode, wke_open_sql  # 2.369.5 (#2517): pulled up from functions
@@ -314,9 +315,12 @@ def wsh_repath(c, oid, owner, old, new, folder):
         ads_repath(c, "wiki", owner, old, new)  # 2.1071.0 (#5658): an open folder share by address follows (a page's names its id)
 
 
-def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
+def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False, pids=()):
     """Pages left the space (wkmove.py): their page shares end, and the shares of a folder that moved as a whole.
-    2.273.0 B (#3042): -> how many end; dry = only count them (the dry run names them)."""
+    2.273.0 B (#3042): -> how many end; dry = only count them (the dry run names them). 2.1145.0 (#6062, Fable review 2.1138
+    F5): the open shares by address too (pids = the ids of the pages that move: an open page share names its page by id) --
+    counted like the bound ones and ended the same way (ads_take, the dialog's end): an open folder share stayed and later
+    shared a new folder of that name, and the count told a bound address apart from an open one."""
     keys = {p.lower() for p in paths if p}
     f = folder.lower() if folder else None
     ts = iso(now_utc())
@@ -331,6 +335,23 @@ def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
                 wsh_end(c, me(), r["fid"])  # 2.937.0 (#5244): the core share (+ pair) into obj_revoked
             else:
                 c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
+    if oid or not owner:
+        return n
+    pset = {int(x) for x in pids or ()}
+    for x in c.execute("SELECT * FROM obj_addr_shares WHERE kind='wiki' AND owner_id=? ORDER BY id LIMIT 500", (owner,)).fetchall():
+        try:
+            b = json.loads(x["body"] or "{}")
+        except ValueError:
+            b = {}
+        pid = None if b.get("page_id") in (None, "") else int(b["page_id"])
+        p = (x["path"] or "").lower()
+        if not ((pid is not None and pid in pset) or (pid is None and f and p and (p == f or p.startswith(f + "/")))):
+            continue
+        if dry and _wsh_open_exp(b)[1]:
+            continue  # run out: not named (as wsh_rows(live=True) leaves an expired bound one out)
+        n += 1
+        if not dry:
+            ads_take(c, x, me())
     return n
 
 
@@ -690,11 +711,10 @@ def wsh_create():
         nodes = wsh_nodes(c, {"owner_id": owner, "path": path, "is_folder": folder, "page_id": page})[:2]
         if not nodes:
             raise Denied(404)
-        if by_mail and c.execute("SELECT 1 FROM fs_shares f LEFT JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
-                                 "AND COALESCE(k.email, '')='' AND NOT EXISTS (SELECT 1 FROM wiki_share_cards k2 WHERE k2.pair_id=f.id "
-                                 "AND COALESCE(k2.email, '')<>'')", (nodes[0]["id"], who)).fetchone():  # (the pair of a card by address is no share by name)
+        if by_mail and _wsh_by_name(c, [n["id"] for n in nodes], who):
             # 2.1138.0 (#6027, review M2): the account has a share of it chosen by name -- the address gets an entry of its own
-            # all the same (an open one, as for any other address); its sign-in binds it once the share by name is gone
+            # all the same (an open one, as for any other address); its sign-in binds it once the share by name is gone.
+            # 2.1145.0 (#6062, Fable review 2.1138 F7): on every node of the share (a folder's pair too), not only the first
             if ads_replaying():  # Fable review 2.1138 F6: the replay writes nothing while the share by name lives
                 return jsonify(ok=True, by_email=True)
             ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid, ref_id=page, path=path if folder else "")
@@ -704,7 +724,11 @@ def wsh_create():
         had = c.execute("SELECT 1 FROM fs_shares f JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
                         "AND (f.expires_at IS NULL OR f.expires_at>?)", (nodes[0]["id"], who, ts)).fetchone()
         # 2.1138.0 (#6025): by address no line of the node's history names the account (an open share writes none either)
-        ids = [obj_node_share(c, uid, n, "user_id", who, "view", exp, None, log=not by_mail) for n in nodes]
+        # 2.1145.0 (#6062, Fable review 2.1138 F2): a share by name never takes the row of a share by address of the same
+        # account (the answer named the address, one entry instead of two as for an open address): a row of its own beside
+        # it; a share by address only ever meets its own rows (one by name sent it the M2 way above)
+        m = ((" AND NOT " if by_mail else " AND ") + FS_NOT_ADDR.format(a="fs_shares"), ())
+        ids = [obj_node_share(c, uid, n, "user_id", who, "view", exp, None, log=not by_mail, match=m) for n in nodes]
         sid = ("person", ids[0])
         # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
         mail = seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else ""
@@ -737,6 +761,16 @@ def _wsh_open_entry(c, x, page_paths, names, revoked=None):
     path = page_paths.get(pid) if pid else x["path"]
     if not path:
         return None  # its page went to the trash / is gone: not listed (the replay drops the row)
+    exp, expired = _wsh_open_exp(b)
+    return {"id": wsh_eid(c, "a", d["id"]), "kind": "person", "space": wiki_space_key(None), "path": path, "folder": pid is None,
+            "is_folder": pid is None, "page_id": pid, "expires_at": exp, "expired": expired,
+            "revoked": bool(revoked), "created_at": d["created_at"], "created_by": x["created_by"],
+            "created_by_name": names.get(x["created_by"], ""), "views": 0, "last_used_at": None, "ended": False,
+            "images": bool(b.get("images")), "user": {"id": None, "name": d["email"], "by_email": True}}
+
+
+def _wsh_open_exp(b):
+    """The end of an open share (its request b: expires YYYY-MM-DD, through that day) -> (UTC ISO | None, run out)."""
     exp = None
     if b.get("expires"):
         try:
@@ -744,11 +778,7 @@ def _wsh_open_entry(c, x, page_paths, names, revoked=None):
             exp = iso(datetime(dd.year, dd.month, dd.day, tzinfo=TZ))
         except ValueError:
             exp = None
-    return {"id": wsh_eid(c, "a", d["id"]), "kind": "person", "space": wiki_space_key(None), "path": path, "folder": pid is None,
-            "is_folder": pid is None, "page_id": pid, "expires_at": exp, "expired": bool(exp and exp <= iso(now_utc())),
-            "revoked": bool(revoked), "created_at": d["created_at"], "created_by": x["created_by"],
-            "created_by_name": names.get(x["created_by"], ""), "views": 0, "last_used_at": None, "ended": False,
-            "images": bool(b.get("images")), "user": {"id": None, "name": d["email"], "by_email": True}}
+    return exp, bool(exp and exp <= iso(now_utc()))
 
 
 def _wsh_open_out(e):
@@ -805,18 +835,29 @@ def _wsh_open_live(c, oid, owner):
 
 def _wsh_addr_full(c, uid, em, who):
     """2.1138.0 (#6027, review N3): the limits of shares by address (core/addrshare.py ADS_MAX per sharer, ADS_PER_ADDR per
-    address) for both kinds alike: open rows plus the shares by address that found their account (cards with an address) --
+    address and sharer) for both kinds alike: open rows plus the shares by address that found their account (cards with an address) --
     so the limit is reached at the same step whether the address has an account or not, and both get the same answer."""
     em = ads_clean(em)
     if not em:
         return False
     bound = ("SELECT COUNT(*) FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id WHERE k.email IS NOT NULL AND k.email<>'' AND ")
-    with system_ctx(c):  # counts only (the address's rows of other sharers too, as ads_open counts them)
+    # 2.1145.0 (#6062, Fable review 2.1138 F9): ADS_PER_ADDR counts uid's own rows of the address only (ads_open does the same):
+    # counted over all sharers, one person could block an address for everybody
+    with system_ctx(c):  # counts only
         mine = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (uid,)).fetchone()[0]
                 + c.execute(bound + "f.created_by=?", (uid,)).fetchone()[0])
-        addr = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (addr_key(c, ADS_SEAL, em),)).fetchone()[0]
-                + (c.execute(bound + "f.user_id=?", (int(who),)).fetchone()[0] if who else 0))
+        addr = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=? AND created_by=?", (addr_key(c, ADS_SEAL, em), uid)).fetchone()[0]
+                + (c.execute(bound + "f.user_id=? AND f.created_by=?", (int(who), uid)).fetchone()[0] if who else 0))
     return mine >= ADS_MAX or addr >= ADS_PER_ADDR
+
+
+def _wsh_by_name(c, nids, who):
+    """2.1145.0 (#6062): account who has a share chosen by name (no card by address, not the pair of one -- files/store.py
+    FS_NOT_ADDR; a share of the file store's dialog counts too) on one of the nodes nids."""
+    if not nids or not who:
+        return False
+    return bool(c.execute(f"SELECT 1 FROM fs_shares WHERE node_id = ANY(CAST(? AS BIGINT[])) AND user_id=? AND {FS_NOT_ADDR.format(a='fs_shares')} "
+                          "LIMIT 1", ([int(x) for x in nids], int(who))).fetchone())
 
 
 def _wsh_card_mail(c, token):
@@ -897,8 +938,9 @@ def wsh_update(sid):
                 for fid in (r["fid"], r["pair_id"]):
                     n = _wsh_node(c, fid) if fid else None
                     if n is not None:
+                        # 2.1145.0 (#6062): exactly this row -- the same account can have one by name and one by address on a node
                         obj_node_share(c, me(), n, "user_id", r["user_id"], r["role"] if r["role"] in ("view", "edit") else "view", exp, None,
-                                       log=not r["token"])  # 2.1138.0 (#6025): by address, no history line
+                                       log=not r["token"], match=(" AND id=?", (int(fid),)))  # 2.1138.0 (#6025): by address, no history line
             if "images" in b:  # Fable F2: a share listed without a card gets one here
                 c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,images,email) VALUES(?,?,?,'') ON CONFLICT (fs_share_id) "
                           "DO UPDATE SET images=excluded.images", (r["fid"], bool(r["is_folder"]), bool(imgs)))
@@ -983,11 +1025,15 @@ def wsh_restore(sid):
         if k.get("email") and _wsh_addr_full(c, uid, _wsh_card_mail(c, k["email"]), r["user_id"]):
             raise Denied(409, tr("Already shared"))  # 2.1138.0 (#6027, N3): the limits of an open share's Undo hold here too
         from ..core.objects import obj_node_reshare
-        back = obj_node_reshare(c, rv["id"], owner=uid, org=None, log=not k.get("email"))  # 2.969.0 (#5644): the node must still be uid's private one
+        # 2.1145.0 (#6062, Fable review 2.1138 F3): a share by address and one by name of the same account are rows of their own
+        # (wsh_create): only a row of the same kind is "shared again" -- the Undo of a share by address after one by name was
+        # made answered 409, an open address came back (the 409 told that the address is that account), and the other way round
+        ts_ = (" AND NOT " if k.get("email") else " AND ") + FS_NOT_ADDR.format(a="fs_shares")
+        back = obj_node_reshare(c, rv["id"], owner=uid, org=None, log=not k.get("email"), taken_sql=ts_)  # 2.969.0 (#5644): the node must still be uid's private one
         if back is None:  # the person has a share of that node again (or the node went): nothing to bring back
             c.commit()
             raise Denied(409, tr("Already shared"))
-        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None, log=not k.get("email")) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
+        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None, log=not k.get("email"), taken_sql=ts_) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
         c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,pair_id,images,email) VALUES(?,?,?,?,?) ON CONFLICT (fs_share_id) DO NOTHING",
                   (n, bool(k.get("folder")), pair[0] if pair else None, bool(k.get("images")), k.get("email") or ""))
         bump(c)

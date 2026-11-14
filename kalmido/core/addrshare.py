@@ -34,7 +34,9 @@ from ..accounts.login import addr_key, seal, unseal
 
 ADS_SEAL = "addr-share"  # purpose of email_seal / email_key
 ADS_MAX = 200  # open rows one person may have typed in
-ADS_PER_ADDR = 50  # open rows of one address (all sharers): the replay at its sign-in stays short (review #5658 F4)
+ADS_PER_ADDR = 50  # open rows of one address (review #5658 F4: the replay at its sign-in stays short, ADS_REDEEM per sign-in)
+# 2.1145.0 (#6062, Fable review 2.1138 F9): ADS_PER_ADDR counts the rows ONE sharer typed in for the address -- counted over all
+# sharers, one person could fill it and so block the address for everybody else
 ADS_REDEEM = 50  # rows replayed per sign-in / proof (the next one takes the rest)
 ADS_DAYS = 180  # an open row nobody redeemed goes after this
 # the parts of a share's request that are kept for its replay (review #5658 F7: no free-form body)
@@ -82,7 +84,7 @@ def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path="", org_id=
     with system_ctx(c):  # counts only; the rows written are the sharer's own (row-level security checks the insert)
         old = c.execute(f"SELECT id FROM obj_addr_shares WHERE {where}", args).fetchone()
         full = not old and (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (by,)).fetchone()[0] >= ADS_MAX
-                            or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (key,)).fetchone()[0] >= ADS_PER_ADDR)
+                            or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=? AND created_by=?", (key, by)).fetchone()[0] >= ADS_PER_ADDR)
     if full:
         return False
     try:
@@ -159,7 +161,8 @@ def ads_back(c, rv):
     x = ads_taken_row(rv)
     with system_ctx(c):  # 2.1115.0 (#5967): review (N2) - the limits of ads_open hold for the Undo too (counts only)
         full = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (x["created_by"],)).fetchone()[0] >= ADS_MAX
-                or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (x["email_key"],)).fetchone()[0] >= ADS_PER_ADDR)
+                or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=? AND created_by=?", (x["email_key"], x["created_by"])).fetchone()[0]
+                >= ADS_PER_ADDR)  # 2.1145.0 (#6062): per sharer
     if full:
         return False
     try:

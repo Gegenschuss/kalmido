@@ -853,7 +853,7 @@ def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="u
     return out
 
 
-def obj_node_reshare(c, revoked_id, *, owner, org, log=True):
+def obj_node_reshare(c, revoked_id, *, owner, org, log=True, taken_sql=""):
     """2.937.0 (#5244, stage 7c): put the share row of obj_revoked revoked_id (src fs_shares, obj_node_unshare) back on its
     node under its OLD id -- obj_share_restore's step for a share of a node no kind names (a knowledge folder), after the
     area checked who may and that the person may still have it. The same id keeps an Undo / Redo of the area's dialog on
@@ -862,7 +862,8 @@ def obj_node_reshare(c, revoked_id, *, owner, org, log=True):
     2.969.0 (#5644, Fable review 2.937 F7): owner / org = whose node the caller checked (org None = owner's private space): the
     node must lie in that space today -- and the obj_revoked row must have been written there -- else Denied 409 (nothing
     written, the row stays). Before, only the caller's check of the main share held this, and a pair id from the stored card
-    went back unchecked; it was tight only because a page that moves loses its node."""
+    went back unchecked; it was tight only because a page that moves loses its node. 2.1145.0 (#6062): taken_sql = SQL added to
+    the check "the node holds a share of that person" (an area that keeps two kinds of rows of one person apart)."""
     r = c.execute("SELECT * FROM obj_revoked WHERE id=? AND src='fs_shares'", (int(revoked_id),)).fetchone()
     if r is None:
         return None
@@ -872,7 +873,7 @@ def obj_node_reshare(c, revoked_id, *, owner, org, log=True):
     if (org is None and owner is None) or (r["org_id"] or None) not in (None, org or None) or (
             n is not None and ((n["org_id"] or None) != (org or None) or (org is None and n["owner_id"] != owner))):
         raise Denied(409, tr("Changed in the meantime"))  # review: the row's space checked also when its node went
-    taken = key and n is not None and c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone()
+    taken = key and n is not None and c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?{taken_sql}", (n["id"], int(s[key]))).fetchone()
     gone = not key or n is None or n["deleted_at"] or c.execute("SELECT 1 FROM fs_shares WHERE id=?", (int(s["id"]),)).fetchone()
     who = key and (c.execute("SELECT 1 FROM groups WHERE id=?", (int(s[key]),)) if key == "group_id" else
                    c.execute("SELECT 1 FROM users WHERE id=?", (int(s[key]),))).fetchone()
