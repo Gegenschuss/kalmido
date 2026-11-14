@@ -6649,6 +6649,7 @@ button.lnph:hover{border-color:var(--accent)}
 .abver{font-size:var(--fs-s);padding:0 .375rem;border:1px solid var(--line);border-radius:99rem}
 .abempty{padding:2rem 1rem}
 .abhint{font-size:var(--fs-b);margin-top:.75rem}
+.abrcx .abrcgo{flex:none;margin-right:.5rem;color:var(--muted)}  /* 2.1148.0 (#4895): a receipt opens in its area */
 /* 2.353.0 A (#2758): the bar of a locked folder (one accent, quiet) */
 .fslbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.5rem .75rem;margin:.25rem 0 .5rem;border:1px solid var(--line);border-radius:.5rem;font-size:var(--fs-b);color:var(--muted)}
 .fslbar>span{flex:1 1 14rem}
