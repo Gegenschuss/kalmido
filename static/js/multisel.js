@@ -39,7 +39,7 @@ function ms_rowMenu(sel, open) {
   return st;  // 2.627.0 (#4962): ms_lpTake
 }
 // 2.1151.0 (#3835): the menu of a phone row whose symbols are hidden (like .sr, they stay for screen readers): one entry per
-// button of btns (a selector inside anchor, or a list of elements) with its name (aria-label / title / text), its icon and red
+// button of btns (a selector inside anchor, or a list of elements) with its name (title / aria-label / text), its icon and red
 // for .danger; an entry clicks its button (detail 0: the click guard of ms_rowMenu lets it through). [hidden] buttons are left
 // out, disabled ones stay greyed. head: entries above them (cm_selHead: "Select" on top)
 let ms_icMap = null;
@@ -50,7 +50,7 @@ function ms_icName(svg) {
 }
 function ms_btnItems(anchor, btns) {
   const list = typeof btns === 'string' ? [...anchor.querySelectorAll(btns)] : [...btns];
-  return list.filter(b => !b.hidden && !b.closest('[hidden]')).map(b => ({label: (b.getAttribute('aria-label') || b.getAttribute('title') || b.textContent || '').trim(),
+  return list.filter(b => !b.hidden && !b.closest('[hidden]')).map(b => ({label: (b.getAttribute('title') || b.getAttribute('aria-label') || b.textContent || '').trim(),
     icon: ms_icName(b.querySelector('svg.i')), cls: b.classList.contains('danger') ? 'danger' : '', dis: b.disabled, fn: () => b.click()}));
 }
 function ms_btnMenu(anchor, btns, title, head = []) { menu(anchor, [...head, ...ms_btnItems(anchor, btns)], null, null, title); }
@@ -189,8 +189,9 @@ const lm_open = (sel, fn) => r => { const b = lm_btn(r, sel); if (!b) return fal
 // click on that button, which the click guard of the press lets through for that one click (as #4616). Every row's "…" button
 // carries data-rowmenu="<a word of sel>": tests/p2695_a_rowmenu_coverage_test.py finds a "…" without it or without a binding.
 // keep: as cm_bind (default lm_keep: a link or a selection inside the row keeps the browser's menu)
-function lm_btnMenu(sel, btn, keep = lm_keep) {
-  const st = cm_bind(sel, r => { const b = r.querySelector(btn); if (!b) return false; const d = st.done; st.done = 0; b.click(); st.done = d; return true; }, null, keep);
+// 2.1151.0 (#3835): phone(row) given = on a phone the long press calls it instead (the menu of the row's hidden symbols, ms_btnMenu)
+function lm_btnMenu(sel, btn, keep = lm_keep, phone = null) {
+  const st = cm_bind(sel, r => { if (phone && isMobile()) { phone(r); return true; } const b = r.querySelector(btn); if (!b) return false; const d = st.done; st.done = 0; b.click(); st.done = d; return true; }, null, keep);
   return st;
 }
 const lm_selKeep = (e, r) => { const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); };  // a row that is a link as a whole
