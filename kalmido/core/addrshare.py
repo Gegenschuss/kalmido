@@ -261,8 +261,14 @@ def _rows_of(uid):
             if not u or not em or em != (u["email_proved"] or "") or u["disabled"] or (u["kind"] or "user") == "agent":
                 return em, []
             c.execute("DELETE FROM obj_addr_shares WHERE created_at<?", (iso(now_utc() - timedelta(days=ADS_DAYS)),))
-            rows = [dict(x) for x in c.execute(f"SELECT * FROM obj_addr_shares WHERE email_key=? ORDER BY id LIMIT {ADS_REDEEM}",
-                                               (addr_key(c, ADS_SEAL, em),)).fetchall()]
+            # 2.1145.0 (#6062, Fable review 2.1145 F4): ADS_PER_ADDR counts per sharer now -- the rows taken in turns of the sharers
+            # (each one's first, then each one's second, ...), so one sharer's rows that stay open (not bound yet, not gone) never
+            # keep another sharer's rows out of every sign-in's ADS_REDEEM
+            rows = [dict(x) for x in c.execute(
+                "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY created_by ORDER BY id) AS ads_turn FROM obj_addr_shares "
+                f"WHERE email_key=?) t ORDER BY ads_turn, id LIMIT {ADS_REDEEM}", (addr_key(c, ADS_SEAL, em),)).fetchall()]
+            for x in rows:
+                x.pop("ads_turn", None)
         c.commit()
         return em, rows
 
