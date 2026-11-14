@@ -256,6 +256,11 @@ def sdl_notify(c, uid, choice, at):
         with system_ctx(c):  # the members of the own project (structure)
             lr = c.execute("SELECT id, name, owner_id FROM lists WHERE id=?", (int(k),)).fetchone()
             people = [x for x in _ol_people(c, lr) if x != uid] if lr else []
+            # review (job/4457): asking, taking back and asking again does not fill the bell -- whoever still has an unread
+            # notice of this project's deletion by this person gets no second one
+            told = {r[0] for r in c.execute("SELECT user_id FROM notifications WHERE kind='orglist' AND list_id=? AND actor_id=? "
+                                            "AND read_at IS NULL AND CAST(data AS jsonb)->>'action'='acctdel'", (lr["id"], uid)).fetchall()} if people else set()
+            people = [x for x in people if x not in told]
         if people:
             obj_notify(c, "list", lr["id"], people, row=KIND_ROW["orglist"], lid=lr["id"], push=False,
                        news={"kind": "orglist", "list_id": lr["id"], "actor": uid,
