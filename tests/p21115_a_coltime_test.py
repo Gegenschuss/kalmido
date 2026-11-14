@@ -160,7 +160,7 @@ alters = []
 ex = c.execute
 def counted(sql, *a, **k):
     if sql.startswith("ALTER TABLE"):
-        alters.append(sql.split()[2])
+        alters.append(sql.split()[2].strip('"'))
     return ex(sql, *a, **k)
 c.execute = counted
 out = {'first': ct._ct_more(c, '2026-11-13T08:00:00+00:00')}
