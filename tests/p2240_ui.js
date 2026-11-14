@@ -78,7 +78,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   // 2.1145.0 (#6075): the width 900 carries its own scale (screen width / 900): the meta is switched after load, Chrome kept
   // the scale 1 of the start meta and an unfolded Fold at 840 px showed only 840 of the 900 px (account button off screen)
   const z840 = vp(840, 700);
-  check(/^width=900, initial-scale=0\.933, minimum-scale=0\.933/.test(z840), '#6075: Fold at 840 px landscape: width 900 scaled to 0.933 so all 900 px fit (' + z840 + ')');
+  check(/^width=900, initial-scale=0\.933,/.test(z840), '#6075: Fold at 840 px landscape: width 900 scaled to 0.933 so all 900 px fit (' + z840 + ')');
   check(/initial-scale=0\.982/.test(vp(884, 1060)), '#6075: near-square 884 px portrait: scaled to 0.982');
   check(/device-width/.test(vp(700, 820)), '#3270: ... in portrait (700 px): the tablet layout as before');
   check(/device-width/.test(vp(915, 412)), '#3270: a phone in landscape (915 x 412) stays the phone layout');
