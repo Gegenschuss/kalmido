@@ -173,7 +173,8 @@ check(Bo.get(B + f"/api/wiki/shared/pages/{plan}").status_code == 404 and not sh
 idx = {p["path"]: p for p in A.get(B + "/api/wiki", params={"space": "private"}).json()["pages"]}
 check(idx["Customer A/Plan"].get("shared") and idx["Customer A"].get("shared") and not idx["Customer AB/Note"].get("shared") and not idx["Secret"].get("shared"),
       "#2104: the mark in the index covers the folder only")
-check(A.get(B + f"/api/wiki/pages/{plan}").json().get("shares") == 1 and A.get(B + f"/api/wiki/pages/{secret}").json().get("shares") == 0,
+# 2.1138.0 (#6026): the open share of nobody@ (no account) counts like dave@'s that found its account: 2, was 1
+check(A.get(B + f"/api/wiki/pages/{plan}").json().get("shares") == 2 and A.get(B + f"/api/wiki/pages/{secret}").json().get("shares") == 0,
       "#2104: the page's share count")
 r = A.get(B + "/api/wiki/shares", params={"page": plan})
 j = r.json()
