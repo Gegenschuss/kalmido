@@ -21,6 +21,36 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1146.0] - 2026-11-14
+
+Package 2.1139 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- The start-time move of the old time columns to TIMESTAMPTZ / DATE turns all columns of a table in one ALTER TABLE (one rewrite instead of one per column, e.g. office_docs, doc_meta, agent_chat), falling back to column by column when that fails (#6028).
+
+### Fixed
+- Re-sign-in and step-up checks (admin switches, off-site backup target, recovery key) compare the confirmation time as a point in time: a value that is no time or lies in the future no longer counts as a fresh sign-in (#6028).
+
+Package 2.1138 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- Knowledge pages shared by e-mail address no longer tell the sharer whether the address has an account:
+  - #6025: the file store's view of a page or folder node (shares, inherited shares, shared mark, "Shared with" names, history) leaves out shares made by address in the knowledge dialog, and the file store's share routes answer 404 for them.
+  - #6026: the tree's "shared" mark, the page's share counter and the per-space share limit count open shares by address like bound ones.
+  - #6027: an address whose account already has the page by name gets its own entry. Both kinds get the same refusal at the address-share limits. The Undo of an open share whose address was proved in the meantime makes the share at once.
+
+Package 2.1140 (Bündel: Weich rot: p2361_a_ui, Weich rot: p21054_a_liststate2, Weich rot: p2800_a_cal_ui u. 2 weitere).
+
+### Fixed
+- #6060: the account import removes the uploaded file before its state says done (it was removed only right after, so a client reading "done" could still find the file).
+- #6048 #6053: suites p2361_a_ui and p2800_a_cal_ui write the calendar subscription's `visible` as a boolean in their setup (the column is BOOLEAN on Postgres).
+- #6051: suite p21054_a_liststate2 - the earlier trigger it puts back for the way-back check reads `archived` 'false' as not archived (BOOLEAN since #5952).
+- #6058: suite p21442_b_ui taps the calendar chip that is shown after the draft confirm (the view is drawn again, the old element was gone) and checks the confirm is still on its way.
+
+Package 2.1141 (Bündel: CI: Push-Lauf auf main nach einem Queue-Merge wied).
+
+### Changed
+- #6063: CI - a push on main that the merge queue made (the same commit its merge_group run already checked) runs no test shards any more: the job "plan" looks up the merge_group run of the pushed commit and picks the stage "none" (`tests/stages.py`), the shard job is skipped and the overall check "Test suites (API, UI, security)" stays green. Only the train's release push, the nightly run and runs by hand run the full stage, so the train's run no longer waits behind a second ~60-shard run for runners.
+
 ## [2.1142.0] - 2026-11-14
 
 Package 2.1123 (Bündel: Wissen teilen: offene Adress-Freigabe im Dialog an, SQLite-Erbe Rest 1: übrige Zeitspalten (*_at/_on/_).
@@ -422,7 +452,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1142.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1146.0...HEAD
+[2.1146.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1146.0
 [2.1142.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1142.0
 [2.1136.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1136.0
 [2.1135.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1135.0
