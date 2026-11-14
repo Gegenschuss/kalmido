@@ -38,6 +38,22 @@ function ms_rowMenu(sel, open) {
   window.addEventListener('click', e => { if (e.detail && ms_lpRecent(st) && /** @type {any} */ (e.target).closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);
   return st;  // 2.627.0 (#4962): ms_lpTake
 }
+// 2.1151.0 (#3835): the menu of a phone row whose symbols are hidden (like .sr, they stay for screen readers): one entry per
+// button of btns (a selector inside anchor, or a list of elements) with its name (aria-label / title / text), its icon and red
+// for .danger; an entry clicks its button (detail 0: the click guard of ms_rowMenu lets it through). [hidden] buttons are left
+// out, disabled ones stay greyed. head: entries above them (cm_selHead: "Select" on top)
+let ms_icMap = null;
+function ms_icName(svg) {
+  if (!svg) return '';
+  if (!ms_icMap) { ms_icMap = new Map(); const d = document.createElement('div'); for (const k of Object.keys(P)) { d.innerHTML = ic(k); ms_icMap.set(d.firstElementChild.innerHTML, k); } }
+  return ms_icMap.get(svg.innerHTML) || '';
+}
+function ms_btnItems(anchor, btns) {
+  const list = typeof btns === 'string' ? [...anchor.querySelectorAll(btns)] : [...btns];
+  return list.filter(b => !b.hidden && !b.closest('[hidden]')).map(b => ({label: (b.getAttribute('aria-label') || b.getAttribute('title') || b.textContent || '').trim(),
+    icon: ms_icName(b.querySelector('svg.i')), cls: b.classList.contains('danger') ? 'danger' : '', dis: b.disabled, fn: () => b.click()}));
+}
+function ms_btnMenu(anchor, btns, title, head = []) { menu(anchor, [...head, ...ms_btnItems(anchor, btns)], null, null, title); }
 // Shift-click: the ids between the last ticked one and id in the shown order (both included); id alone without an anchor
 function ms_range(order, from, id) {
   const a = order.indexOf(from), b = order.indexOf(id);
