@@ -197,7 +197,8 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
       out.same = __secs(LID);
       return out; })()`);
     check(t.ghost && t.fold && /dropafter/.test(t.mark) && t.now === 'Beta,Gamma,Alpha' && t.clean, `${tag}: #1635: a long press drags the section to the end (it folds while dragged) ` + JSON.stringify(t));
-    check(t.menu.includes('Move section up') && t.menu.includes('Move section down') && t.same === t.now, `${tag}: #1635: held without moving = the menu up / down, nothing moved ` + JSON.stringify(t));
+    // 2.1151.0 (#3835): held without moving = the head's whole menu, no up / down (the head drags)
+    check(t.menu.includes('Rename') && !t.menu.some(x => /^Move (section|left|right)/.test(x)) && t.same === t.now, `${tag}: #1635: held without moving = the head's menu (no up / down), nothing moved ` + JSON.stringify(t));
   }, true);
 
   console.log(`${ok} ok, ${F.length} failed`);
