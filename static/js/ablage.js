@@ -176,7 +176,10 @@ function ab_panelHtml() {
     ns: 'ab', id: n.id, par: n.parent_id ? 'n:' + n.parent_id : 'top:' + (n.org_id || 'p'), drag: ab_canWrite(n.role), drop: ab_canWrite(n.role), menu: true,
     kids: AB.pt['n:' + n.id]?.items?.length !== 0, open: path.includes(n.id) && n.id !== r.nid, sub: () => (it => it && it.map(node))(ab_ptGet('n:' + n.id))});
   // 2.429.0 (#3580): a space's collections "From <area>" after its folders (read-only: no drag, no drop, no menu)
-  const collNodes = s => (AB.pt['s:' + s]?.coll || []).map(x => ({k: 'ab:c:' + s + ':' + x.key, name: x.name, go: 'ablage/aus-' + x.key, on: on && r.aus === x.key && ab_curSpace() === s, icon: AB_COLL_ICON[x.key] || 'folder', battrs: `data-absp="${esc(s)}"`, kids: false}));
+  // 2.1148.0 (#4895): "Receipts" (x.subs) with its parts Office / Entertainment / Household below it; open while one of them is shown
+  const collNode = (s, x) => ({k: 'ab:c:' + s + ':' + x.key, name: x.name, go: 'ablage/aus-' + x.key, on: on && r.aus === x.key && ab_curSpace() === s, icon: AB_COLL_ICON[x.key] || 'folder', battrs: `data-absp="${esc(s)}"`,
+    kids: !!x.subs?.length, open: !!x.subs?.some(y => on && r.aus === y.key && ab_curSpace() === s), sub: () => (x.subs || []).map(y => collNode(s, y))});
+  const collNodes = s => (AB.pt['s:' + s]?.coll || []).map(x => collNode(s, x));
   const withColl = (s, it) => it && [...it.map(node), ...collNodes(s)];
   const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: ab_home(s) /* 2.540.0 (#4575) */, on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
     kids: real.includes(s) && (AB.pt['s:' + s]?.items?.length !== 0 || !!AB.pt['s:' + s]?.coll?.length), open: !!path.length && AB.data?.space === s, sub: () => withColl(s, ab_ptGet('s:' + s))});
@@ -225,17 +228,33 @@ document.addEventListener('click', e => { const b = e.target.closest?.('#side [d
 // pages, project files, files left in an area's folders) is a read-only collection "From <area>" at the top of the space,
 // grouped by its object (route ablage/aus-<key>, the space shown: AB.space). Open / download only; deleting stays on the
 // page / in the project. Knowledge pages themselves: the global search.
-const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'proj', contacts: 'user'};
+const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'proj', contacts: 'user', receipts: 'receipt', rcoffice: 'brief', rcmeals: 'meal', rcbudget: 'wallet'};  // 2.1148.0 (#4895): + Receipts and its parts
+// 2.1148.0 (#4895): "Receipts" below the tree = references: a receipt opens in its own area (it stays there, no copy). The
+// server names the area's address (office/..., budget/<list>/<month>); under "All workspaces" the office's address carries the space
+const AB_RCX = ['receipts', 'rcoffice', 'rcmeals', 'rcbudget'];
+const ab_rcGo = (o, sp) => /^office\//.test(o || '') && ab_all() && sp ? 'office/s/' + sp + '/' + o.slice(7) : o;
 const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read-only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read-only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read-only'))}">${ic('lock', 's')}</span></span></div>`;
 function ab_collHtml(d, sp) {
-  const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span><span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
+  const rcPart = d && d.key !== 'receipts' && AB_RCX.includes(d.key);  // 2.1148.0 (#4895): a part of Receipts: Space / Receipts / Office
+  const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span>${rcPart ? `<button type="button" class="linkbtn" data-go="ablage/aus-receipts">${esc(tr('Receipts'))}</button><span class="abcsep" aria-hidden="true">/</span>` : ''}<span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
   if (AB.err && !d) return crumbs + `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button></div>`;
   if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
   const note = `<p class="muted abhint abcollnote">${esc(d.key === 'wiki' ? tr('Files of knowledge pages, read-only. Delete them on the page itself.') : d.key === 'lists' ? tr('Files of projects, read-only. Delete them in the project itself.') : d.key === 'sheets' ? tr('Files of tables, read-only. Delete them in the table itself.') : tr('Files of this area, read-only.'))}</p>`;
+  if (AB_RCX.includes(d.key)) return crumbs + ab_rcxHtml(d, sp);  // 2.1148.0 (#4895)
   if (!d.groups?.length) return crumbs + note + `<div class="empty abempty">${ic('folder')}<span>${tr('This folder is empty')}</span></div>`;
   const row = (f, gi) => `<div class="abrow" role="listitem"><button type="button" class="abopen" data-abc="open" data-g="${gi}" data-id="${f.id}">${ab_icon({kind: 'file', mime: f.mime})}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span></span></button><span class="abmeta muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span><a class="iconbtn" href="${esc(f.dl)}" download="${esc(f.name)}" aria-label="${esc(tr('Download') + ' ' + f.name)}" title="${esc(tr('Download'))}">${ic('download')}</a></div>`;
   const grp = (g, gi) => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(g.open)}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${g.items.map(f => row(f, gi)).join('')}</div></section>`;
   return crumbs + note + d.groups.map(grp).join('') + (d.more ? `<p class="muted abhint">${tr('Only the first {0} files are shown.', 500)}</p>` : '');
+}
+// 2.1148.0 (#4895): the receipts of a part (or of all three, one section each): name, day, amount, what it is; a tap opens
+// the receipt's area (the office's receipts list / entertainment receipts, the budget list in the receipt's month)
+function ab_rcxHtml(d, sp) {
+  const note = `<p class="muted abhint abcollnote">${esc(tr('Receipts stay in their area. Open one to view, change or book it there.'))}</p>`;
+  if (!d.groups?.length) return note + `<div class="empty abempty">${ic('receipt')}<span>${tr('No receipts here yet')}</span></div>`;
+  const meta = f => [ab_when(f.created_at), f.amount ? curMoney(f.amount, f.currency || (S.settings.time_currency ?? '€')) : '', f.sub].filter(Boolean).join(' · ');
+  const row = f => `<div class="abrow abrcx" role="listitem"><button type="button" class="abopen" data-go="${esc(ab_rcGo(f.open, sp))}">${/*html-ok*/ f.kind === 'meal' ? ic('meal') : ab_icon({kind: 'file', mime: f.mime}) /* icons only */}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc(meta(f))}</span></span></button><span class="abmeta muted">${esc(meta(f))}</span>${ic('right', 's abrcgo')}</div>`;
+  const grp = g => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(ab_rcGo(g.open, sp))}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${/*html-ok*/ g.items.map(row).join('') /* row(): escaped above */}</div></section>`;
+  return note + d.groups.map(grp).join('') + (d.more ? `<p class="muted abhint">${tr('Only the first {0} files are shown.', 500)}</p>` : '');
 }
 function ab_collOpen(f) {  // like a search hit of a project file (filetext.js ftxtOpenLf): PDF viewer, picture in a new tab, else download
   if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url: f.url, name: f.name, size: f.size, dlUrl: f.dl}); return; }
