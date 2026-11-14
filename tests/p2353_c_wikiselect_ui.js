@@ -87,7 +87,10 @@ const barText = d => d.querySelector('#view #wk-sbar .mcount')?.textContent || '
 
   // ================= a phone: the tree list
   w = await boot({user: 'alice', hash: 'wiki', mobile: true}); d = w.document;
-  (await until(() => d.querySelector('#view [data-wksel="mode"]')))?.click();
+  // 2.1163.0 (#6089): the phone's list has one row (Find, New page, "…"): Select is in its "…"
+  (await until(() => d.querySelector('#view [data-wk="lmenu"]')))?.click();
+  mi = await until(() => menuItems(d).length && menuItems(d));
+  (mi || []).find(x => /^Select/.test(x.textContent.trim()))?.click();
   check(await until(() => boxOf(d, 'Phone page') && boxOf(d, 'Target')), 'a phone: Select shows the boxes in the list');
   tick(w, boxOf(d, 'Phone page'));
   await until(() => /1 selected/.test(barText(d)));

@@ -72,7 +72,8 @@ function dnd(w, from, to, y) {  // a mouse drag of node from onto node to at hei
   check(await until(() => [...d.querySelectorAll('#view #wk-res .wkrow')].length === 2), 'the list of Processes: its folder and its page');
   const row = [...d.querySelectorAll('#view #wk-res .wkrow')].find(r => r.textContent.includes('Checklist'));
   check(!!row?.querySelector('.wkwhen') && !!row.querySelector('[data-wk="rmenu"]'), 'a row: the date and the menu "…"');
-  check(d.querySelector('#view .wkcrumbs a')?.textContent === 'Knowledge' && d.querySelector('#side .sbbi[data-go="wiki"] .n')?.textContent === 'Knowledge', 'one name for the top in the panel and the path (audit B 1)');
+  // 2.1163.0 (#6089): the top is named after the workspace (Private), no longer the area ("Knowledge")
+  check(d.querySelector('#view .wkcrumbs a')?.textContent === 'Private' && d.querySelector('#side .sbbi[data-go="wiki"] .n')?.textContent === 'Private', 'one name for the top in the panel and the path (audit B 1): the workspace\'s');
   row.querySelector('[data-wk="rmenu"]').click();
   mi = await until(() => menuItems(d).length && menuItems(d));
   check(mi && mi.includes('Rename…') && mi.includes('Move to…') && mi.includes('Move to the trash'), 'the row\'s "…": its menu ' + JSON.stringify(mi));
