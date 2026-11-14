@@ -31,4 +31,6 @@
 .rssfn b,.rssfn .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rssfl .iconbtn{min-width:2.75rem;min-height:2.75rem}
 @media (max-width:599px){ .rssacts .btn{flex:1;justify-content:center} }
+/* 2.1151.0 C (#3835): phones: no buttons under an article, a long press opens the menu with the same actions (feeds.js); they stay for screen readers (like .sr) */
+@media (max-width:767px){ .rssitem .rssacts{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0} .rssitem{-webkit-touch-callout:none} }
 .rssro{flex:1;margin:0;display:flex;align-items:center;gap:.375rem;min-width:0}  /* 2.172.0 B (#2677): an organisation's feeds for a member who is no admin */
