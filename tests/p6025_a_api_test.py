@@ -11,6 +11,8 @@ freelancer-matrix: wiki
  - #6027 N3: at the limit of shares by address (ADS_MAX) both kinds get the same refusal
  - #6027 N1: the Undo of an open share whose address was proved in between makes the share at once
 usage: p6025_a_api_test.py <datadir>      (KMT_NOSTART=1 / P6025A_NOSTART=1: a running server)"""
+import sys
+
 from freelancer_fixture import freelancer
 from kt import B, check, dbx, done, fresh, sess, setup
 
@@ -135,4 +137,4 @@ check("Late proof" in shared_with(L) and not dbx("SELECT 1 FROM obj_addr_shares 
       "#6027 N1: the share is made at once (no open row left until her next sign-in)")
 check([s["user"]["name"] for s in people(PN)] == ["lena@example.com"], "#6027 N1: the dialog still shows the address")
 
-done()
+sys.exit(done("p6025_a_api"))
