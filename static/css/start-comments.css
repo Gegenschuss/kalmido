@@ -3,6 +3,10 @@
   .cacts{position:absolute;right:.25rem;top:.25rem;margin:0;display:none;opacity:1;background:var(--bg2);border-radius:var(--radius);box-shadow:0 0 0 1px var(--line)}
   .cm:hover .cacts,.cm:focus-within .cacts,.cm.cacton .cacts{display:inline-flex}
 }
+/* 2.1151.0 B (#3835): phones: a comment shows no symbols (not on a tap either); a long press opens its menu with all of them (chat.js cmCopyMenu). They stay for screen readers */
+@media (max-width:767px){
+  .cm .cacts,.cm:hover .cacts,.cm:focus-within .cacts,.cm.cacton .cacts{position:absolute!important;display:inline-flex;width:1px;min-width:0;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0;box-shadow:none}
+}
 /* 2.537 (#4569) a comment on its way stands in the list lighter; a failed one shows Not sent with Send again / Discard */
 .cm.cmpend:not(.cmfail) .cbody{opacity:.6}
 .cm.cmfail .cpfail{color:var(--danger);font-size:var(--fs-xs)}  /* 2.556 (#4662): token of the scale, not .85em (p2419_scale) */
