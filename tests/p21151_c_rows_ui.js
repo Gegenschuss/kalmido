@@ -53,25 +53,27 @@ async function hold(w, el) {
 
   // ================= the phone CSS (the rules themselves)
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'start-phrows-3835.css'), 'utf8');
-  check(/@media \(max-width:767px\)\{[^}]*\.ms-phsr\{position:absolute!important;width:1px!important/.test(css), 'phone: a .ms-phsr button leaves the row like .sr');
+  check(/@media \(max-width:767px\)\{\s*\.ms-phdots\{display:inline-flex\}\s*\.ms-phsr\{position:absolute!important;width:1px!important/.test(css), 'phone: a .ms-phsr button leaves the row like .sr');
   check(/^\.ms-phdots\{display:none\}/m.test(css) && /\.ms-phdots\{display:inline-flex\}/.test(css), 'the "…" of a settings row shows only on a phone');
-  check(/#side \.fhead \.fmenu\{position:absolute!important/.test(css), 'phone: the sidebar folder\'s "…" is hidden (its long press opens the folder menu)');
+  check(/#side \.fhead \.fmenu\{opacity:0;pointer-events:none\}/.test(css), 'phone: the sidebar folder\'s "…" is invisible (its long press opens the folder menu)');
   const bcss = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'bookmarks.css'), 'utf8');
   check(/\(#3835\)[\s\S]*@media \(max-width:767px\)\{\s*\.bmrow \.bmacts,[^{]*\{position:absolute!important/.test(bcss), 'phone: no symbols in a bookmark row / card');
   const fcss = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'feeds.css'), 'utf8');
   check(/\.rssitem \.rssacts\{position:absolute!important/.test(fcss), 'phone: no buttons under a feed article');
 
   // ================= time entries on the phone
-  let w = await boot({user: 'alice', hash: 'time', mobile: true}), d = w.document;
-  const row = await until(() => d.querySelector('#view .terow.temine'), {timeout: 20000});
-  if (check(row, 'phone: the own entry is shown in the time view')) {
-    check(/Colour grading/.test(row.querySelector('.tett')?.textContent || ''), 'the entry\'s title is in the row');
+  let w = await boot({user: 'alice', hash: 'l/' + P, mobile: true}), d = w.document;
+  await until(() => w.eval(`!!taskById(${T})`), {timeout: 20000});
+  w.eval(`openDetail(${T})`);
+  const row = await until(() => d.querySelector('#d-time .terow.temine'), {timeout: 20000});
+  if (check(row, 'phone: the own entry is shown in the task\'s time section')) {
+    check(/first pass/.test(row.querySelector('.ten')?.textContent || ''), 'the entry\'s note is in the row');
     const resume = row.querySelector('[data-act="te-resume"]'), edit = row.querySelector('[data-act="te-edit"]'), del = row.querySelector('[data-act="te-del"]');
     check(resume && !resume.classList.contains('ms-phsr'), '"Continue" stays visible in the row');
     check(edit?.classList.contains('ms-phsr') && del?.classList.contains('ms-phsr'), 'edit and delete are hidden on the phone (still in the page for screen readers)');
     const h0 = w.location.hash, got = await hold(w, row.querySelector('.ten') || row);
     check(['Continue (same task and note)', 'Edit', 'Delete'].every(t => got.includes(t)), 'a long press opens the menu with all actions of the row: ' + got);
-    check(w.location.hash === h0 && !d.querySelector('#detail.open, body.detail-open'), 'the click that ends the press opens nothing (' + w.location.hash + ')');
+    check(w.location.hash === h0 && !d.querySelector('.modal'), 'the click that ends the press opens nothing (' + w.location.hash + ')');
     check(await pick(w, 'Edit'), 'the menu has "Edit"');
     check(await until(() => d.querySelector('#te-note')?.value === 'first pass', {timeout: 5000}), 'the menu entry opens the entry\'s dialog with its note');
     d.querySelector('.modal [data-m="close"], .modal [data-m="cancel"]')?.click();
