@@ -128,7 +128,8 @@ const upload = async (ck, name, text, form) => {
     await ev(`(() => { ab_details(${KUNDE}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.abdlg .xl-row')`, 60), 'phone: the details list the link');
     await ev(`(() => { document.querySelector('.abdlg .xl-sec').scrollIntoView(); return 1; })()`);
-    check(await ev(`[...document.querySelectorAll('.abdlg .xl-row .iconbtn')].every(b => b.getBoundingClientRect().width >= 40)`), 'phone: the link buttons are big enough');
+    // 2.1151.0 (#3835): a phone shows one "…" per link row (big enough), the three symbols are hidden (screen readers keep them)
+    check(await ev(`[...document.querySelectorAll('.abdlg .xl-row .iconbtn')].every(b => b.classList.contains('ms-phdots') ? b.getBoundingClientRect().width >= 40 : b.getBoundingClientRect().width <= 1)`), 'phone: one big "…" per link, the symbols hidden');
     await shot('p21121-b-details-phone.png');
     await ev(`(() => { xl_newDlg(${KUNDE}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.xldlg #xl-exp')`), 'phone: the new link dialog');

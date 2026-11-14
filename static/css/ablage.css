@@ -21,8 +21,7 @@
 /* 2.1151.0 A (#3835): phones: no symbols in the file rows, the name gets the width; a long press opens the row menu (ablage.js
    AB_LP / AB_CARDLP, "Select" on top). The buttons stay for screen readers (like .sr), as the office rows (#3834) */
 @media (max-width:767px){
-  .abrow>.iconbtn[data-ab="menu"],.abcollg .abrow>a.iconbtn,.abdl>.abdlrow>.abdl-act,.xl-row>.iconbtn:not(.xl-more){position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .abrow>.iconbtn[data-ab="menu"],.abcollg .abrow>a.iconbtn,.abdl>.abdlrow>.abdl-act{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
   .abdl>.abdlrow{grid-template-columns:minmax(0,1fr) auto}
-  .xl-row{position:relative}
+  .xl-row{position:relative}  /* the dialog's link rows: one "…" (multisel.js ms_dots), the three symbols .ms-phsr */
 }
-@media (min-width:768px){.xl-row>.xl-more{display:none}}  /* the dialog's link rows: the "…" only on a phone, the computer keeps its three symbols */
