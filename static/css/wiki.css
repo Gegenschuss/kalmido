@@ -276,3 +276,32 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkdpbar>.muted{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wkdpbar .spacer{flex:1}
 .wkdpmd{max-width:var(--w-lesen)}
+/* 2.1161.0 (#6086): the phone's breaks at the cause. The trash: the name keeps a line of its own and the two buttons go below it
+   when the row is narrow (like the share dialog's rows) - before, the name took what the buttons left and broke letter by letter */
+.wktrow .n{flex:1 1 12rem}
+.wktrow .oadmb{display:flex;flex-wrap:wrap;gap:.375rem;margin-left:auto}
+/* Select on a phone: the date and the row's "…" leave the row (the floating bar has Move and Delete), so the name keeps its room */
+@media (max-width:767px){.wkselrow .wkwhen,.wkselrow .wkmore{display:none}}
+/* a table in the editor: cells never narrower than their words (CodeMirror's lines break anywhere); the box scrolls sideways like
+   the read view's .mdtbl. The text column may not grow with a wide table (a flex item keeps its content's width by default):
+   it keeps the editor's width, so the table's box (max-width 100 %) scrolls instead of being cut off at the edge */
+.wkcm .cm-scroller>.cm-content{min-width:0}
+.wkcm .cm-wktbl{overscroll-behavior-x:contain}
+.wkcm .cm-wktbl :is(table,td,th){word-break:normal;overflow-wrap:normal}
+.wkcm .cm-wktbl :is(td,th){min-width:4ch}
+/* targets for a finger: the editor's boxes as big as the read view's, the row "…", the file buttons, the daily note's arrows and
+   the history's Back at 44 px */
+@media (pointer:coarse){
+  .wkcm .cm-wkcb input{width:1.25rem;height:1.25rem;vertical-align:-.25em}
+  .wkrow .wkmore,.wkfiles .iconbtn,.wkday .iconbtn,.wkhhead .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+}
+/* 2.1161.0 (#6088): a save that failed stays in the footer until a save works (wiki.js wk_unsaved) */
+#wk-saved.wkunsaved{color:var(--danger);font-weight:600}
+#wk-saved.wkunsaved .linkbtn{font-weight:400}
+@media (pointer:coarse){#wk-saved.wkunsaved .linkbtn{min-height:2.75rem}}
+/* 2.1161.0 (#6090): the front matter as fields - in the editor one folded line (a click opens its lines, wkcm.js), a page's
+   folders quietly beside its name in hits and "Linked from", the task's title after "#1" in the editor */
+.wkcm .cm-wkfmw{padding:.25rem 0}
+.wkcm .cm-wkfmw .wkattrs{cursor:text}
+.wkpdir{margin-left:.25rem;font-size:var(--fs-s);font-weight:400}
+.wkcm .cm-wkreft{text-decoration:none;color:var(--muted)}

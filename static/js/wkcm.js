@@ -134,7 +134,7 @@ function wkcm_ext(p) {
     C.history(), C.drawSelection(), C.EditorView.lineWrapping, C.markdown(), C.search({top: true}),
     C.EditorState.phrases.of(wkcm_phrases()),
     C.EditorView.contentAttributes.of({'aria-label': tr('Text') + ': ' + wk_base(p.path), spellcheck: 'true', autocapitalize: 'sentences', autocorrect: 'on'}),
-    C.placeholder(tr('Write … ([[Page]], [[#123]], / for commands)')),
+    C.placeholder(tr('Write … (/ for commands)')),  // 2.1161.0 (#6090): no link syntax in the hint
     // files pasted / dropped: uploaded by wkembed.js (its document listener), CodeMirror must not insert their text
     C.Prec.highest(C.EditorView.domEventHandlers({mousedown: wkcm_down, click: wkcm_click, mouseover: wkcm_hov, mouseleave: (_e, v) => { v.dom.querySelector('.cm-wkhov')?.classList.remove('cm-wkhov'); return false; },
       paste: e => !!e.clipboardData?.files?.length, drop: e => !!e.dataTransfer?.files?.length})),
@@ -310,10 +310,16 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
   const blocks = [], skip = [];  // ranges drawn as one widget (nothing else inside), ranges no inline pattern may touch (code)
   const inside = (a, z, rs) => rs.some(x => a < x[1] && z > x[0]), within = (a, z, rs) => rs.some(x => a >= x[0] && z <= x[1]);
   const block = (a, z, h, cls) => { out.push(D.replace({widget: new W.Html(h, true, cls), block: true}).range(a, z)); blocks.push([a, z]); };
-  // front matter: muted, never parsed as a heading
-  const fm = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(doc.sliceString(0, Math.min(doc.length, 20000)));
+  // front matter: muted, never parsed as a heading; 2.1161.0 (#6090): folded to one line of fields (the read view's, wiki.js
+  // wk_attrsHtml) while the cursor is outside it, a click on it opens the lines
+  const fm = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(doc.sliceString(0, Math.min(doc.length, 20000)));
   const fmEnd = fm ? Math.min(fm[0].replace(/\r?\n$/, '').length, doc.length) : 0;
-  if (fmEnd) { lines(0, fmEnd, 'cm-wkfm'); skip.push([0, fmEnd]); }
+  if (fmEnd) {
+    const fa = typeof wk_fmParse === 'function' && !near(0, fmEnd) ? wk_fmParse(fm[1]) : null;
+    if (fa && Object.keys(fa).length) block(0, fmEnd, wk_attrsHtml(fa, (WKCM.p || WK.pg)?.space, 'cm-wkfmf'), 'cm-wkfmw');
+    else lines(0, fmEnd, 'cm-wkfm');
+    skip.push([0, fmEnd]);
+  }
   // $$ … $$ lines / blocks (wiki.js wk_dgCut makes them formulas)
   if (doc.length < 400000 && doc.sliceString(0, doc.length).includes('$$')) {
     for (let n = 1; n <= doc.lines; n++) {
@@ -364,13 +370,16 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
       const open = !near(a, z);
       if (open) { hide(a, a + 2); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
       mark(open ? a + (bar >= 0 ? 3 + bar : 2) : a, open ? z - 2 : z, 'cm-wkl cm-wkref', open ? {'data-wkgo': '#t/' + t.id, title: String(t.title || '')} : undefined);
+      if (open && bar < 0 && t.title) out.push(D.widget({widget: new W.Txt(' ' + mdPlain(t.title), 'cm-wkl cm-wkreft'), side: -1}).range(z - 2));  // 2.1161.0 (#6090): "#1 Title" like the read view
       continue;
     }
     const path = (bar < 0 ? body : body.slice(0, bar)).replace(/#.*$/, '').trim(), sp = (WKCM.p || WK.pg)?.space;
     const pg = sp ? wk_byPath(sp, path) : null, open = !near(a, z);
     const attrs = open ? (pg ? {'data-wkgo': '#wiki/' + pg.id} : {'data-wknew': path}) : null;
-    if (open) { hide(a, a + 2); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
-    mark(open ? a + (bar >= 0 ? 3 + bar : 2) : a, open ? z - 2 : z, 'cm-wkl cm-wkwl' + (pg ? '' : ' cm-wkmiss'), attrs || undefined);
+    const dir = open && bar < 0 ? path.lastIndexOf('/') : -1, at0 = dir >= 0 ? body.indexOf(path) + dir + 1 : 0;  // 2.1161.0 (#6090): [[A/B/Page]] shows "Page", the path as its tooltip
+    if (open) { hide(a, a + 2 + at0); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
+    if (attrs && dir >= 0) attrs.title = path;
+    mark(open ? a + (bar >= 0 ? 3 + bar : 2 + at0) : a, open ? z - 2 : z, 'cm-wkl cm-wkwl' + (pg ? '' : ' cm-wkmiss'), attrs || undefined);
   }
   tree.iterate({...part, enter: n => {
     const a = n.from, z = n.to, k = n.name;

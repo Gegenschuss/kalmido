@@ -72,9 +72,9 @@ async function wklv_slashPick(ta, c) {
     return;
   }
   if (c.k === 'tpl') {
-    let t; try { t = await rawFetch('GET', '/api/wiki/pages/' + c.id); if (typeof wkePage === 'function') await wkePage(t); } catch (e) { toast(e.message); return; }
+    let t; try { t = await rawFetch('GET', '/api/wiki/pages/' + c.id); if (typeof wkePage === 'function') await wkePage(t); } catch (e) { toast(errText(e, tr('The template could not be loaded'))); return; }  // 2.1161.0 (#6088)
     if (!ta.isConnected) return;
-    const f = wk_tplFill(wk_bodyStrip(t.body).replace(/\n+$/, ''), p?.path || '');  // 2.371.2 (#3151): {{datum}}, {{cursor}} …
+    const f = wk_tplFill(wk_tplClean(wk_bodyStrip(t.body)).replace(/\n+$/, ''), p?.path || '');  // 2.371.2 (#3151): {{datum}}, {{cursor}} …; 2.1161.0 (#6090): no empty points
     put(f.text, f.at >= 0 ? f.at : f.text.length);
   }
 }
@@ -138,7 +138,7 @@ function wkst_menu(sp) {
   const items = [{head: tr('For me')}, mine('', tr('Like the workspace ({0})', name(d))), mine('clear', name('')), ...Object.keys(WKST).map(k => mine(k, name(k)))];
   if (WK.idx[sp]?.may_style) {
     items.push({head: tr('Default of the workspace')}, ...['', ...Object.keys(WKST)].map(k => ({label: name(k), on: d === k, fn: async () => {
-      try { await api('PUT', '/api/wiki/style', {space: sp, style: k}); } catch (e) { toast(e.message); return; }
+      try { await api('PUT', '/api/wiki/style', {space: sp, style: k}); } catch (e) { toast(errText(e, tr('The reading style could not be saved'))); return; }
       if (WK.idx[sp]) WK.idx[sp].style = k;
       renderView();
     }})));

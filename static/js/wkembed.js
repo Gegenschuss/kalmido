@@ -121,7 +121,7 @@ async function wem_tickSave(p) {
   } catch (e) {
     if (e.status === 409 && e.data?.page) { await wk_conflict(p, e.data.page, patch); return; }
     if (e instanceof Offline) { await wko_queue(p, patch); return; }
-    toast(e.message); viewSafeRender();
+    toast(errText(e, tr('The page could not be saved'))); viewSafeRender();  // 2.1161.0 (#6088): what failed first
   }
 }
 // right click / a long press on a checkbox line: its menu
@@ -196,7 +196,7 @@ async function wem_cbRun(p, lines, lid) {
     }
     if (!made.length) return;
     const pairs = made.map(({L, t}) => [L.raw, L.raw.replace(/\s+$/, '') + ' [[#' + t.id + ']]' + (L.raw.endsWith('\r') ? '\r' : '')]);
-    try { await wem_swap(p, pairs, true); } catch (e) { toast(e.message); }
+    try { await wem_swap(p, pairs, true); } catch (e) { toast(errText(e, tr('The page could not be saved'))); }
     const e = histAdd({label: tr('Create tasks'), ids: [], snaps: [], lids: [], wsp: p.space,
       undo: async () => { await wem_swap(p, pairs, false); return {skipped: []}; },
       redo: async () => { await wem_swap(p, pairs, true); return {skipped: []}; }});
@@ -291,7 +291,7 @@ async function wem_upload(p, files, at) {
   if (wk_e2e(p.space)) { toast(tr('Files cannot be added to a page of a locked workspace yet')); return; }
   const fd = new FormData(); files.forEach(f => fd.append('file', f));
   toast(trn('Uploading {0} file…', 'Uploading {0} files…', files.length));
-  let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(e.message); return; }
+  let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(errText(e, tr('The file could not be attached'))); return; }
   const fs = r.files || []; if (!fs.length) return;
   p.files = [...(p.files || []), ...fs];  // no new drawing while typing (the text would be drawn again)
   wem_insert(fs.map(wka_md).join('\n'), at);
@@ -321,9 +321,9 @@ function wem_pick(p, at) {
   const list = $('#wem-pick', md), crumbs = $('#wem-crumbs', md);
   const load = async () => {
     const n = ++st.n, sp = encodeURIComponent(p.space);
-    list.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
+    list.innerHTML = loadingHtml('sec');
     let j; try { j = st.q ? await rawFetch('GET', `/api/search?kind=files&q=${encodeURIComponent(st.q)}&space=${sp}`) : await rawFetch('GET', st.parent ? `/api/files?parent=${st.parent}` : `/api/files?space=${sp}`); }
-    catch (e) { if (n === st.n) list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    catch (e) { if (n === st.n) list.innerHTML = errorState({title: errText(e, tr('The files could not be loaded')), size: 'sec', retry: load}); return; }  // 2.1161.0 (#6088)
     if (n !== st.n) return;
     const its = (j.items || []).filter(x => !x.no_access && (x.kind === 'file' || (x.kind === 'folder' && !st.q)));
     crumbs.innerHTML = st.q ? '' : `<button type="button" class="btn sm" data-wemc="">${esc(p.space === 'private' ? tr('Private|workspace') : wk_spaceName(p.space))}</button>${(j.crumbs || []).map(c => `<span aria-hidden="true">/</span><button type="button" class="btn sm" data-wemc="${c.id}">${esc(c.name)}</button>`).join('')}`;

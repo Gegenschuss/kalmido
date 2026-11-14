@@ -35,7 +35,7 @@ async function wkt_fetch(key, url, sp) {
   WKT.busy[key] = true;
   const box = key[0] === 'l' ? WKT.list : key[0] === 'p' ? WKT.pages : WKT.q, k = key.slice(2);
   try { box[k] = {v: S.v, j: await rawFetch('GET', url)}; }
-  catch (e) { if (e.message === 'auth') return; box[k] = {v: S.v, j: null, err: e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message}; }
+  catch (e) { if (e.message === 'auth') return; box[k] = {v: S.v, j: null, err: e instanceof Offline ? tr('Knowledge pages are only available online.') : errText(e, tr('The tags could not be loaded'))}; }  // 2.1161.0 (#6088): what failed first
   finally { WKT.busy[key] = false; }
   if (S.route.mod === 'wiki') wk_redraw();
   if (sp && typeof sbb_sync === 'function') sbb_sync('wiki');
@@ -76,9 +76,9 @@ function wkt_sideHtml(sp) {
 // the open tag (#wiki/t/<tag>): its pages as rows like a folder's
 function wkt_viewHtml(sp, tag) {
   const ps = wkt_tagPages(sp, tag), c = wkt_local(sp) ? null : WKT.pages[sp + '\n' + tag.toLowerCase()];
-  const rows = ps == null ? `<div class="muted mhint">${tr('Loading…')}</div>` : c?.err ? `<div class="muted mhint">${esc(c.err)}</div>`
-    : ps.length ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${ps.map(p => `<li class="wkrow"><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}<span>${esc(p.path)}</span></a></li>`).join('')}</ul>`
-    : `<div class="empty">${tr('No page has this tag.')}</div>`;
+  const rows = ps == null ? loadingHtml('sec') : c?.err ? errorState({title: c.err, size: 'sec', retry: () => { c.v = -1; wk_redraw(); }})  // 2.1161.0 (#6088): the shared blocks
+    : ps.length ? `<ul class="wktree wkdlist" aria-label="${esc(tr('Pages'))}">${ps.map(p => `<li class="wkrow"><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${/*html-ok*/ wk_pathHtml(p.path)/* built with esc() */}</a></li>`).join('')}</ul>`  /* 2.1161.0 (#6090): name + folders */
+    : emptyState({icon: 'tag', title: tr('No page has this tag.'), size: 'sec'});
   return `<div class="nthead"><div class="wktitle"><nav class="wkcrumbs" aria-label="${esc(tr('Path'))}"><a href="#${esc(wk_home(sp))}">${esc(wk_rootName(sp))}</a><span aria-hidden="true">/</span><span>${esc(tr('Tags'))}</span></nav><h2 class="wktagh">${ic('tag', 's')}#${esc(tag)}</h2></div></div><nav id="wk-res" aria-label="${esc(tr('Pages'))}">${rows}</nav>`;
 }
 // the #tags of a rendered text as links (not inside code / pre / links; the html is the app's Markdown)

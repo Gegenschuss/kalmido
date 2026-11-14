@@ -1690,15 +1690,16 @@ const symEmpty = (icon, title, sub = '') => emptyState({icon, title, sub});
 const botEmpty = (st, title, sub = '') => emptyState({bot: st, title, sub});
 // 2.891.0 (#5440): the same block when loading failed (says so instead of "nothing here", with "Try again") and when the
 // person may not see the thing (lock, no button). For the lists here, the office (#5450) and the calendar (#5461): they
-// only call these. o = {title, sub, size, cls, retry: function run by "Try again" (without it no button)}
+// only call these. o = {title, sub, size, cls, retry: function run by "Try again" (without it no button), action: a button beside it (2.1161.0, #6088)}
 const ES_RETRY = new Map(); let es_n = 0;
 function errorState(o = {}) {
   let act = '';
   if (typeof o.retry === 'function') {
     const k = String(++es_n); ES_RETRY.set(k, o.retry);
     if (ES_RETRY.size > 40) ES_RETRY.delete(ES_RETRY.keys().next().value);  // old screens' buttons are gone long ago
-    act = `<div class="eacts"><button type="button" class="btn" data-esretry="${esc(k)}">${ic('sync', 's')} ${esc(tr('Try again'))}</button></div>`;
+    act = `<button type="button" class="btn" data-esretry="${esc(k)}">${ic('sync', 's')} ${esc(tr('Try again'))}</button>`;
   }
+  if (act || o.action) act = `<div class="eacts">${act}${/*html-ok*/ o.action || ''/* 2.1161.0 (#6088): a second way out, ready HTML of the caller (the wiki's "Back") */}</div>`;
   return emptyState({icon: 'alert', title: o.title || tr('Could not be loaded'), size: o.size, cls: 'eerr' + (o.cls ? ' ' + o.cls : ''), action: act,
     sub: o.sub ?? (navigator.onLine === false ? tr('You are offline') : tr('Check the connection and try again.'))});
 }
@@ -2095,7 +2096,7 @@ function qaddBox(extraCls = '') {
 // paper clip (pick files: the task is created with them as attachments, the first file's name is the title when none
 // is typed; then its details open). Phones, Fold and desktop; 44 px targets on touch screens.
 function qExtraBtns(inp, lab = false) {  // 2.32.0 (#1059): lab = with a short visible label (the phone sheet)
-  const b = (act, icn, t, l) => `<button type="button" class="${lab ? 'btn sm qlab' : 'iconbtn'} qbtn" data-act="${act}" data-q="${inp}" title="${esc(t)}" aria-label="${esc(t)}">${ic(icn, 's')}${lab ? `<span aria-hidden="true">${esc(l)}</span>` : ''}</button>`;
+  const b = (act, icn, t, l) => `<button type="button" class="${lab ? 'btn sm qlab' : 'iconbtn'} qbtn" data-act="${/*html-ok*/ act/* the buttons above, built with esc() */}" data-q="${inp}" title="${esc(t)}" aria-label="${esc(t)}">${ic(icn, 's')}${lab ? `<span aria-hidden="true">${esc(l)}</span>` : ''}</button>`;
   return b('q-clip', 'qclip', tr('Add with a file…'), tr('File|quick add')) + b('q-open', 'qopen', tr('Add and open details'), tr('Details|quick add'));
 }
 // 2.32.0 (#1059): the quick add syntax as chips; a tap puts the shortcut into the field (# and ~ only the sign, the
