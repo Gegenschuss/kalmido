@@ -435,7 +435,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     for (const pct of [150, 50]) {
       await ev(`(() => { localStorage.setItem('tasks.fsize', '${pct}'); return 1; })()`);
       await nav(B + `?fs=${pct}#l/` + P); await ready(ev, idle);
-      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
+      const r = await ev(`(() => { const small = [...document.querySelectorAll('#top button, #view .iconbtn, #tabs button, #view .vsegm button')].filter(e => e.offsetWidth > 1 /* 2.1151.0 (#3835): a button hidden for the eye (kept for screen readers) is no touch target */).filter(e => e.getBoundingClientRect().height < (e.closest('.vsegm') ? 35.5 : 43.5)).map(e => (e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)); return {ui: getComputedStyle(document.documentElement).getPropertyValue('--ui').trim(), over: document.documentElement.scrollWidth > innerWidth, small, h1: !!document.querySelector('#top h1')?.offsetWidth}; })()`);
       check(!r.over && r.h1 && (pct === 150 || !r.small.length), `390 #429 ${pct} %: no sideways overflow, the title shows` + (pct === 50 ? ', touch targets still 44 px ' : ' ') + JSON.stringify(r));
       await shot(`p2130-fontsize-${pct}-390.png`);
     }
