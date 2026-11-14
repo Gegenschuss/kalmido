@@ -74,7 +74,9 @@ assert A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"}
 
 # ================================================================== schema + defaults
 cols = {r[1]: r for r in dbx("PRAGMA table_info(tasks)")}
-check("locked" in cols and cols["locked"][3] == 1 and str(cols["locked"][4]) == "0", "tasks.locked INTEGER NOT NULL DEFAULT 0 " + str(cols.get("locked")))
+# 2.1121.0 (#6043): yes / no columns are BOOLEAN NOT NULL DEFAULT false since #5952 (they still read as 0 / 1)
+check("locked" in cols and cols["locked"][2] == "BOOLEAN" and cols["locked"][3] == 1 and str(cols["locked"][4]) == "false",
+      "tasks.locked BOOLEAN NOT NULL DEFAULT false " + str(cols.get("locked")))
 r = A.post(B + "/api/tasks", json={"title": "Mine", "list_id": W})
 check(r.ok and r.json().get("locked") == 0, "a person's new task is open " + r.text[:120])
 HT = r.json()["id"]

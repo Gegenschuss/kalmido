@@ -98,7 +98,9 @@ def cb_misfits(c, table, col):
     has_id = c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? "
                        "AND column_name='id'", (table,)).fetchone()
     key = "id" if has_id else "ctid::text"
-    return [r[0] for r in c.execute(f"SELECT {key} FROM {qi(table, CB_BOOL)} WHERE {q} NOT IN (0, 1) ORDER BY 1").fetchall()]
+    # 2.1121.0 (#4949): as text - the same statement must prepare on a number column and on one already BOOLEAN
+    return [r[0] for r in c.execute(f"SELECT {key} FROM {qi(table, CB_BOOL)} "
+                                    f"WHERE {q}::text NOT IN ('0', '1', 'true', 'false') ORDER BY 1").fetchall()]
 
 
 def cb_migrate(c, at):
