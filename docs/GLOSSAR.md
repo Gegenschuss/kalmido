@@ -668,6 +668,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/periodlock.py` (`pl`) - Locking accounting periods (GoBD "Festschreibung")
 - `kalmido/office/pipeline.py` (`pl2`) - Office & finance: the sales pipeline
 - `kalmido/office/portaldocs.py` (`kp`) - The customer's documents in the customer portal (module "portal" + office)
+- `kalmido/office/postcalc.py` - the post-calculation of an accepted quotation as an invoice draft (decision of 14.11.2026)
 - `kalmido/office/privacy.py` (`dsb`) - Data protection sheets of a client
 - `kalmido/office/procdoc.py` (`pd`) - The procedure documentation (Verfahrensdokumentation, GoBD)
 - `kalmido/office/rcfolder.py` (`rcf`) - Receipts of the credit cards and of the bank file themselves into month folders (Receipts / Credit card or Bank / card or account / year / month)
@@ -1050,6 +1051,7 @@ The start-up module.
 - `static/js/office_peppol.js` (`pep`) - Office & finance, e-invoices over the Peppol network
 - `static/js/office_periods.js` (`pl`) - Office & finance, locking accounting periods + the export for the tax auditor
 - `static/js/office_pipeline.js` (`pp`) - Stages inquiry, quotation sent, order and lost
+- `static/js/office_postcalc.js` - the post-calculation dialog of an accepted quotation: planned / actual per position, then the invoice draft (2.1158.0, 4566 B)
 - `static/js/office_procdoc.js` (`pd`) - The procedure documentation (GoBD)
 - `static/js/office_receipts.js` (`rcl`) - The receipts list of the bookkeeping over all months (#office/books/receipts, "All receipts" below "Receipts this month")
 - `static/js/office_recurring.js` (`rin`) - From a template invoice. The editor of an invoice offers "

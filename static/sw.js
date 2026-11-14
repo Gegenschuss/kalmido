@@ -57,7 +57,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/wkshare.js', '/static/js/wkarea.js', '/static/js/wkhist.js', '/static/js/wkembed.js', '/static/js/wklive.js', '/static/js/wkcm.js',
   '/static/js/wktags.js', '/static/js/wiki.js', '/static/js/wkimport.js', '/static/js/wikioff.js', '/static/js/stats.js', '/static/js/calview.js',
   '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js', '/static/js/calgest.js',
-  '/static/js/calrrule.js', '/static/js/office_reprice.js', '/static/js/calabs.js', '/static/js/docviews.js', '/static/js/docfacets.js',
+  '/static/js/calrrule.js', '/static/js/office_reprice.js', '/static/js/office_postcalc.js', '/static/js/calabs.js', '/static/js/docviews.js', '/static/js/docfacets.js',
   '/static/js/docs.js', '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js',
   '/static/js/docsplit.js', '/static/js/docscan.js', '/static/js/docfetch.js', '/static/js/abdocs.js', '/static/js/docview.js',
   '/static/js/tilesize.js', '/static/js/docflows.js', '/static/js/docnotes.js', '/static/js/docpages.js', '/static/js/pdfopt.js',

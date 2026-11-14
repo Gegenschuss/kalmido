@@ -80,6 +80,8 @@ ROUTES = {
     "POST /api/office/docs/{}/invoice": ("refused", "an invoice is made from a quotation only", [{}]),
     # 2.546.0 (#4287): the route of 2.537 (#3433) that arrived on main meanwhile - tasks are made from a quotation only (otk_offer)
     "POST /api/office/docs/{}/tasks": ("refused", "tasks with a time budget come from a quotation only, never from an invoice", [{"pick": []}]),
+    # 2.1158.0 (#4566 B): the post-calculation's invoice draft comes from an accepted quotation only
+    "POST /api/office/docs/{}/postcalc": ("refused", "the post-calculation makes an invoice from an accepted quotation only, never from an invoice", [{}]),
     "POST /api/office/docs/{}/send": ("allowed", "the mail sends the stored files; the status sent is a mark (no mail server here: 409)",
                                       [{"to": "rechnung@example.com", "subject": "Changed", "text": "Changed"}]),
     "POST /api/office/docs/{}/datev": ("allowed", "the DATEV copy sends the stored files; datev_sent_at is a mark (no mail server here: 409)", [{}]),

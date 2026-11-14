@@ -66,6 +66,7 @@ EXPECT_4XX = {
     "GET /api/lists/{}/e2e/todo": (409, "no encryption change is running for the private list"),
     "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private workspace"),
     "GET /api/office/docs/{}/timesheet.pdf": (400, "no time entries of the client in the period (the own entries are on a list without a client)"),
+    "GET /api/office/docs/{}/postcalc": (409, "the sweep's quotation is not accepted: the post-calculation needs an accepted one (2.1158.0, #4566 B; p21158_b_nachkalk_test.py runs it as the freelancer)"),
     "GET /api/office/logo": (404, "no logo uploaded in the personal office"),
     "GET /api/office/books/archive/files/{}": (404, "no past DATEV year imported into the personal office, the id is a file of the file store"),
     "GET /api/office/move/check": (404, "the freelancer has no organisation to move the personal office into"),

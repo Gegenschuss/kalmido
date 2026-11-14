@@ -614,6 +614,7 @@ ORDER = (
     "office.docproject",  # 2.168.0 A (#2665): quotations / invoices bound to a project, the project's documents
     "office.offerdispo",  # 2.589.0 (#4571): shoot days of a quotation as pencilled-in bookings of the disposition (no routes)
     "office.offertasks",  # 2.537.0 C (#3433): tasks with a time budget from a quotation
+    "office.postcalc",  # 2.1158.0 (#4566 B): the post-calculation of a quotation as an invoice draft (after office.offertasks)
     "office.search",  # 2.250.0 A (#2992): office hits of the web search /api/search (no routes; used by tasks.ftsearch)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
     "agents.sheetprop",  # 2.126.1 B (#2125): table rows -> tasks as an agent's proposal (after api.v1, sheets.step2)

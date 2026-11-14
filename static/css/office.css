@@ -1333,3 +1333,13 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orp .orp-sum th{text-align:left;font-weight:400;padding:2px .625rem 2px 0}
 .orp .orp-sum td{padding:2px .25rem;text-align:right}
 .orp .orp-dev.ok{color:var(--ok, inherit)}
+/* 2.1158.0 (#4566 B): the post-calculation's preview (office_postcalc.js) */
+.opc .opc-wrap{overflow-x:auto;margin:.5rem 0}
+.opc .opc-tab{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.opc .opc-tab th,.opc .opc-tab td{padding:.25rem .5rem;border-bottom:1px solid var(--line, #ddd);vertical-align:top}
+.opc .opc-tab th[scope=row]{text-align:left;font-weight:400}
+.opc .opc-tab .num{text-align:right;white-space:nowrap}
+.opc .opc-tab small{display:block}
+.opc .opc-tab tfoot th,.opc .opc-tab tfoot td{font-weight:600;border-bottom:0}
+.opc .opc-diff.up{color:var(--warn, inherit)}
+.opc .opc-time .opc-act{font-weight:600}
