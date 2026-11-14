@@ -45,9 +45,12 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
   let ce = new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true});
   ttl.dispatchEvent(ce);
   check(ce.defaultPrevented, '#1178 touch: no browser menu over a task title');
+  // 2.1151.0 (#3835): the long press opens the task's menu with "Select" on top (was: the selection at once)
+  const lpIt = await until(() => { const it = [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]:not([disabled])')].map(b => b.textContent.trim()); return it.length && it; });
+  check((lpIt || [])[0] === 'Select' && !w.eval('S.multiMode'), '#1178 touch: the long press on the title opens the task menu, "Select" first: ' + lpIt);
+  [...d.querySelectorAll('#pop:not(.hidden) [role^="menuitem"]')].find(b => b.textContent.trim() === 'Select')?.click();
   await until(() => w.eval('S.multiMode'));
-  check(w.eval(`S.multiMode && S.multi.has(${T}) && S.multi.size === 1`), '#1178 touch: the long press on the title starts the selection with this task');
-  check(d.querySelector('#pop').classList.contains('hidden'), '#1178 touch: no task menu opens on top');
+  check(w.eval(`S.multiMode && S.multi.has(${T}) && S.multi.size === 1`), '#1178 touch: "Select" starts the selection with this task');
   // the selection bar's Move: the same list picker (#1177)
   w.eval(`multiMoveMenu(document.querySelector('#top h1') || document.body)`); await sleep(150);
   let heads = [...d.querySelectorAll('#pop .menu-list .mgrp.tch-fd > .mgh')].map(x => x.textContent);

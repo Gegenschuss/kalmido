@@ -961,7 +961,7 @@ function taskMenu(anchor, id, o = {}) {
   const inHead = sel => { const b = inPanel ? $('#detail .dtop ' + sel) : null; return !!b && getComputedStyle(b).display !== 'none'; };
   const rare = menuTidy([
     ...(open ? spr_menuItems(t, anchor) : []),  // 2.60.0 (#343): Sprint… (lists with sprints on)
-    ...(open && t.id > 0 && S.route.mod === 'tasks' && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
+    ...(open && t.id > 0 && S.route.mod === 'tasks' && !isTouch() /* 2.1151.0 B (#3835): touch drags (hold and move) */ && $(`#view .trow[data-id="${id}"]`) ? [{row: [{label: tr('Move up'), icon: 'up', title: kt(tr('Move up'), 'Alt+ArrowUp'), fn: () => taskNudge(id, -1)}, {label: tr('Move down'), icon: 'down', title: kt(tr('Move down'), 'Alt+ArrowDown'), fn: () => taskNudge(id, 1)}]}] : []),
     ...(open && t.id > 0 && dFor(t) ? [{label: tr('Waiting on a task…'), icon: 'lock', fn: () => dgDepPick(id)}] : []),  // 2.43.0 (#1330): the phone's way to a dependency
     ...(open && t.id > 0 && collab() && l?.shared && t.approval !== 'pending' ? [{label: tr('Ask for approval…'), icon: 'eye', fn: () => approvalRequest(id)}] : []),
     '-',
@@ -992,7 +992,7 @@ function taskMenu(anchor, id, o = {}) {
   ]);
   menu(anchor, [
     // 2.25.0 (UX-11): opened by a long press: the title on top, then "Select" (more tasks follow with a tap)
-    ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
+    ...(o.select ? [{label: t.title.length > 60 ? t.title.slice(0, 59) + '…' : t.title, cls: 'mhead', dis: true, fn: () => {}}, {label: tr('Select'), icon: 'select', act: 'cm-select' /* 2.1151.0 B (#3835): as cm_selHead */, fn: () => { S.multiMode = true; S.multi.add(id); S.multiLast = id; render(); }}, '-'] : []),
     ...tp_menuItems(t, anchor),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
     {head: tr('Plan|nav')},
     // date

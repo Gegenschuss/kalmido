@@ -79,6 +79,10 @@ body:is(.prbg-soft,.prbg-strong) .trow:is(.pr7,.pr5,.pr3,.pr1):not(.sel):not(.ms
 .trow.ck .meta:empty{display:none}
 .trow .ckback{color:var(--muted);flex:none}
 .trow .ckback:hover{color:var(--accent)}
+/* 2.1151.0 B (#3835): phones: a task row has no symbols besides its tick; a long press opens its menu (dnd.js tdRowMenu). The buttons stay for screen readers */
+@media (max-width:767px){
+  #view .trow .ckback,#view .trow.trtrash>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+}
 /* 1.7.0: Flow "next" marker, cycle hint, overdue banner on Today */
 .trow.flownext{box-shadow:inset 2px 0 0 var(--accent)}
 body.fab-on #detail .dbot .dcomp:not(.dctop){padding-right:var(--fab-safe)}
