@@ -35,6 +35,7 @@ async function loadRoom(rid, older = false) {
   S.tc.msgs = before ? [...j.messages, ...S.tc.msgs] : [...keep, ...j.messages, ...sent];
   e2eFromCache(S.tc.msgs); e2eRoomDecrypt(rid);  // 2.42.0 (#909): encrypted DMs (e2e.js)
   le2eChanDecrypt(rid);  // 2.64.2 (#1817): the channel of a list with the lock (liste2echan.js)
+  if (!before && S.tc.newAt?.rid !== rid) tc_newMark(rid, j.room.last_read || 0);  // 2.1162.0 (#6097): before the read mark below moves
   const last = S.tc.msgs[S.tc.msgs.length - 1];
   if (last && (!j.room.last_read || last.id > j.room.last_read) && !document.hidden) {
     try { const r = await rawFetch('POST', `/api/team/rooms/${rid}/read`, {last_id: last.id}); if (S.team) S.team.unread = r.unread; } catch { /* offline */ }
@@ -151,7 +152,9 @@ function tcMsgsHtml(list = S.tc.msgs, o = {}) {
   if (!th && !list.length && !csdBusy(ck)) return `<div class="muted cmempty" data-k="empty">${tr('No messages yet. Say hello.')}</div>`;
   const U = S.tc.users, ags = new Set((S.tc.room.members || []).filter(m => m.agent).map(m => m.id)), rd = o.root ? null : trd_pick(list);
   let prev = null, h = (th ? o.older : S.tc.more) ? `<div class="chold" data-k="older"><button type="button" class="btn sm" data-act="${th ? 'tth-older' : 'tc-older'}">${tr('Load older messages')}</button></div>` : '';
+  const nw = th ? 0 : tc_newId();  // 2.1162.0 (#6097)
   for (const m of list) {
+    if (nw && m.id === nw) { h += `<div class="chunread tcunread" role="separator" data-k="unread"><span>${esc(tr('New'))}</span></div>`; prev = null; }
     const editing = S.tc.edit === m.id && !!S.tc.editTh === th;
     const mine = m.user_id === S.me?.id, first = !prev || prev.user_id !== m.user_id || Date.parse(m.created_at) - Date.parse(prev.created_at) > 10 * 60000;
     prev = m;
@@ -187,12 +190,35 @@ function tcPatch(bottom) {
 // a tap, the wheel or a key in the log ends the "stay at the newest message" phase (the person reads / reacts)
 for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown']) document.addEventListener(ev, e => { if (S.tc?.fitUntil && e.target.closest?.('#tc-msgs')) S.tc.fitUntil = 0; }, {capture: true, passive: true});
 function teamFit(again) {
-  const box = $('#tc-msgs'); if (box) box.scrollTop = box.scrollHeight;
+  const box = $('#tc-msgs'); if (box && !tc_toNew(box)) { box.scrollTop = box.scrollHeight; if (!again) tc_pillN(0); }
   if (again) return;
   // the first load of a page (state, fonts, avatars) re-renders and grows the log after this: stay at the end for a moment
   S.tc.fitUntil = Date.now() + 2000;
   for (const ms of [60, 300, 900]) setTimeout(() => { if (document && S.route.mod === 'team' && S.tc.fitUntil > Date.now()) teamFit(true); }, ms);
 }
+// 2.1162.0 (#6097): the line "New" before the first message of someone else that was unread when the conversation was opened.
+// Taken once per opening (from last_read before the read mark moves) and kept until the conversation is left: the read mark,
+// live patches and my own new messages do not move it. Nothing unread = no line, the log opens at the end as before.
+function tc_newMark(rid, lr) {
+  const un = S.tc.msgs.filter(m => m.id > lr && m.user_id !== S.me?.id);
+  S.tc.newAt = {rid, id: un[0]?.id || 0, n: un.length};
+}
+const tc_newId = () => S.tc.newAt && S.tc.newAt.rid === S.tc.rid ? S.tc.newAt.id : 0;
+// the pill "New message ↓" with the number of unread ones (n = 0: its plain text again)
+function tc_pillN(n) {
+  const t = $('#tc-new')?.firstChild; if (!t || t.nodeType !== 3) return;
+  const v = (n ? trn('{0} new message', '{0} new messages', n) : tr('New message')) + ' ';
+  if (t.nodeValue !== v) t.nodeValue = v;
+}
+// opening: the line "New" at the top of what is seen; more unread than fit -> the pill with their number. false = no line
+function tc_toNew(box) {
+  const el = tc_newId() && box.querySelector('.tcunread'); if (!el) return false;
+  box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 4;  // sprung-ok: opening a conversation, the first unread one (#6097)
+  const far = !tcNear(box); if (far) tc_pillN(S.tc.newAt.n);
+  cf_pill('tc-new', far); return true;
+}
+// at the end again (scrolled or the pill): the pill's number goes
+document.addEventListener('scroll', e => { if (e.target.id === 'tc-msgs' && tcNear(e.target)) tc_pillN(0); }, true);
 // "@Name" of a member -> <@id> (longest names first), so the server can tell the person
 function tcMentions(text) {
   const mem = (S.tc.room?.members || []).filter(m => m.id !== S.me?.id).sort((a, b) => b.name.length - a.name.length);
@@ -334,7 +360,7 @@ const chatKeyHint = () => matchMedia('(hover:none)').matches ? tr('Send') : /Mac
 // the open conversation follows the route; switching rooms loads it
 function teamRoute(rid) {
   if (typeof cw_route === 'function' && cw_route(rid)) return;  // 2.47.1 (#1720): the phone's row of open chats / a conversation live in the chat panel
-  if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; S.tc.th = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
+  if (S.tc.rid !== rid) { S.tc.rid = rid; S.tc.newAt = null; S.tc.room = null; S.tc.msgs = []; S.tc.more = false; S.tc.edit = null; S.tc.th = null; if (rid) loadRoom(rid).then(() => { if (S.route.mod === 'team' && S.tc.rid === rid) { renderView(); teamFit(); } }); }
 }
 document.addEventListener('keydown', e => {
   if (e.target.id === 'tc-in' && e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing)  // 2.94.0 (#2024): Enter = new line, Ctrl/Cmd+Enter sends

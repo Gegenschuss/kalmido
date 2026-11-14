@@ -8678,3 +8678,8 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 /* 2.634.0 (#4797) board (mouse): the placeholder where the dragged card will land (dnd.js kph_*); the neighbours slide to
    make room (FLIP, transform only, class kflip while it runs). Reduced motion: the placeholder alone, nothing slides */
 #view .kcards>.kph{flex-shrink:0;border:2px dashed var(--accent);border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,transparent);pointer-events:auto}
+
+/* 2.1162.0 (#6107): a selection bar with many buttons (multisel.js ms_barHtml: ms4 = four and more, ms5 = five and more) on a
+   narrow phone: the symbols alone, never a cut word ("Verschi…"); the word stays in title / aria-label */
+@media (max-width:480px){ .mselbar.ms4 .mbb .mbl{display:none} .mselbar.ms4 .mbb{min-width:2.75rem;justify-content:center} }
+@media (max-width:599px){ .mselbar.ms5 .mbb .mbl{display:none} .mselbar.ms5 .mbb{min-width:2.75rem;justify-content:center} }

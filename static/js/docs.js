@@ -21,6 +21,9 @@ const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'
 // 2.65.0 (#1823): the module switch (FEATS, FEAT_DESC) and dc_shareOk are in lazyload.js (this file loads on demand)
 const dc_ws = () => (typeof wsCur === 'function' ? wsCur() : 'all');
 const dc_upWs = () => { const w = dc_ws(); return w.startsWith('org:') ? w : 'private'; };
+// 2.1162.0 (#6108): may the person add documents where they go (dc_upWs)? Private: yes; an organisation: not as read-only / guest
+// (accounting uploads receipts: docs/store.py root_add_ok). Only the view follows the server's rule.
+const dc_upOk = () => { const w = dc_upWs(); return w === 'private' || !['readonly', 'guest'].includes(wsOrg(w.slice(4))?.role); };
 const dc_hashId = () => { try { const m = location.hash.match(/^#(docs|ablage)\/(\d+)/); return m && (m[1] === 'docs' || AB_FILEIDS.has(+m[2])) ? +m[2] : null; } catch { return null; } };  // the sheet may close after its window is gone; 2.752.0 (#4887): #ablage/<id> of a file (core.js AB_FILEIDS)
 const dc_money = (a, cur) => curMoney(a, cur);  // 2.189.0 (#2475): + £; 2.368.0 C (#2983): one money format (i18n.js curMoney)
 const dc_day = d => { const s = String(d || '').slice(0, 10); return /^\d{4}-\d\d-\d\d$/.test(s) ? fmtDateNum(pd(s)) : ''; };  // 2.583.0 (#4877): always the whole date with the year (06.11.2026), no Today / weekday
@@ -226,8 +229,8 @@ function viewDocs() {
 function dc_headHtml(fold) {
   const active = dc_fEntries().length > 0;  // 2.122.0 B (#2294): the filters are drawn by dc_fltHtml / dc_fbarHtml
   const seg = fold || (typeof sbb_on === 'function' && sbb_on()) ? '' : `<div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}" class="${DC.f.review ? '' : 'on'}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}" class="${DC.f.review ? 'on' : ''}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>`;
-  const add = !fold ? `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
-      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`
+  const add = !fold ? (!dc_upOk() ? '' /* 2.1162.0 (#6108) */ : `<label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
+      <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>`)
     : fold.canAdd ? `<button type="button" class="btn pri dc-up" data-ab="upload" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span></button><input type="file" id="ab-file" multiple hidden>
       <button type="button" class="btn sm" data-ab="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>` : '';
   return `
@@ -256,7 +259,7 @@ function dc_bodyHtml(fold) {
     return before + grid + after + ab_selBar();  // 2.768.0 (#4888): the area's one bar (ablage.js)
   }
   if (!DC.docs) return `<p class="muted lempty">${tr('Loading…')}</p>`;
-  if (!DC.docs.length) return `<div class="empty nempty dc-empty">${ic('file')}<span>${active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span>${/*html-ok*/ active || DC.f.review ? '' : hlp_linkHtml('files')/* 2.1086.0 (#5820): How it works */}</div>`;
+  if (!DC.docs.length) return `<div class="empty nempty dc-empty">${ic('file')}<span>${active || DC.f.review ? tr('No documents found') : !dc_upOk() ? tr('No documents yet') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span>${/*html-ok*/ active || DC.f.review ? '' : hlp_linkHtml('files')/* 2.1086.0 (#5820): How it works */}</div>`;  // 2.1162.0 (#6108): no drop sentence where one only reads (dc_upOk)
   return grid + ab_selBar();
 }
 // 2.768.0 (#4888): the choosing mark of every card (documents, files, folders): ablage.js ab_selPick
@@ -1162,9 +1165,10 @@ document.addEventListener('input', e => {
 const dc_hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e);  // 2.750.0 (#4879): a drag begun in Kalmido never uploads
 // 2.752.0 (#4887): a folder's documents (.dc-infold) take a drop the file store's way (ablage.js: ab_upload into the folder)
 const dc_dropV = e => { const v = e.target.closest?.('.dc-view'); return v && !v.classList.contains('dc-infold') ? v : null; };
-document.addEventListener('dragenter', e => { const v = dc_dropV(e); if (!v || !dc_hasFiles(e)) return; DC.drag++; v.classList.add('dragging'); });
+document.addEventListener('dragenter', e => { const v = dc_dropV(e); if (!v || !dc_hasFiles(e) || !dc_upOk()) return;  // 2.1162.0 (#6108): no drop zone where one only reads
+  DC.drag++; v.classList.add('dragging'); });
 document.addEventListener('dragleave', e => { const v = dc_dropV(e); if (!v) return; DC.drag = Math.max(0, DC.drag - 1); if (!DC.drag) v.classList.remove('dragging'); });
-document.addEventListener('dragover', e => { if (dc_dropV(e) && dc_hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+document.addEventListener('dragover', e => { if (!dc_dropV(e) || !dc_hasFiles(e)) return; if (!dc_upOk()) { const t = Date.now(); if (t - (DC.roAt || 0) > 4000) toast(tr('You can only read here')); DC.roAt = t; return; } e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });  // 2.1162.0 (#6108): a read-only place says so
 document.addEventListener('drop', e => {
   const v = dc_dropV(e); if (!v || !dc_hasFiles(e)) return;
   e.preventDefault(); e.stopPropagation(); DC.drag = 0; v.classList.remove('dragging');
