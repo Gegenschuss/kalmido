@@ -120,10 +120,12 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const st = await ev(`(() => { const m = document.querySelector('.smodal'), n = m.querySelector('.snav'), sub = m.querySelector('.aisub:not(.admsub)') /* 2.364.0 (#3041): the Organisation area has its own strip */, bs = [...sub.querySelectorAll('button')];
       const lbl = s => { const b = m.querySelector('#s-ags [data-ag="' + s + '"] .aglbl'); return b ? getComputedStyle(b).display !== 'none' && b.textContent : ''; };
       return {nav: getComputedStyle(n).display, back: getComputedStyle(m.querySelector('.sback')).display, h: m.querySelector('.shdr h3').textContent,
-        flex: getComputedStyle(bs[0]).flexGrow, sc: sub.scrollWidth > sub.clientWidth, ox: getComputedStyle(sub).overflowX, test: lbl('test'), edit: lbl('edit'), over: document.documentElement.scrollWidth <= 390}; })()`);
+        flex: getComputedStyle(bs[0]).flexGrow, sc: sub.scrollWidth > sub.clientWidth, ox: getComputedStyle(sub).overflowX, test: lbl('test'), edit: lbl('edit'), stop: lbl('pause'), over: document.documentElement.scrollWidth <= 390,
+        hid: ['test', 'edit', 'hold'].every(s => m.querySelector('#s-ags [data-ag="' + s + '"]')?.getBoundingClientRect().width <= 1), dots: m.querySelector('#s-ags .agacts .ms-phdots')?.getBoundingClientRect().width > 20}; })()`);
     check(st.nav === 'none' && st.back !== 'none' && st.h === 'Agents', '#1060: inside an area no area tabs, a back arrow, the header names the area ' + JSON.stringify(st));
     check(st.flex === '0' && st.sc && st.ox === 'auto' && st.over, '#1060: the sub-tabs keep their width and scroll sideways ' + JSON.stringify(st));
-    check(st.test === 'Send test' && st.edit === 'Edit', '#1060: the agent card says "Send test" and "Edit" in words ' + JSON.stringify(st));
+    // 2.1151.0 (#3835): on the phone "Send test", "Edit" and the pause sit behind one "…" (its menu names them in words); the emergency stop stays in words
+    check(st.hid && st.dots && /Emergency stop|Resume/.test(st.stop || ''), '#1060 / #3835: the agent card: one "…" for test, edit and pause, the emergency stop in words ' + JSON.stringify(st));
     await shot('p2320c-390-settings-agents.png');
     await ev(`(() => { document.querySelector('.smodal .sback').click(); return 1; })()`); await sleep(400);
     const ix = await ev(`(() => { const m = document.querySelector('.smodal'); return {idx: m.classList.contains('sidx'), h: m.querySelector('.shdr h3').textContent, nav: getComputedStyle(m.querySelector('.snav')).display}; })()`);
