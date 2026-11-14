@@ -649,7 +649,9 @@ def wsh_create():
         return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     exp = wsh_expiry(b.get("expires"))
     imgs = wsh_images(b.get("images", False))
-    if len(wsh_live_rows(c, oid, owner)) >= WSH_MAX:  # 2.1138.0 (#6026): the open shares by address count too
+    # 2.1138.0 (#6026): the open shares by address count too -- not at the replay of one of them (it is counted already: the
+    # refusal would drop it, Fable review 2.1138 F1)
+    if not ads_replaying() and len(wsh_live_rows(c, oid, owner)) >= WSH_MAX:
         raise BadInput(tr("Too many shares in this workspace (at most {0})", WSH_MAX))
     ts = iso(now_utc())
     page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
@@ -693,6 +695,8 @@ def wsh_create():
                                  "AND COALESCE(k2.email, '')<>'')", (nodes[0]["id"], who)).fetchone():  # (the pair of a card by address is no share by name)
             # 2.1138.0 (#6027, review M2): the account has a share of it chosen by name -- the address gets an entry of its own
             # all the same (an open one, as for any other address); its sign-in binds it once the share by name is gone
+            if ads_replaying():  # Fable review 2.1138 F6: the replay writes nothing while the share by name lives
+                return jsonify(ok=True, by_email=True)
             ads_open(c, "wiki", uid, b["email"], {**b, "kind": "person"}, owner_id=uid, ref_id=page, path=path if folder else "")
             bump(c)
             c.commit()

@@ -24,6 +24,7 @@ FEAT = "wiki,files,collab"
 FID, F = freelancer(B, A, "frida", features=FEAT)
 UID, U = freelancer(B, A, "uma", features=FEAT)
 VID, V = freelancer(B, A, "vera", features=FEAT)
+MID, M = freelancer(B, A, "mia", features=FEAT)
 LID, L = freelancer(B, A, "lena", features=FEAT)
 dbx("UPDATE users SET email_proved=email WHERE id IN (?, ?)", (UID, VID))  # uma and vera proved their address, lena not
 
@@ -55,6 +56,8 @@ def shared_with(s):
 
 
 PB, PO = page("Bound offer"), page("Open offer")
+PM0 = page("Mia's page")
+check(share_mail(PM0, "mia@example.com").ok, "(setup) mia's unproved address: an open share")
 for pid, em in ((PB, "uma@example.com"), (PO, "nobody@example.com")):
     r = share_mail(pid, em)
     check(r.ok and r.json() == {"ok": True, "by_email": True}, f"(setup) {em} by address {r.status_code} {r.text[:200]}")
@@ -72,6 +75,10 @@ dbx("INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_sea
     "FROM obj_addr_shares, generate_series(1, 300) g WHERE id=?", (row,))
 r = F.post(B + "/api/wiki/shares", json={"page_id": PB, "kind": "link"})
 check(r.status_code == 400 and "Too many shares" in r.text, f"#6026: open shares count towards WSH_MAX {r.status_code} {r.text[:200]}")
+# Fable review 2.1138 F1: at WSH_MAX the replay of an open share (counted already) still binds it, it is not dropped
+dbx("UPDATE users SET email_proved=email WHERE id=?", (MID,))
+M = sess("mia")
+check("Mia's page" in shared_with(M), "#6026 (F1): at WSH_MAX mia's sign-in still makes her open share")
 dbx("DELETE FROM obj_addr_shares WHERE path LIKE 'zz6026/%'")
 
 # ================================================================ #6025: the file store's view of the page's node
