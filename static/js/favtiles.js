@@ -664,7 +664,7 @@ domReady(() => {
 window.addEventListener('click', e => {
   const t = e.target; if (Date.now() - FV2.held < 600) return;  // the click after a long press (the tile's menu) is none
   if (Date.now() - FVD.sw < 350 && t.closest?.('#tabs')) { e.preventDefault(); e.stopPropagation(); return; }
-  if (t.closest?.('#favgrip')) { e.preventDefault(); e.stopPropagation(); if (Date.now() - FVD.mvd > 600) fvd_set(!fvd_isOpen()); return; }
+  if (t.closest?.('#favgrip')) { e.preventDefault(); e.stopPropagation(); if (Date.now() - FVD.mvd < 350) FVD.mvd = 0; else fvd_set(!fvd_isOpen()); return; }  // #6082: only the one click after the lift
   if (!fvd_isOpen()) return;
   if (!t.closest?.('#favup') || t.closest('#favup .fv2-tile')) fvd_set(false);
 }, true);
