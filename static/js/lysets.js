@@ -194,7 +194,7 @@ function lyv_manage(v) {
       ${rowd_arrows(`<button type="button" class="iconbtn" data-lyvm="up" ${i ? '' : 'disabled'} aria-label="${esc(tr('Move up') + ': ' + r.name)}">${ic('up', 's')}</button>
       <button type="button" class="iconbtn" data-lyvm="down" ${i < n - 1 ? '' : 'disabled'} aria-label="${esc(tr('Move down') + ': ' + r.name)}">${ic('down', 's')}</button>`)}
       <button type="button" class="iconbtn ms-phsr" data-lyvm="ren" aria-label="${esc(tr('Rename') + ': ' + r.name)}" title="${esc(tr('Rename'))}">${ic('edit', 's')}</button>
-      <button type="button" class="iconbtn ms-phsr" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${ms_dots('.ms-phsr', r.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
+      <button type="button" class="iconbtn ms-phsr" data-lyvm="del" aria-label="${esc(tr('Delete') + ': ' + r.name)}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>${/*html-ok*/ ms_dots('.ms-phsr', r.name) /* 2.1151.0 C (#3835): one "…" on a phone */}</div>`).join('')
       : `<p class="muted">${esc(tr('No saved arrangements yet.'))}</p>`;
   };
   draw();
