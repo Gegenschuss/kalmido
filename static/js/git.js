@@ -229,6 +229,8 @@ function snipFileUrl(t, s) {  // the file in the list's repository (as file:line
   MD_REPO = listRepos(t.list_id).find(r => httpUrl(r.web_url)) || null;
   try { return MD_REPO ? mdFileUrl(s.path + (s.line ? ':' + s.line : '')) : null; } catch { return null; } finally { MD_REPO = keep; }
 }
+// 2.1151.0 B (#3835): phones: the head of a code snippet has no symbols (.ms-phsr: copy, edit, remove); a long press on it opens their menu
+domReady(() => ms_rowMenu('#detail .snip .sniphead', h => ms_btnMenu(h, '.iconbtn[data-act^="snip-"]', h.querySelector('.snippath')?.textContent.trim() || h.querySelector('.sniplang')?.textContent.trim() || '')));  // multisel.js loads later
 function snipHtml(t, ro) {
   if (!snipShown(t)) return '';
   if (!snipLoaded(t)) { snipLoadShow(t); return `<div class="dsec snipsec" id="d-snips"><h5>${tr('Code snippets')} <span class="muted h5note">${snipCount(t)}</span></h5><div class="muted">${tr('Loading…')}</div></div>`; }
@@ -239,7 +241,7 @@ function snipHtml(t, ro) {
     const who = s.by && s.by !== S.me?.id ? personNameAny(s.by) : '';
     return `<div class="snip" data-sid="${esc(s.id)}">
       <div class="sniphead"><span class="sniplang" title="${esc(s.lang ? tr('Language') : tr('Language (recognised automatically)'))}">${esc(lg ? snipLangName(lg) : tr('Plain text'))}</span>${where ? (fu ? `<a class="snippath" href="${esc(fu)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the file in the repository'))}"><code>${esc(where)}</code></a>` : `<code class="snippath">${esc(where)}</code>`) : ''}${who ? `<span class="muted snipby">${esc(who)}</span>` : ''}<span class="spacer"></span>
-        <button type="button" class="iconbtn" data-act="snip-copy" data-sid="${esc(s.id)}" title="${esc(tr('Copy code'))}" aria-label="${esc(tr('Copy code'))}">${ic('copy', 's')}</button>${ro ? '' : `<button type="button" class="iconbtn" data-act="snip-edit" data-sid="${esc(s.id)}" title="${esc(tr('Edit code snippet'))}" aria-label="${esc(tr('Edit code snippet'))}">${ic('edit', 's')}</button><button type="button" class="iconbtn" data-act="snip-rm" data-sid="${esc(s.id)}" title="${esc(tr('Remove code snippet'))}" aria-label="${esc(tr('Remove code snippet'))}">${ic('trash', 's')}</button>`}</div>
+        <button type="button" class="iconbtn ms-phsr" data-act="snip-copy" data-sid="${esc(s.id)}" title="${esc(tr('Copy code'))}" aria-label="${esc(tr('Copy code'))}">${ic('copy', 's')}</button>${ro ? '' : `<button type="button" class="iconbtn ms-phsr" data-act="snip-edit" data-sid="${esc(s.id)}" title="${esc(tr('Edit code snippet'))}" aria-label="${esc(tr('Edit code snippet'))}">${ic('edit', 's')}</button><button type="button" class="iconbtn ms-phsr" data-act="snip-rm" data-sid="${esc(s.id)}" title="${esc(tr('Remove code snippet'))}" aria-label="${esc(tr('Remove code snippet'))}">${ic('trash', 's')}</button>`}</div>
       <pre class="mdpre snipcode"${lg ? ` data-lang="${esc(lg)}"` : ''}><code>${hlCode(s.code, lg)}</code></pre></div>`;
   };
   const add = !ro && list.length < SNIP_MAX && !(ed && ed.sid === 'new') ? `<button type="button" class="attadd" data-act="snip-new" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add code snippet')}</span></button>` : '';
