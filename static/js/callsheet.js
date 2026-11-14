@@ -118,6 +118,7 @@ function cs_formHtml(cs) {
     <input type="file" id="cs-logofile" accept="image/png,image/jpeg" hidden>
     <div class="foot"><button class="btn" data-cs="close">${tr('Close')}</button><span class="spacer"></span>
       <button class="btn" data-cs="pdf">${ic('download', 's')} ${tr('PDF')}</button>${navigator.canShare ? `<button class="btn" data-cs="share">${ic('share', 's')} ${tr('Share')}</button>` : ''}
+      ${cs.can_edit ? `<button class="btn" data-cs="mail">${ic('mail', 's')} ${tr('Send by e-mail')}</button>` : ''}
       ${cs.can_edit ? `<button class="btn pri" data-cs="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`;
 }
 
@@ -240,6 +241,12 @@ async function cs_open(job, org) {
     if (k === 'sketchdel') { sketch = ''; const box = cs_one('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
     if (k === 'reload') { if (md._cur) { cs = md._cur; md._cur = null; sketch = undefined; draw(); } return; }
     if (k === 'save') { b.disabled = true; await save(); b.disabled = false; return; }
+    if (k === 'mail') {  // 2.1155.0 (#5652): what the form shows is what goes out (saved first when changed)
+      const dirty = sketch !== undefined || JSON.stringify(cs_collect(md)) !== JSON.stringify(cs.data || {});
+      if (dirty && !(await save())) return;
+      cs_mail(job, org);
+      return;
+    }
     if (k === 'pdf' || k === 'share') {
       const dirty = sketch !== undefined || JSON.stringify(cs_collect(md)) !== JSON.stringify(cs.data || {});
       if (cs.can_edit && dirty && !(await save())) return;  // what the form shows is what the PDF says (saved first when changed)
@@ -251,6 +258,96 @@ async function cs_open(job, org) {
         else { const u = URL.createObjectURL(blob), x = document.createElement('a'); x.href = u; x.download = fname(); document.body.append(x); x.click(); x.remove(); setTimeout(() => URL.revokeObjectURL(u), 30000); }
       } catch (er) { toast(er.message || tr('The PDF could not be made.')); }
       b.disabled = false;
+    }
+  });
+}
+
+// ---- 2.1155.0 (#5652): the call sheet by e-mail (decision of 14.11.2026): a mail with the PDF attached to the
+// distribution -- crew, agency, client, each recipient ticked and can be left out one by one; before sending ALWAYS the
+// preview with the recipients, the subject, the text (with the signature) and the PDF; no link. The server only takes
+// addresses of the distribution (hub/callsheet.py cs_mail_post) and sends each recipient a mail of their own.
+const CS_MAIL_GROUPS = [['crew', N_('Crew')], ['agency', N_('Agency')], ['client', N_('Client')]];
+/** one recipient of the choice (a checkbox, ticked) */
+function cs_rcptHtml(x, on) {
+  return `<label class="csrcpt"><input type="checkbox" data-csm-to="${esc(x.email)}"${on ? ' checked' : ''}><span class="csrn">${esc(x.name)}${x.role ? ` <span class="muted">${esc(x.role)}</span>` : ''}</span><span class="csre muted">${esc(x.email)}</span></label>`;
+}
+function cs_mailFormHtml(m, st) {
+  const groups = CS_MAIL_GROUPS.map(([g, label]) => {
+    const xs = m.recipients.filter(x => x.group === g), no = m.without.filter(x => x.group === g);
+    if (!xs.length && !no.length) return '';
+    return `<fieldset class="csrg"><legend>${tr(label)}</legend>${/*html-ok*/ xs.map(x => cs_rcptHtml(x, st.to.has(x.email))).join('')}
+      ${no.length ? `<p class="muted cshint">${tr('Without an e-mail address: {0}', no.map(x => x.name).join(', '))}</p>` : ''}</fieldset>`;
+  }).join('');
+  const none = !m.recipients.length;
+  return `<h3>${tr('Send the call sheet')}</h3>
+    ${none ? `<p class="muted">${tr('Nobody in the distribution has an e-mail address yet. Add them to the contacts of the crew, the agency or the client.')}</p>` : `<p class="lbl">${tr('Recipients')}</p>${/*html-ok*/ groups}`}
+    ${none && m.without.length ? `<p class="muted cshint">${tr('Without an e-mail address: {0}', m.without.map(x => x.name).join(', '))}</p>` : ''}
+    <div class="row"><label for="csm-subject">${tr('Subject')}</label><input id="csm-subject" maxlength="200" value="${esc(st.subject)}"></div>
+    <div class="row"><label for="csm-text">${tr('Text')}</label><textarea id="csm-text" rows="5" maxlength="5000">${esc(st.text)}</textarea></div>
+    <p class="muted cshint">${tr('Attachment')}: ${esc(m.filename)}${m.sender?.note ? ' · ' + esc(m.sender.note) : ''}</p>
+    <p class="cserr" role="alert" hidden></p>
+    <div class="foot"><button type="button" class="btn" data-csm="cancel">${tr('Cancel')}</button><span class="spacer"></span>
+      <button type="button" class="btn pri" data-csm="preview"${none ? ' disabled' : ''}>${ic('eye', 's')} ${tr('Preview')}</button></div>`;
+}
+function cs_mailPreviewHtml(p, pdfUrl) {
+  const who = p.recipients.map(x => `<li><b>${esc(x.name)}</b> <span class="muted">${esc(x.email)}</span></li>`).join('');
+  return `<h3>${tr('Preview')}</h3>
+    <p class="muted cshint">${tr('Everyone gets a mail of their own; the recipients do not see one another.')}</p>
+    <p class="lbl">${tr('To ({0})', p.recipients.length)}</p><ul class="csprev">${/*html-ok*/ who}</ul>
+    ${p.sender?.address ? `<p class="lbl">${tr('From')}</p><p>${esc([p.sender.name, p.sender.address].filter(Boolean).join(' · '))}</p>` : ''}
+    <p class="lbl">${tr('Subject')}</p><p class="csmsubj">${esc(p.subject)}</p>
+    <p class="lbl">${tr('Text')}</p><div class="csmtext">${esc(p.text)}</div>
+    <p class="lbl">${tr('Attachment')}</p><p><a class="btn sm" href="${esc(pdfUrl)}" target="_blank" rel="noopener" data-csm="pdf">${ic('file', 's')} ${esc(p.file.name)} <span class="muted">${esc(fmtSize(p.file.size))}</span></a></p>
+    <p class="cserr" role="alert" hidden></p>
+    <div class="foot"><button type="button" class="btn" data-csm="back">${tr('Back')}</button><span class="spacer"></span>
+      <button type="button" class="btn pri" data-csm="send">${ic('send', 's')} ${tr('Send')}</button></div>`;
+}
+/** opens the mail dialog of the call sheet of shoot day `job` (saved before) */
+async function cs_mail(job, org) {
+  let m;
+  try { m = await api('GET', cs_url(job, org, '/mail')); } catch { return; /* api() said it */ }
+  if (!m.sender?.way) { toast(tr('E-mail sending is not set up on this server yet: whoever runs the server sets it up.')); return; }
+  const st = {to: new Set(m.recipients.map(x => x.email)), subject: m.subject, text: m.text, step: 'form'};
+  const md = /** @type {any} */ (modal('')), card = cs_one('.card', md);
+  md.classList.add('csmd', 'csmail');
+  const err = t => { const e = cs_one('.cserr', md); if (e) { e.textContent = t || ''; e.hidden = !t; } };
+  const keep = () => {  // the form's values into st (before the preview, so "Back" shows them again)
+    if (st.step !== 'form') return;
+    st.to = new Set(cs_all('[data-csm-to]', md).filter(x => x.checked).map(x => x.dataset.csmTo));
+    st.subject = cs_one('#csm-subject', md)?.value ?? st.subject;
+    st.text = cs_one('#csm-text', md)?.value ?? st.text;
+  };
+  const sync = () => { const b = cs_one('[data-csm="preview"]', md); if (b && m.recipients.length) b.disabled = !cs_all('[data-csm-to]', md).some(x => x.checked); };
+  const form = () => { st.step = 'form'; setHtml(card, cs_mailFormHtml(m, st)); sync(); };
+  const req = preview => ({to: [...st.to], subject: st.subject, text: st.text, ...(preview ? {preview: true} : {})});
+  form();
+  md.addEventListener('change', e => { if (/** @type {any} */ (e.target).dataset?.csmTo !== undefined) sync(); });
+  md.addEventListener('click', async e => {
+    const b = /** @type {any} */ (e.target).closest?.('[data-csm]'); if (!b || b.disabled) return;
+    const k = b.dataset.csm;
+    if (k === 'cancel') { md.remove(); return; }
+    if (k === 'back') { form(); return; }
+    if (k === 'preview') {
+      keep();
+      if (st.to.size > m.max) { err(tr('At most {0} recipients at once', m.max)); return; }
+      b.disabled = true;
+      try {
+        const p = await api('POST', cs_url(job, org, '/mail'), req(true));
+        st.step = 'preview';
+        setHtml(card, cs_mailPreviewHtml(p, cs_url(job, org, '/pdf') + '&inline=1'));
+      } catch { b.disabled = false; /* api() said it */ }
+      return;
+    }
+    if (k === 'send') {
+      b.disabled = true; b.textContent = tr('Sending…');
+      try {
+        const r = await api('POST', cs_url(job, org, '/mail'), req(false));
+        if (r.failed?.length) {
+          setHtml(card, `<h3>${tr('Send the call sheet')}</h3><p>${tr('Sent to {0} of {1} recipients.', r.sent.length, r.sent.length + r.failed.length)}</p>
+            <p class="lbl">${tr('Not sent')}</p><ul class="csprev">${/*html-ok*/ r.failed.map(x => `<li><b>${esc(x.email)}</b> <span class="muted">${esc(x.error)}</span></li>`).join('')}</ul>
+            <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-csm="cancel">${tr('Close')}</button></div>`);
+        } else { md.remove(); toast(trn('Call sheet sent to {0} recipient', 'Call sheet sent to {0} recipients', r.sent.length)); }
+      } catch { b.disabled = false; b.textContent = tr('Send'); /* api() said it */ }
     }
   });
 }

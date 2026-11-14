@@ -42,7 +42,10 @@ uploaded at the call sheet: it is saved at the contact as its photo through the 
 op_contact_edit: the contact's write right, 403 else, the person's undo step, vCard / sync) and so counts everywhere.
 GET  /api/team/dispo/callsheet/<job>/logo?org=             the production's logo (PNG; 404 without one)
 GET  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  the photo of a contact of the area the viewer reads (404 else)
-PUT  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  {photo: data URI PNG / JPEG}: the contact's new photo (the logo)"""
+PUT  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  {photo: data URI PNG / JPEG}: the contact's new photo (the logo)
+2.1155.0 (#5652): the call sheet by e-mail, the PDF attached, to the distribution (crew, agency, client; see cs_mail_post).
+GET  /api/team/dispo/callsheet/<job>/mail?org=   the form: the recipients, those without an address, subject, text, sender
+POST /api/team/dispo/callsheet/<job>/mail?org=   {to: [...], subject?, text?, preview?}: the preview, else one mail each"""
 import base64
 import binascii
 import hashlib
@@ -995,15 +998,166 @@ def cs_pdf(c, uid, oid, job, rows):
     return pdf_write(doc.pages, doc.images, title=T(N_("Call sheet")) + ": " + title, author=prod["name"])
 
 
+def cs_pdf_name(rows):
+    """The file name of the call sheet PDF of the job's bookings rows (download and mail attachment)."""
+    fn = (re.sub(r"[^A-Za-z0-9._-]+", "-", rows[0]["title"] or "")[:50].strip("-") or "shoot") + "-" + min(b["start"][:10] for b in rows)
+    return f"callsheet-{fn}.pdf"
+
+
 @app.get("/api/team/dispo/callsheet/<job>/pdf")
 def cs_pdf_route(job):
     """The call sheet of shoot day `job` as a PDF (see the module text)."""
     c, uid, oid, rows = cs_gate(job)
     data = cs_pdf(c, uid, oid, job, rows)
-    fn = (re.sub(r"[^A-Za-z0-9._-]+", "-", rows[0]["title"] or "")[:50].strip("-") or "shoot") + "-" + min(b["start"][:10] for b in rows)
     disp = "inline" if request.args.get("inline") else "attachment"
-    return Response(data, mimetype="application/pdf", headers={"Content-Disposition": f'{disp}; filename="callsheet-{fn}.pdf"',
+    return Response(data, mimetype="application/pdf", headers={"Content-Disposition": f'{disp}; filename="{cs_pdf_name(rows)}"',
                                                                "Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------- 2.1155.0 (#5652): the call sheet by e-mail
+# Decision of 14.11.2026: the call sheet goes out as a mail with the PDF attached; every recipient of the distribution
+# (crew, agency, client) can be left out one by one; before sending there is always a preview with the recipients, the
+# subject, the text and the PDF; no link. The mail leaves the way the office's document mails leave (office/mailsig.py: the
+# person's signature, sender name, the workspace's mailbox or the server's address, Reply-To) and counts against the same
+# day's limits (office/invoices.py h6c_send_budget, inv_own_text_quota); each recipient gets a mail of their own (the
+# addresses of the crew and the client are not shown to one another). Only addresses of the distribution can be chosen --
+# no address typed in -- so the call sheet is no way to mail anything to anybody.
+CS_MAIL_MAX = 60  # recipients of one send at most (the crew of a big shoot day, agency and client)
+CS_MAIL_TEXT = 5000
+CS_MAIL_RE = re.compile(r"[^@\s,;<>()\"'\[\]]+@[^@\s,;<>()\"'\[\]]+\.[^@\s,;<>()\"'\[\]]+")
+CS_GROUPS = ("crew", "agency", "client")
+
+
+def cs_mail_rcpts(c, uid, oid, job, rows):
+    """The distribution of the call sheet by e-mail: ([{email, name, group: crew | agency | client, role}] each address once,
+    crew in booking order, then the agency, then the client; [{name, group, role}] of those without an address). Only the
+    addresses the call sheet itself shows the person: the crew's from the area's address books (cs_people), the contacts
+    chosen (cs_contact), else an address in the free text of agency / client, else the client file's (client_rows)."""
+    d = cs_data(cs_row(c, oid, job))
+    a = cs_auto(c, uid, oid, rows, d, choice=False)
+    out, none, seen = [], [], set()
+
+    def add(group, name, mail, role=""):
+        mail, name, role = (mail or "").strip(), (name or "").strip(), (role or "").strip()
+        if mail and len(mail) <= 254 and CS_MAIL_RE.fullmatch(mail):
+            if mail.lower() not in seen:
+                seen.add(mail.lower())
+                out.append({"email": mail, "name": name or mail, "group": group, "role": role})
+        elif name:
+            none.append({"name": name, "group": group, "role": role})
+
+    def free(group, text):
+        m = CS_MAIL_RE.search(text)
+        lines = [x.strip() for x in text.splitlines() if x.strip() and (not m or m.group(0) not in x)]
+        add(group, lines[0] if lines else "", m.group(0) if m else "")
+
+    for x in a["crew"]:
+        if not x["open"]:
+            add("crew", x["name"], x["mail"], x["function"])
+    ac, cc, cl = a["agency_contact"], a["client_contact"], a["client"]
+    if ac:
+        add("agency", ac["person"] or ac["company"], ac["email"], ac["company"] if ac["person"] else "")
+    elif d.get("agency"):
+        free("agency", d["agency"])
+    if cc:
+        add("client", cc["person"] or cc["company"], cc["email"], cc["company"] if cc["person"] else "")
+    elif d.get("client"):
+        free("client", d["client"])
+    elif cl.get("name") or cl.get("contact"):
+        add("client", cl.get("contact") or cl.get("name"), cl.get("email"), cl.get("name") if cl.get("contact") else "")
+    return out, none
+
+
+def cs_mail_default(c, uid, rows, a=None):
+    """(subject, text) of the call sheet's mail in the person's language (the language of the PDF)."""
+    lg = lang(c, uid)
+    proj = cs_project(c, uid, rows) if a is None else {"name": a["project"]}
+    title = proj.get("name") or rows[0]["title"] or ""
+    d0 = cs_when(rows)[0]
+    day = cs_weekday(d0, lg) + ", " + pdf_date(d0, lg)
+    return (tr(N_("Call sheet: {0} – {1}"), title, day, lg=lg).strip(" –"),
+            tr(N_("Hello,\n\nattached is the call sheet for {0} on {1}."), title, day, lg=lg))
+
+
+def cs_mail_way(c, uid, oid):
+    """{way, address, note} of the person's mails from area oid (office/mailsig.py ofm_sender); way '' = no way out."""
+    from ..office.mailsig import OFM_NOTE_BOX, OFM_NOTE_SERVER, ofm_sender
+    snd = ofm_sender(c, oid, uid)
+    note = tr(OFM_NOTE_BOX, snd["addr"]) if snd["via"] in ("workspace", "private") else tr(OFM_NOTE_SERVER) if snd["via"] else ""
+    return {"way": snd["via"], "address": snd["addr"], "name": snd["name"] or "", "note": note}
+
+
+@app.get("/api/team/dispo/callsheet/<job>/mail")
+def cs_mail_get(job):
+    """2.1155.0 (#5652): the form of the call sheet's mail: {recipients, without, subject, text, filename, sender, can_send}."""
+    c, uid, oid, rows = cs_gate(job)
+    rc, none = cs_mail_rcpts(c, uid, oid, job, rows)
+    subject, text = cs_mail_default(c, uid, rows)
+    return jsonify(recipients=rc, without=none, subject=subject, text=text, filename=cs_pdf_name(rows), sender=cs_mail_way(c, uid, oid),
+                   can_send=org_writes(c, uid, oid), max=CS_MAIL_MAX)
+
+
+@app.post("/api/team/dispo/callsheet/<job>/mail")
+def cs_mail_post(job):
+    """2.1155.0 (#5652): {to: [addresses of the distribution], subject?, text?, signature?, preview?}. preview true: what would
+    go out -- {recipients, subject, text (with the signature), sender, reply_to, file: {name, size}}, nothing sent or counted.
+    Else one mail per recipient with the PDF attached -> {sent: [address], failed: [{email, error}]}; nothing sent at all:
+    the first refusal (409 the mail server, 429 a day's limit). The shoot day's write right (a read-only member 403); 409
+    without a way out (no SMTP on the server and no mailbox); 400 for an address that is not in the distribution."""
+    from ..office.invoices import _mail, h6c_send_budget, inv_clean_subject, inv_own_text_quota
+    from ..office.ledger import ofx_log
+    from ..office.letters import lt_multi
+    from ..office.mailsig import ofm_mail, ofm_own_text, ofm_reply
+    from .dspkern import dsk_need_day
+    c, uid, oid, rows = cs_gate(job)
+    dsk_need_day(c, uid, rows[:1])  # sending is a change of the shoot day's people's day: the write right of saving it
+    b = body()
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+    way = cs_mail_way(c, uid, oid)
+    if not way["way"]:
+        raise Denied(409, tr("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
+    to = b.get("to")
+    if not isinstance(to, list) or not to or len(to) > CS_MAIL_MAX or not all(isinstance(x, str) for x in to):
+        raise BadInput(tr("Invalid value: {0}", "to"))
+    rc, _none = cs_mail_rcpts(c, uid, oid, job, rows)
+    known = {x["email"].lower(): x for x in rc}
+    want = list(dict.fromkeys(x.strip().lower() for x in to))
+    if any(x not in known for x in want):
+        raise BadInput(tr("Invalid value: {0}", "to"))
+    chosen = [known[x] for x in want]
+    d_subject, d_text = cs_mail_default(c, uid, rows)
+    subject = inv_clean_subject(b.get("subject")) or d_subject
+    text = lt_multi(b.get("text"), "text", CS_MAIL_TEXT).strip()
+    own = bool(text) and text != d_text.strip()
+    mail = ofm_mail(c, oid, uid, text or d_text, {"signature": b.get("signature", True)})
+    own = own or ofm_own_text(c, oid, uid, mail)
+    rt = ofm_reply(c, oid, mail["profile"])
+    pdf = cs_pdf(c, uid, oid, job, rows)
+    fname = cs_pdf_name(rows)
+    if b.get("preview"):
+        return jsonify(recipients=chosen, subject=subject, text=mail["text"], sender=way, reply_to=rt or "",
+                       file={"name": fname, "size": len(pdf)})
+    if own:
+        inv_own_text_quota(c, oid, uid)  # a member's own words to people outside: the organisation's day's limit (one send counts once)
+    c.commit()
+    sent, failed, first = [], [], None
+    for x in chosen:
+        try:
+            h6c_send_budget(c, oid, uid, [x["email"]])  # the day's limits of the office mails (per area, person, address)
+            ofx_log(c, oid, "send", target="callsheet", detail={"job": job, "to": x["email"], **({"own_text": 1} if own and not sent else {})})
+            _mail(x["email"], subject, mail["text"], attachments=[(fname, pdf, "application/pdf")], from_name=mail["name"],
+                  reply_to=rt, **mail["kw"])
+        except Denied as e:  # nothing of this one is kept: neither its count nor its log entry
+            c.rollback()
+            first = first or e
+            failed.append({"email": x["email"], "error": e.text()})
+            continue
+        c.commit()
+        sent.append(x["email"])
+    if not sent and first is not None:
+        raise first
+    return jsonify(sent=sent, failed=failed)
 
 
 
