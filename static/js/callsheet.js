@@ -292,7 +292,7 @@ function cs_mailFormHtml(m, st) {
 function cs_mailPreviewHtml(p, pdfUrl) {
   const who = p.recipients.map(x => `<li><b>${esc(x.name)}</b> <span class="muted">${esc(x.email)}</span></li>`).join('');
   return `<h3>${tr('Preview')}</h3>
-    <p class="muted cshint">${tr('Everyone gets a mail of their own; the recipients do not see one another.')}</p>
+    <p class="muted cshint">${tr('Everyone gets an e-mail of their own; the recipients do not see one another.')}</p>
     <p class="lbl">${tr('To ({0})', p.recipients.length)}</p><ul class="csprev">${/*html-ok*/ who}</ul>
     ${p.sender?.address ? `<p class="lbl">${tr('From')}</p><p>${esc([p.sender.name, p.sender.address].filter(Boolean).join(' · '))}</p>` : ''}
     <p class="lbl">${tr('Subject')}</p><p class="csmsubj">${esc(p.subject)}</p>

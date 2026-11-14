@@ -18551,7 +18551,7 @@
   "At most {0} recipients at once": "Höchstens {0} Empfänger auf einmal",
   "Call sheet sent to {0} recipient": ["Call Sheet an {0} Empfänger verschickt", "Call Sheet an {0} Empfänger verschickt"],
   "Call sheet: {0} – {1}": "Call Sheet: {0} – {1}",
-  "Everyone gets a mail of their own; the recipients do not see one another.": "Jeder bekommt eine eigene Mail; die Empfänger sehen einander nicht.",
+  "Everyone gets an e-mail of their own; the recipients do not see one another.": "Jeder bekommt eine eigene E-Mail; die Empfänger sehen einander nicht.",
   "Hello,\n\nattached is the call sheet for {0} on {1}.": "Hallo,\n\nanbei das Call Sheet für {0} am {1}.",
   "Nobody in the distribution has an e-mail address yet. Add them to the contacts of the crew, the agency or the client.": "Im Verteiler hat noch niemand eine E-Mail-Adresse. Trag sie bei den Kontakten von Crew, Agentur oder Kunde ein.",
   "Recipients": "Empfänger",
