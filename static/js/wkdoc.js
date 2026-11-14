@@ -73,7 +73,7 @@ function wdxDocx(p) {
       if (n.nodeType === 3) { if ((n.textContent || '').trim()) body.push(para(run(n.textContent.trim(), {}), quote ? 'Quote' : '')); continue; }
       if (n.nodeType !== 1) continue;
       const e = /** @type {HTMLElement} */ (n), tg = e.tagName;
-      if (/^H[1-6]$/.test(tg)) body.push(para(inl(e), 'Heading' + tg[1]));
+      if (/^H[1-6]$/.test(tg)) body.push(para(inl(e), 'Heading' + Math.min(6, Math.max(1, +tg[1] - top + 1))));  // the app draws "#" as h4: the page's highest level is Heading1
       else if (tg === 'P') body.push(para(inl(e), quote ? 'Quote' : ''));
       else if (tg === 'UL' || tg === 'OL') list(e, 0);
       else if (tg === 'BLOCKQUOTE') blocks(e, true);
@@ -91,7 +91,7 @@ function wdxDocx(p) {
       else { const t = inl(e); if (t) body.push(para(t, quote ? 'Quote' : '')); }
     }
   };
-  const dom = wdxDom(p);
+  const dom = wdxDom(p), top = Math.min(6, ...[...dom.querySelectorAll('h1, h2, h3, h4, h5, h6')].map(h => +h.tagName[1]));
   if (!wdxDupTitle(dom, title)) body.push(para(run(title, {}), 'Title'));
   blocks(dom);
   const hs = Math.round(lk.fs * 2), ln = Math.round(240 * lk.lh / 1.15), after = Math.round(lk.fs * lk.gap * 20), side = Math.round(lk.side * 56.7), f = lk.font;
