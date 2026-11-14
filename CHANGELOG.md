@@ -21,6 +21,15 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.1162.0] - 2026-11-14
+
+Package 2.1162 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Polish Dateien: Handy - Papierkorb-Knöpfe überlapp, Polish Dateien: Schreibknöpfe nur).
+### Added
+- #6097: Team chat - opening a conversation with unread messages shows a line "New" before the first unread one and opens there instead of at the end; with more unread than fit on the screen the "New message" pill shows their number. The line stays until the conversation is left.
+### Fixed
+- #6108: Files and documents show New folder, Upload, Scan, Add documents, the "+" in the tree, the drop frame and the drop sentence only where the person may write (not for read-only, guest, and for files not for accounting); the selection bar leaves out Move and Trash when nothing chosen can be changed; dropping files on a read-only place says "You can only read here". Only the view follows the server's rights.
+- #6107: Files on phones and tablets - in the trash Restore and Delete permanently are symbol buttons next to each other (the word in their label), the badges of a row give way to the name, and the selection bar shows only symbols when its words would be cut off ("Verschi…").
+
 ## [2.1155.0] - 2026-11-14
 
 Package 2.1155 (Bündel: Call Sheet versenden (an Crew, Agentur, Kunde)).
@@ -501,7 +510,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1155.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1162.0...HEAD
+[2.1162.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1162.0
 [2.1155.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1155.0
 [2.1150.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1150.0
 [2.1147.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1147.0
