@@ -186,7 +186,7 @@ r = export(A, P1, "pdf")
 check(r.status_code == 409 and "wiki_e2e" in r.text, f"#5524: a space with the lock 409 wiki_e2e ({r.status_code}) {r.text[:200]}")
 sql("UPDATE wiki_spaces SET e2e=NULL WHERE org_id=?", (ORG,), write=True)
 
-# ---- freelancer parity
+# ---- freelancer parity  (freelancer-matrix: wiki)
 FID2, Fr = freelancer(B, A)
 FP = page(Fr, "Invoice letter", "## Payment\n\nPlease pay **soon**.", space="private")
 r = export(Fr, FP, "pdf")
