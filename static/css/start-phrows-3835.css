@@ -18,3 +18,9 @@
   #side .fhead .fmenu{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0;transform:none}
   #side .sbpw>.srow{padding-right:.5rem}
 }
+/* 2.1151.0 C (#3835): settings / dialog rows on a phone: .ms-phacts = a box of row buttons that is hidden as a whole except its
+   one "…" (ms_dots), which opens the same actions */
+@media (max-width:767px){
+  .ms-phacts>:not(.ms-phdots){position:absolute!important;width:1px!important;min-width:0!important;height:1px!important;min-height:0!important;padding:0!important;margin:-1px!important;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0!important}
+  .aglist .agsrow .agacts.ms-phacts{flex:none;margin-left:auto}
+}
