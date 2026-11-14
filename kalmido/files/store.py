@@ -876,9 +876,9 @@ def fs_addr_log_purge(c):
                 sids.add((int(d["node_id"]), str(d.get("id"))))
         n = 0
         for nid, uid in sorted(pairs):
-            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND action='share' AND detail LIKE ?", (nid, f"user:{uid}:%")).rowcount or 0
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND action='share' AND detail ILIKE ?", (nid, f"user:{uid}:%")).rowcount or 0
         for nid, sid in sorted(sids):
-            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND ((action='unshare' AND detail=?) OR (action='share_change' AND detail LIKE ?))",
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND ((action='unshare' AND detail=?) OR (action='share_change' AND detail ILIKE ?))",
                            (nid, sid, sid + ":%")).rowcount or 0
     return n
 
