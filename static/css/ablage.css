@@ -37,8 +37,8 @@
   .abtools{flex-wrap:nowrap;min-width:0}
   .abtools .abmbtn{display:inline-flex;margin-left:auto;flex:none}
   .abcrumbs{flex-wrap:nowrap;overflow:hidden;white-space:nowrap;margin-bottom:0}
-  .abcrumbs .abcfar,.abcrumbs .abcsegcur{display:none}
   .abcrumbs .abcseg{display:inline-flex;align-items:center;gap:.25rem;min-width:0}
+  .abcrumbs .abcseg.abcfar,.abcrumbs .abcseg.abcsegcur,.abcrumbs .linkbtn.abcfar{display:none}
   .abcrumbs .abcell{display:inline-flex;align-items:center;flex:none}
   .abcrumbs .linkbtn{flex:0 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .abcrumbs>.linkbtn{flex:none;max-width:45%}

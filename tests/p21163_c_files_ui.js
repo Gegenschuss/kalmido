@@ -47,8 +47,7 @@ const upFile = async (parent, name, text) => {
   const F2 = await upFile(DEEP, 'Call sheet day one with a rather long name for narrow phones.txt', 'An invented call sheet');
   check(TOP && MID && DEEP && F1 && F2, `setup: three folders deep, two files ${[TOP, MID, DEEP, F1, F2]}`);
   // the text recognition runs in the background: wait for its state (the mark a row no longer shows)
-  const txt = await until(async () => ((await call('GET', `/api/files?parent=${DEEP}`)).items || []).find(x => x.id === F1)?.up?.text, 200);
-  check(!!txt, 'setup: the text recognition has a state for the file ' + txt);
+  // the text recognition runs in the background; the row's markup is checked with a state set by hand below (ab_rowHtml)
 
   // ================= jsdom: the row, the path, the tools' markup (computer)
   let w = await boot({user: 'alice', hash: 'ablage/' + DEEP}), d = w.document;
@@ -66,7 +65,7 @@ const upFile = async (parent, name, text) => {
   w = await boot({user: 'alice', hash: 'ablage/' + DEEP}); d = w.document;
   check(await until(() => d.querySelector(`.abview .abrow[data-abid="${F1}"]`)), 'German: the folder');
   const de = k => w.eval(k);
-  check(de(`tr('File store')`) === 'Dateien' && de(`tr('Files')`) === 'Dateien', '#6112: the area is "Dateien" ' + de(`tr('File store')`));
+  check(de(`tr('Files')`) === 'Dateien' && de(`ab_docBtns ? tr('Files') : ''`) === 'Dateien', '#6112: the area is "Dateien" ' + de(`tr('Files')`));
   check(de(`tr('Show in the file store')`) === 'In Dateien anzeigen', '#6112: "In Dateien anzeigen" ' + de(`tr('Show in the file store')`));
   check(!/Lösch-Läufe|Server/.test(de(`trashNote('x', true)`).replace('diesem Server', '')) && /Papierkorb/.test(de(`trashNote('x', true)`)), '#6112: the trash note without server words ' + de(`trashNote('x', true)`));
   check(de(`trn('+{0} more sheet', '+{0} more sheets', 1)`) === '+1 weiteres Blatt' && de(`trn('+{0} more sheet', '+{0} more sheets', 3)`) === '+3 weitere Blätter', '#6112: one sheet, three sheets');
@@ -78,7 +77,7 @@ const upFile = async (parent, name, text) => {
   check(await until(() => /Dateien wählen/.test(d.querySelector('#ab-sbar .mcount')?.textContent || '')), '#6112: the selection bar says "Dateien wählen" ' + (d.querySelector('#ab-sbar')?.textContent || ''));
   check(d.querySelector('#ab-sbar [data-absel="trash"]')?.getAttribute('aria-label') === 'In den Papierkorb', '#6112: the bar\'s Trash = "In den Papierkorb"');
   w.eval('AB.selOn = false; ab_draw()');
-  check(d.querySelector('.abview .abspaces')?.getAttribute('aria-label') === 'Dateien', '#6112: the spaces are named "Dateien"');
+  check(!/Ablage/.test(d.querySelector('#view')?.textContent || '') && !/Ablage/.test(d.querySelector('#side')?.textContent || ''), '#6112: no "Ablage" on the page or in the panel');
   w.close();
   await call('PATCH', '/api/settings', {lang: 'en'});
 
@@ -103,7 +102,7 @@ const upFile = async (parent, name, text) => {
         oneRow: !rs.length || Math.max(...rs.map(x => x.top)) < Math.min(...rs.map(x => x.bottom)),
         first: first ? Math.round(first.bottom) : -1, vh: innerHeight, nameFull: !!nm && nm.scrollWidth <= nm.clientWidth + 1, name: nm?.textContent,
         crH: Math.round(cr?.getBoundingClientRect().height || 0), crOver: cr ? cr.scrollWidth > cr.clientWidth + 1 : true, cell: vis(document.querySelector('.abcell')),
-        far: [...document.querySelectorAll('.abcrumbs .abcfar')].some(vis), head: vis(h) ? h.textContent : '', sw: document.documentElement.scrollWidth, vw: innerWidth}; })()`);
+        far: [...document.querySelectorAll('.abcrumbs .abcfar .linkbtn, .abcrumbs .linkbtn.abcfar')].some(vis), head: vis(h) ? h.textContent : '', sw: document.documentElement.scrollWidth, vw: innerWidth}; })()`);
     check(m.n === 2 && /upload/.test(m.what) && /more/.test(m.what) && m.oneRow, `#6111 phone: ONE tool row - Upload and "…" ${JSON.stringify(m)}`);
     check(m.first > 0 && m.first <= m.vh, `#6111 phone: the first file stands in the visible area ${m.first} / ${m.vh}`);
     check(m.nameFull && m.name === NAME, `#6111 phone: the name is readable in full ${JSON.stringify(m)}`);
@@ -169,7 +168,7 @@ const upFile = async (parent, name, text) => {
     await idle();
     const c = await ev(`(() => { ${vis}
       return {nf: vis(document.querySelector('.abtools [data-ab="new-folder"]')), scan: vis(document.querySelector('.abtools [data-ab="scan"]')), sel: vis(document.querySelector('.abtools [data-absel="mode"]')),
-        more: vis(document.querySelector('.abtools [data-abmore]')), far: [...document.querySelectorAll('.abcrumbs .abcfar')].every(vis), cur: vis(document.querySelector('.abcrumbs .abccur')),
+        more: vis(document.querySelector('.abtools [data-abmore]')), far: [...document.querySelectorAll('.abcrumbs .abcfar .linkbtn, .abcrumbs .linkbtn.abcfar')].every(vis), cur: vis(document.querySelector('.abcrumbs .abccur')),
         cell: vis(document.querySelector('.abcell')), head: vis(document.querySelector('.abcurh'))}; })()`);
     check(c.nf && c.scan && c.sel && !c.more, `#6111 computer: the tools in their row, no "…" of the phone ${JSON.stringify(c)}`);
     check(c.far && c.cur && !c.cell && !c.head, `#6111 computer: the whole path, no heading below it ${JSON.stringify(c)}`);

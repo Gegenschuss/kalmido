@@ -131,7 +131,7 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
           seg: vis(document.querySelector('.abview [data-abdv="list"]')), more: vis(document.querySelector('.abview .dc-bar [data-abmore]')), menu: vis(r?.querySelector('[data-ab="menu"]')), menuW: Math.round(r?.querySelector('.abdl-act')?.getBoundingClientRect().width || 0),
           sw: document.documentElement.scrollWidth, vw: innerWidth, right: Math.round(document.querySelector('.abdl').getBoundingClientRect().right),
           // 2.783.0 (#5356): the folder's tools in ONE line - every visible item on the same row, none past the right edge
-          tools: (() => { const t = document.querySelector('.abview .abtools'), it = t ? [...t.children].filter(vis).map(e => e.getBoundingClientRect()) : [];
+          tools: (() => { const t = document.querySelector('.abview .abtools'), it = t ? [...t.querySelectorAll(':scope > *, :scope > .abwide > *')].filter(vis).map(e => e.getBoundingClientRect()) : [];  /* 2.1163.0 (#6111): the tools wrapped in .abwide (display: contents) */
             return {n: it.length, ovl: !it.length || Math.max(...it.map(x => x.top)) < Math.min(...it.map(x => x.bottom)), h: Math.round(t?.getBoundingClientRect().height || 0),
               maxH: Math.round(Math.max(0, ...it.map(b => b.height))), right: Math.round(Math.max(0, ...it.map(b => b.right))), tr: Math.round(t?.getBoundingClientRect().right || 0)}; })() }; })()`);
       if (W >= 768) check(m.head && m.type && !m.sub, `${W}: the header and the column Type, no second line ${JSON.stringify(m)}`);
