@@ -300,7 +300,7 @@ function newsText(it, U) {
     case 'whorgcut': return tr('Your webhook {0} no longer delivers events of the organisation {1}. An admin of it can set it up as an organisation webhook.', q(d.webhook || ''), q(d.org || ''));  // 2.380 G (#3391)
     case 'orggone': return tr('The organisation {0} was deleted.', q(d.name || '')) + (olvText(d.own) ? ' ' + esc(tr('Yours that went with it: {0}.', olvText(d.own))) : '');
     case 'connreq': return tr('{0} wants to connect with you', who);  // 2.49.0 (#1106)
-    case 'connok': return tr('{0} accepted your connection request', who);
+    case 'connok': return d.via === 'invite' ? tr('{0} accepted your invitation and is connected with you now', who) : tr('{0} accepted your connection request', who);  // 2.1156.0 (#4550): an invitation link
     case 'lytpl': return tr('{0} sent you the arrangement {1}', who, q(d.name || ''));  // 2.55.0 (#1068)
     case 'dispo': return tr('{0} booked you: {1} ({2})', who, q(d.title || ''), d.start ? esc(fmtDayAbs(d.start.slice(0, 10))) : '');  // 2.50.0 (#1194)
     case 'leavereq': return tr('{0} asks for holiday ({1})', who, d.start ? esc(fmtDayAbs(d.start) + (d.end && d.end !== d.start ? ' – ' + fmtDayAbs(d.end) : '')) : '');  // 2.125.0 A (#2117)

@@ -220,7 +220,7 @@ function navWatch(w) {
 }
 exports.navTrace = w => { try { return JSON.stringify({hash: w.location.hash, state: w.history.state, dialogs: [...w.document.querySelectorAll('.modal')].map(m => m.className), log: w.__nav?.log || []}); } catch (e) { return 'navTrace: ' + e.message; } };
 exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, startPage, shared = null, allWs = false} = {}) {
-  const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons, startPage});
+  const cookie = proxy || user === null ? '' : await exports.login(user, undefined, {rowIcons, startPage});  // 2.1156.0 (#4550): user null = a visitor without a session
   if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons, startPage});  // 2.56.1 (#1799)
   if (!allWs && /^office(\/|$)/.test(hash)) await exports.officeWs(proxy ? {'Remote-User': proxy} : {Cookie: cookie});  // 2.543.0 (#4606)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last

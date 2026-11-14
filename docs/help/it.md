@@ -232,6 +232,18 @@ anche una propria chat.
 Cosa succede dopo: i messaggi fissati restano nella barra sopra i messaggi (al massimo cinque per conversazione); un
 thread mostra le risposte a quel messaggio e i suoi partecipanti vengono avvisati.
 
+<!-- help: team#how-to-invite-someone-without-an-account-by-a-link src=0b47d08909 -->
+## Invitare con un link qualcuno senza account
+
+1. In Impostazioni > Account scegli **Trova una persona …**.
+2. Scegli **Invita con link**, aggiungi se vuoi per chi è (lo vedi solo tu) e scegli **Crea link**.
+3. Invia il link con **Copia** o **Condividi**, oppure fai scansionare il codice QR alla persona.
+
+Cosa succede poi: chi apre il link crea un account con nome e indirizzo e-mail ed è subito collegato con te; ricevi una
+notifica. Il link funziona una volta e per 14 giorni e viene mostrato solo subito dopo averlo creato; **Ritira** chiude
+subito un link aperto. Chi ha già un account lo apre dopo aver effettuato l'accesso e conferma il collegamento. Un admin del
+server può disattivare questi link (Impostazioni > Server > Accesso).
+
 <!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
 ## Creare un budget domestico
 

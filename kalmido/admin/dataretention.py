@@ -36,6 +36,7 @@ from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
 from ..integrations.mail import MAIL_OUT_ON, mail_send  # 2.1062.0 (#5786): passed down to oinv_expire (accounts stands below)
 from ..accounts.orginvite import oinv_expire, ojn_purge  # 2.1005.0 (#5118): expired organisation invitations; 2.1062.0 (#5786): never used accounts
+from ..accounts.cinvite import cinv_purge  # 2.1156.0 (#4550): a person's invitation links, used / taken back / run out
 
 # 2.239.0 D (#2874): file store nodes that are office records (receipts assigned or not, filed letters, cash book / equipment /
 # DATEV receipts, a kept lock): their file log and their versions stay while the node exists (it goes after its period)
@@ -161,6 +162,11 @@ def lgc_expired(c, now):
             out["org_joins"] = ojn_purge(c, now)
     except Exception as e:  # noqa: BLE001  the invitations must not stop the clean-up of the logs
         lgc_failed(c, "org_joins", e)
+    try:
+        with c.savepoint():
+            out["conn_invites"] = cinv_purge(c, now)  # 2.1156.0 (#4550)
+    except Exception as e:  # noqa: BLE001  the invitation links must not stop the clean-up of the logs
+        lgc_failed(c, "conn_invites", e)
     return out
 
 

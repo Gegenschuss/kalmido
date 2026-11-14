@@ -231,6 +231,18 @@ heeft bovendien een eigen chat.
 Wat er dan gebeurt: vastgezette berichten blijven in de balk boven de berichten (hoogstens vijf per gesprek); een thread
 toont de antwoorden op dat ene bericht en de betrokkenen krijgen een melding.
 
+<!-- help: team#how-to-invite-someone-without-an-account-by-a-link src=0b47d08909 -->
+## Iemand zonder account uitnodigen via een link
+
+1. Kies onder Instellingen > Account **Persoon zoeken …**.
+2. Kies **Uitnodigen via link**, vul als je wilt in voor wie hij is (alleen jij ziet dit) en kies **Link aanmaken**.
+3. Stuur de link met **Kopiëren** of **Delen**, of laat de persoon de QR-code scannen.
+
+Wat er dan gebeurt: wie de link opent, maakt een account aan met naam en e-mailadres en is meteen met je verbonden; je krijgt
+een melding. De link werkt één keer en 14 dagen lang en wordt alleen direct na het aanmaken getoond; **Intrekken** beëindigt
+een openstaande link meteen. Wie al een account heeft, opent hem ingelogd en bevestigt de verbinding. Een beheerder van de
+server kan deze links uitschakelen (Instellingen > Server > Inloggen).
+
 <!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
 ## Een huishoudbudget starten
 

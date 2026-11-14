@@ -59,7 +59,8 @@ KINDS = {
                          "the agent API with that agent's token; p2491_a_replystyle_test.py: her wishes for her agent's replies (2.491.0)"),
     "team": ("matrix", SUITE + ": the people list, direct messages and discovery without an organisation (no team rooms of "
                        "an organisation, nothing of another workspace); p2113b_b_api_test.py: a private channel with files, "
-                       "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
+                       "rename / archive / restore as its own admin, groups only with people one works with (2.113.1); "
+                       "p21156_b_cinvite_test.py: invitation links for people without an account (2.1156.0)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2361_a_texts_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail; 2.352.0 D: the shortened view of a private mail; p2483_a_mail_api_test.py (2.483.0): her private client's mails through the API v1 with her token and her own agent"),
     "modcards": ("matrix", "p2575_a_api_test.py: her own module cards in the private workspace (create, change, apply, delete; 2.575.0)"),
@@ -314,6 +315,9 @@ ROUTES = {
     "POST /api/auth/enrol/passkey/options": "auth", "POST /api/auth/enrol/totp": "auth",
     "POST /api/auth/enrol/totp/confirm": "auth", "POST /api/auth/forgot": "auth", "POST /api/auth/delete-cancel": "auth", "POST /api/auth/invite/accept": "auth",
     "POST /api/auth/invite/check": "auth", "POST /api/auth/link": "auth", "POST /api/auth/login": "auth",
+    # 2.1156.0 (#4550): invitation links (accounts/cinvite.py): p21156_b_cinvite_test.py as a person without an organisation
+    "GET /api/disc/invites": "team", "POST /api/disc/invites": "team", "DELETE /api/disc/invites/{}": "team",
+    "POST /api/disc/invites/{}/restore": "team", "POST /api/auth/cinv/check": "auth", "POST /api/auth/cinv/accept": "auth",
     "POST /api/auth/logout": "auth", "POST /api/auth/passkey": "auth", "POST /api/auth/passkey/options": "auth",
     "POST /api/stepup/passkey": "auth",  # 2.223.2 C (#2871): the passkey challenge of the step-up (stepup_need)
     "POST /api/auth/setup": "auth", "POST /api/auth/signup": "auth", "POST /api/me/2fa/recovery": "auth",

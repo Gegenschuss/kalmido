@@ -30,7 +30,7 @@ KNOWN = {
     "ab": ("shared", {"abdocs.js", "docs.js", "filetext.js", "tagsel.js"}),  # 2.752.0 (#4887): docs.js dc_headHtml (Add / Scan into a folder with recognition = ablage.js upload / scan)
     "abo": ("shared", {"office_cashflow.js"}),
     "absel": ("shared", {"docs.js"}),  # 2.768.0 (#4888): the area's one selection and bar (ablage.js), its "Select" in the documents' bar
-    "bk": ("guarded", {"account.js"}),
+    "bk": ("guarded", {"account.js", "acctadm.js"}),  # 2.1156.0 (#4280): the backup part moved to acctadm.js
     "bka": ("guarded", {"office_bankacc.js", "office_bookarch.js"}),
     "bnk": ("shared", {"office_bankrules.js"}),
     "cb": ("guarded", {"contacts.js"}),
@@ -50,11 +50,11 @@ KNOWN = {
     "mm": ("guarded", {"popovers.js"}),
     "mwtask": ("shared", {"detail.js"}),
     "ofc": ("shared", {"officeagents.js"}),
-    "oinv": ("shared", {"account.js"}),
+    "oinv": ("shared", {"account.js", "acctadm.js"}),  # 2.1156.0 (#4280): the Workspaces pane moved to acctadm.js
     "pl": ("guarded", {"render.js", "office_periods.js", "paperless.js"}),
     "pov": ("shared", {"trashui.js"}),
-    "pp": ("guarded", {"agents.js", "asstprop.js", "contractprop.js", "dupprop.js", "importprop.js", "lyprop.js",
-                       "objprop.js", "office_leads.js", "playbook.js", "rules.js", "sheetprop.js"}),
+    "pp": ("guarded", {"agents.js", "propcards.js", "asstprop.js", "contractprop.js", "dupprop.js", "importprop.js", "lyprop.js",
+                       "objprop.js", "office_leads.js", "playbook.js", "rules.js", "sheetprop.js"}),  # 2.1156.0 (#4280): + propcards.js (propOpen moved out of agents.js)
     "rkf": ("shared", {"office_import.js"}),
     "rx": ("guarded", {"agents.js", "orgexport.js"}),
     "sgfoff": ("shared", {"render.js"}),  # 2.891.0 (#5440): the empty state of a column filter offers "Show all" too

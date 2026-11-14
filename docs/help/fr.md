@@ -235,6 +235,18 @@ tu partages a aussi son propre chat.
 Ce qui se passe ensuite : les messages épinglés restent dans la barre au-dessus des messages (cinq au plus par
 conversation) ; un fil montre les réponses à ce message et ses participants sont prévenus.
 
+<!-- help: team#how-to-invite-someone-without-an-account-by-a-link src=0b47d08909 -->
+## Inviter par un lien quelqu'un sans compte
+
+1. Dans Paramètres > Compte, choisis **Trouver une personne …**.
+2. Choisis **Inviter par lien**, indique si tu veux pour qui il est (visible par toi seul) et choisis **Créer le lien**.
+3. Envoie le lien avec **Copier** ou **Partager**, ou laisse la personne scanner le code QR.
+
+Ce qui se passe ensuite : qui ouvre le lien crée un compte avec son nom et son adresse e-mail et est aussitôt connecté avec
+toi ; tu reçois une notification. Le lien fonctionne une fois et pendant 14 jours et n'est affiché que juste après sa
+création ; **Retirer** met fin aussitôt à un lien ouvert. Qui a déjà un compte l'ouvre connecté et confirme la connexion. Un
+admin du serveur peut désactiver ces liens (Paramètres > Serveur > Connexion).
+
 <!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
 ## Créer un budget du foyer
 

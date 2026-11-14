@@ -1379,6 +1379,18 @@ also has its own chat.
 What happens then: pinned messages stay in the bar above the messages (at most five per conversation); a thread shows
 the replies to that one message and its people get notified.
 
+## How to: Invite someone without an account by a link
+<!-- user-help: team -->
+
+1. Under Settings > Account select **Find a person …**.
+2. Select **Invite by link**, add for whom it is if you like (only you see it) and select **Create link**.
+3. Send the link with **Copy** or **Share**, or let the person scan the QR code.
+
+What happens then: whoever opens the link creates an account with their name and e-mail address and is connected with
+you at once; you get a notification. The link works once and for 14 days and is shown only right after you made it;
+**Withdraw** ends an open link at once. Someone who already has an account opens it signed in and confirms the connection.
+An admin of the server can switch these links off (Settings > Server > Sign-in).
+
 ## How to: Share a folder with people
 <!-- user-help: sharing -->
 
