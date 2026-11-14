@@ -361,3 +361,13 @@ the link opens a plain page without login. **Switch off** ends a link at once.
 
 What happens then: the old text becomes the current one again as a new version, so nothing is lost; the restore can be
 undone.
+
+## Loading, errors and phones (2.1167)
+
+- **Loading, errors, nothing here.** A page that cannot be loaded says what failed and offers *Try again* and the way back
+  to the pages; a page that does not exist (or is not shared with you) says so with the way back. A save that failed keeps
+  *Not saved* in the page's footer until a save works (*Try again* there); error messages say what did not work first.
+  An empty space offers *Create the first page*.
+- **On a phone.** Names in the trash keep their own line (the buttons wrap below), *Select* hides the date and the row
+  menu so the names stay readable, tables in the editor scroll sideways instead of breaking words, and small targets
+  (boxes, row menu, attachment buttons, day arrows, back in the history) are big enough for a finger.
