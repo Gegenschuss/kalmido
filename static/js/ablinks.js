@@ -57,7 +57,7 @@ async function xl_click(e, box, n) {
   if (!l) return;
   if (a === 'copy') { xl_copy(l.url); return; }
   if (a === 'regen') {
-    if (!await askConfirm(tr('Create a new link?'), tr('The old one stops working at once.'), {ok: tr('New link'), danger: true})) return;
+    if (!await askConfirm(tr('Create a new link?'), tr('The old link stops working at once.') /* 2.1163.0 (#6112) */, {ok: tr('New link'), danger: true})) return;
     let j; try { j = await calReq('POST', `/api/files/ext-links/${id}/regenerate`); } catch (x) { toast(x.message); return; }
     xl_draw(box, n, j); toast(tr('New link created, the old one no longer works')); return;
   }

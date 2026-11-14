@@ -73,7 +73,7 @@ async function dpvOpen(o) {
       const sh = j.sheets || [];
       tabs.hidden = sh.length < 2;
       tabs.innerHTML = sh.map((s, i) => `<button type="button" role="tab" class="dpvtab${i === sheet ? ' on' : ''}" aria-selected="${i === sheet}" data-dpv="sheet" data-i="${i}">${esc(s.name || tr('Sheet {0}', i + 1))}</button>`).join('')
-        + (j.sheets_total > sh.length ? `<span class="muted dpvmore">${esc(tr('+{0} more sheets', j.sheets_total - sh.length))}</span>` : '');
+        + (j.sheets_total > sh.length ? `<span class="muted dpvmore">${esc(trn('+{0} more sheet', '+{0} more sheets', j.sheets_total - sh.length))}</span>` : '');
       body.innerHTML = dpvSheetHtml(sh[sheet], false);
     } else body.innerHTML = dpvDocHtml(j);
   };

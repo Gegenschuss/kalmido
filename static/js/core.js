@@ -58,7 +58,7 @@ function debounce(fn, ms) {
 // ------------------------------------------------------------------ dates
 // 2.223.3 A (#2877): while the server's deletion runs only count (KALMIDO_RETENTION_PURGE off), no trash promises a period
 const trashKeeps = () => S.trashPurge === false;
-const trashNote = (txt, off) => off || trashKeeps() ? tr('Deleted items stay in the trash until the deletion runs of the server are switched on.') : txt;
+const trashNote = (txt, off) => off || trashKeeps() ? tr('Deleted items stay in the trash for now: emptying it automatically is not switched on on this server yet.') /* 2.1163.0 (#6112): no server words */ : txt;
 const pad = n => String(n).padStart(2, '0');
 const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -151,7 +151,7 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['office', N_('Office & finance')],
   // 2.49.0 (#1199): knowledge pages (a small wiki per organisation), off by default
   ['wiki', N_('Knowledge pages')],
-  ['files', N_('File store')],  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
+  ['files', N_('Files')],  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
   // 2.50.0 (#1194): resources and disposition (a tab of the workload view), off by default
   ['dispo', N_('Disposition')],
   ['sheets', N_('Tables')],  // 2.89.0 (#1916): tables with Kalmido variables (sheets.js), off by default

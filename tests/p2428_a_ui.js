@@ -63,7 +63,8 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   d.querySelector('[data-absel="mode"]').click();
   let bar = await until(() => d.querySelector('#ab-sbar.mselbar'));
   // 2.768.0 (#4888): the area's one bar; Edit only once documents are chosen
-  check(bar && /Tap files/.test(count(d, 'ab-sbar')) && !bar.querySelector('[data-absel="edit"]'), 'documents: Select -> the shared bar with the hint, no Edit yet ' + count(d, 'ab-sbar'));
+  // 2.1163.0 (#6112): "Select files" instead of "Tap files" (a mouse too)
+  check(bar && /Select files/.test(count(d, 'ab-sbar')) && !bar.querySelector('[data-absel="edit"]'), 'documents: Select -> the shared bar with the hint, no Edit yet ' + count(d, 'ab-sbar'));
   for (const id of ids) w.eval(`ab_selPick(${id})`);
   bar = await until(() => /2 selected/.test(count(d, 'ab-sbar')) && d.querySelector('#ab-sbar'));
   check(bar && ['edit', 'dl', 'move', 'trash', 'more', 'all', 'close'].every(k => bar.querySelector(`[data-absel="${k}"]`)), 'documents: 2 selected, Edit / Download / Move / Trash / More / All / X');
