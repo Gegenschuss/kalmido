@@ -420,10 +420,10 @@ async function taskToNewSection(id) {
 function secHeadMenu(anchor, sid) {
   const s = S.sections.find(x => x.id === sid); if (!s) return;
   if (!canEditList(s.list_id)) { roToast(); return; }
-  const ids = secIds(s.list_id), i = ids.indexOf(sid);
-  menu(anchor, [...(i > 0 ? [{label: tr('Move section up'), icon: 'left', fn: () => moveSection(sid, -1)}] : []),
-    ...(i < ids.length - 1 ? [{label: tr('Move section down'), icon: 'right', fn: () => moveSection(sid, 1)}] : []),
-    '-', {label: tr('Section menu…'), icon: 'dots', next: 1, fn: () => sectionMenu(anchor, sid)}]);
+  // 2.1151.0 B (#3835): the head's whole menu at once, its "+" (hidden on the phone) on top; up / down went (the head drags).
+  // Was 2.46.1 (#1635): Move section up / down and "Section menu…"
+  const add = ms_btnItems(anchor, '.gadd');
+  sectionMenu(anchor, sid, add.length ? [...add, '-'] : []);
 }
 let secDrag = null;
 const secOf = el => el.classList.contains('kcol') ? el.dataset.kcol : el.dataset.section;
