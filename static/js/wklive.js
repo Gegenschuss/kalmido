@@ -215,7 +215,7 @@ function wkp_go(/** @type {number} */ i, swiped = false) {
   WKP.i = Math.max(0, Math.min(WKP.sl.length - 1, i));
   const st = $('.wkpstage', m);
   st.innerHTML = wkp_slideHtml(WKP.i);
-  wkp_cbOff(st); st.scrollTop = 0;
+  wkp_cbOff(st); st.scrollTop = 0;  // sprung-ok: a new slide starts at its top (the person leafed)
   if (!swiped && was !== WKP.i && typeof swn_slideIn === 'function') swn_slideIn($('.wkpslide', st), WKP.i > was ? 1 : -1);
   $('.wkpno', m).textContent = `${WKP.i + 1} / ${WKP.sl.length}`;
   $('[data-wkp="-1"]', m).disabled = WKP.i === 0;
