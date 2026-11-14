@@ -296,11 +296,12 @@ const isMobile = () => td_rc('mob', () => matchMedia('(max-width:767px)').matche
 const VP_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const VIEWPORT = 'width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // the layout width 900 keeps the iOS zoom stop of #453 too (iOS ignores interactive-widget, harmless)
-// 2.1145.0 (#6075): with the scale spelled out (screen width / 900, also the floor of pinch zoom). The meta is switched
+// 2.1145.0 (#6075): with the scale spelled out (screen width / 900; no minimum-scale: a split screen / pop-up window narrower than
+// the screen can still be zoomed out). The meta is switched
 // after load (the page starts with initial-scale=1): without its own scale Chrome kept 1, so an unfolded Fold (840 px
 // landscape) showed 840 of the 900 px and the account button sat 60 px off screen. w = the width of the screen as held
 const VP_900 = w => { const z = w > 0 && w < 900 ? Math.floor(w / 900 * 1000) / 1000 : 1;
-  return `width=900, initial-scale=${z}, minimum-scale=${z}, viewport-fit=cover, interactive-widget=resizes-content` + (VP_IOS ? ', maximum-scale=1' : ''); };
+  return `width=900, initial-scale=${z}, viewport-fit=cover, interactive-widget=resizes-content` + (VP_IOS ? ', maximum-scale=1' : ''); };
 const VP_767 = 'width=767, viewport-fit=cover, interactive-widget=resizes-content' + (VP_IOS ? ', maximum-scale=1' : '');
 // 2.7.2 (hotfix): the orientation comes from the PHYSICAL screen (screen.orientation / screen.width), never from the media
 // query (orientation: landscape): on Android that follows the viewport, so the on-screen keyboard (it shrinks the height)
