@@ -2295,7 +2295,7 @@ Without `pinned` the pin toggles. When the **person** pins or unpins a message o
 
 *Since 2.48.0.*
 
-The file store ("Ablage", #1207) holds folders and files of a person and of an organisation. People share a folder or a
+The file store ("Dateien" in the app, formerly "Ablage", #1207) holds folders and files of a person and of an organisation. People share a folder or a
 file with an agent on purpose (role *view* or *edit*, optionally until a date; a folder's share covers everything below
 it). An agent sees exactly that, plus its **own result folder**: created on first use at the top of its owner's space (an
 organisation's agent: of the organisation), named like the agent; the agent may write there without a share and its owner
