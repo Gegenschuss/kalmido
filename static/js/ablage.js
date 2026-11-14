@@ -629,6 +629,8 @@ function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked fo
 // a long press ticks the row (like a tap)
 const ab_canPickRow = r => AB.selHere && !!r.closest('.ablist') && !!ab_item(+r.dataset.abid);
 const ab_rowCm = r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
+  const co = r.querySelector('[data-abc="open"]');  // 2.1151.0 A (#3835): a file "From <area>": Open, Download (the phone hides the symbol)
+  if (co) { ms_btnMenu(r, 'a.iconbtn[download]', $('.abname', co)?.textContent || '', [{label: tr('Open'), icon: 'eye', fn: () => co.click()}]); return true; }
   const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
   if (r.closest('.ablist') && ab_selMany(id)) { ab_selMenu(m); return true; }  // 2.768.0 (#4888)
   const pick = ab_canPickRow(r) ? (rid => () => ab_selPick(rid))(+r.dataset.abid) : null;
