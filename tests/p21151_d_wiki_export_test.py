@@ -169,7 +169,7 @@ check(r.ok and "Short memo" in pdf_text(r.content), "#5524: Notepad style PDF wi
 
 # ---- rights
 PRIV = page(A, "Private draft", "secret plan", space="private")
-check(export(Bs, PRIV, "pdf").status_code == 404, "#5524: another person's private page 404")
+check(export(Bs, PRIV, "pdf").status_code == 404, "#5524: another person's private page 404")  # tenant: GET /api/wiki/pages/{}/export
 check(export(A, PRIV, "pdf").status_code == 200, "#5524: the own private page")
 check(export(Bs, P1, "docx").status_code == 200, "#5524: a member exports the organisation's page")
 check(export(Rs, P1, "pdf").status_code == 200, "#5524: a read-only member exports too (reading is enough)")
