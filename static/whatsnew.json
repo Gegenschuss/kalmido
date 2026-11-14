@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.1131.0",
+   "date": "2026-11-14",
+   "items": [
+    {
+     "de": "Menüs am Handy lassen sich mit einem kurzen Wisch nach unten flüssig schließen, auch aus der Mitte der Liste.",
+     "en": "On the phone, menus close smoothly with one quick swipe down, even from within the list."
+    }
+   ]
+  },
+  {
    "version": "2.1117.0",
    "date": "2026-11-13",
    "items": [
@@ -1339,40 +1349,6 @@
     {
      "de": "In der Liquidität benennst du eine Fixkosten-Kategorie mit dem Stift auf einmal um oder legst zwei zusammen.",
      "en": "In cash flow you rename a fixed cost category at once with the pencil or merge two."
-    }
-   ]
-  },
-  {
-   "version": "2.621.0",
-   "date": "2026-11-07",
-   "items": [
-    {
-     "de": "In Wissensseiten wird eine Aufgabe nur noch verlinkt, wenn sie in doppelten eckigen Klammern steht; eine einfache Nummer mit Raute bleibt normaler Text.",
-     "en": "In wiki pages a task is only linked inside double square brackets; a plain number with a hash stays normal text."
-    },
-    {
-     "de": "Am Handy schließt Zurück das Schnell-Anlegen und ein Tipp auf die offene Seite schließt die Seitenleiste.",
-     "en": "On the phone, Back closes quick add and tapping the open page closes the sidebar."
-    },
-    {
-     "de": "Eindeutige Stapel mit Archivnummer-Codes werden jetzt ohne Rückfrage aufgeteilt, Rückgängig bleibt möglich.",
-     "en": "Clear stacks with archive number codes are now split without asking, and you can still undo it."
-    },
-    {
-     "de": "Unter „Alle Arbeitsbereiche“ siehst du an jeder Aufgabe, aus welchem Bereich und welcher Liste sie kommt.",
-     "en": "Under \"All workspaces\" every task shows which workspace and project it comes from."
-    },
-    {
-     "de": "Projekte für Token und Agenten wählst du jetzt über ein Suchfeld statt über eine lange Häkchen-Liste.",
-     "en": "You now pick the projects of tokens and agents with a search field instead of a long list of ticks."
-    },
-    {
-     "de": "Beim Import alter Dokumente wählst du jetzt, wie deine Dateinamen aufgebaut sind.",
-     "en": "When importing old documents you can now choose how your file names are built."
-    },
-    {
-     "de": "Im Büro holst du die Umsätze eines Kontos jetzt direkt von der Bank, mit Freigabe in deiner Banking-App.",
-     "en": "In the office you can now fetch an account's transactions straight from your bank, approved in your banking app."
     }
    ]
   }

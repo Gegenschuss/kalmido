@@ -21,7 +21,16 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1128.0] - 2026-11-13
+## [2.1131.0] - 2026-11-14
+
+Package 2.1122 (Bündel: CI: pg_prepare und pg_dialect in tests/hard_suites).
+
+### Changed
+- CI: the Postgres guards pg_prepare and pg_dialect are hard suites now (tests/hard_suites.txt): the merge queue gate and the hard shards hold on them, like the live train already did (#6046).
+
+Package 2.1126 (Bündel: Handy: Mehr-Menü und Menü-Sheets mit einem Wisch n).
+### Changed
+- Phone: menu sheets (the More menu, choice menus, the bell) follow the finger by transform only - the height is set once when a drag starts instead of on every move, so pulling a sheet no longer stutters. A quick flick down closes a sheet from any height (before, a flick on a tall sheet only shrank it), a flick up opens it full, a slow release settles on half or full or springs back. In a menu a pull down in the content closes it too while the content stands at its top; scrolling a long menu stays as it was. Dialogs with a form keep dragging at the head only (#6049).
 
 ### Fixed
 - main: CI red of 2.1125.0 (pg_dialect, pg_prepare) after #5952 - merging two clients set the default contact person with a number instead of yes / no and failed; catalogue reads marked as Postgres-only; the check of a not yet turned yes / no column listed as a known exception
@@ -47,6 +56,10 @@ Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1128.0] - 2026-11-13
+
+Not released (the CI of this version was red); its changes are listed under 2.1131.0.
 
 ## [2.1125.0] - 2026-11-13
 
@@ -346,7 +359,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1128.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1131.0...HEAD
+[2.1131.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1131.0
 [2.1128.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1128.0
 [2.1125.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1125.0
 [2.1120.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1120.0
