@@ -18575,6 +18575,9 @@
   "{0} day after {1}": ["{0} giorno dopo {1}", "{0} giorni dopo {1}"],
   "Saved as version {0} with {1} - the original stays as version {2}": "Salvato come versione {0} con {1} - l'originale resta come versione {2}",
   "{0} documents merged into “{1}” ({2}) - the others are in the trash": "{0} documenti uniti in «{1}» ({2}) - gli altri sono nel cestino",
+  "More tools": "Altri strumenti",
+  "Folders above": "Cartelle superiori",
+  "Only you see this folder": "Solo tu vedi questa cartella",
   "New": "Nuovo",
   "You can only read here": "Qui puoi solo leggere",
   "No documents yet": "Ancora nessun documento"

@@ -395,3 +395,12 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
   .abdlsub{display:block}
   .abdlrow .iconbtn{width:2.75rem;height:2.75rem}
 }
+/* 2.1163.0 (#6111): the documents' bar on a phone: search, (All | To review,) Filter, Sorting, "+" and "…" in one row after the
+   search; the saved views, the card size, Scan, Select, the lists and the settings are in "…" (ablage.js ab_moreMenu) */
+.dc-bar .abwide{display:contents}
+.dc-bar .abmbtn{display:none}
+@media (max-width:767px){
+  .dc-bar .abwide{display:none}
+  .dc-bar .abmbtn{display:inline-flex;align-items:center;justify-content:center}
+  .dc-acts2{flex:0 0 auto;margin-left:auto}
+}
