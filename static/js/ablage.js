@@ -5,7 +5,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Map(), selOn: false, drag: null};  // 2.768.0 (#4888): sel = the area's ONE selection (ab_selInfo)
+const AB = {space: (sp => sp === 'trash' ? '' : sp)(LS.get('abSpace', '')) /* 2.1165.0 (#6115): never the trash first */, key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Map(), selOn: false, drag: null};  // 2.768.0 (#4888): sel = the area's ONE selection (ab_selInfo)
 const ab_spaces = () => { const w = wsCur(); return [...(w === 'all' || w === 'private' || !wsOn() ? ['private'] : []), ...(wsOn() ? (S.me?.workspaces || []).filter(o => w === 'all' || w === 'org:' + o.id).map(o => 'org:' + o.id) : []), 'shared', 'trash']; };
 // 2.540.0 (#4575): "All workspaces" with more than one space of one's own (Private + an organisation): the top of the file
 // store is the overview of the spaces (areas.js spo_html, + Shared with me and the trash), the open one is in the address
@@ -20,7 +20,9 @@ const ab_curSpace = () => {
 };
 const ab_ovr = () => ab_all() && S.route.mod === 'ablage' && !S.route.nid && !S.route.aus && !ab_spaces().includes(S.route.wsp);
 const ab_home = s => ab_all() && s ? 'ablage/s/' + s : 'ablage';
-const ab_pick = s => { if (ab_all()) AB.allSp = s; else { AB.space = s; LS.set('abSpace', s); } };
+const ab_pick = s => { if (ab_all()) AB.allSp = s; else { AB.space = s; if (s !== 'trash') LS.set('abSpace', s); } };  // 2.1165.0 (#6115): the trash is not remembered
+// 2.1165.0 (#6115): the trash left (another page of Files or another area): "Files" opens its workspace again, not the trash
+window.addEventListener('hashchange', () => { if (location.hash === '#ablage' || location.hash === '#ablage/s/trash') return;  /* the trash's own page; Documents (#ablage/docs), a folder, another area: left */ if (AB.space === 'trash') { AB.space = LS.get('abSpace', ''); AB.key = ''; } if (AB.allSp === 'trash') { AB.allSp = ''; AB.key = ''; } });
 // the space a node lies in (the top of it under "All": its space's page)
 const ab_nodeSp = n => n?.space || (n?.org_id ? 'org:' + n.org_id : n?.role === 'owner' ? 'private' : 'shared');
 const ab_url = (n, dl, v) => `/api/files/nodes/${n.id}/content?${[dl ? 'dl=1' : '', v ? 'v=' + v : ''].filter(Boolean).join('&')}`;
@@ -127,7 +129,7 @@ function viewAblage() {
   const search = !trash && !fold /* 2.752.0 (#4887): the documents' search of the folder */ && !d?.node?.locked && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text; 2.353.0 F (#2758, review N9): a locked folder searches its names here only (the banner)
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
-  const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted permanently after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
+  const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(ab_trashNote(d))}</p>` : '';  // 2.152.0 B (#2165); 2.1165.0 (#6115): ab_trashNote
   return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_selBar(trash)}</div></div>`;
 }
 // 2.752.0 (#4887): the file store's tools above a folder with recognition: New folder, Share, its menu (Upload and Scan are
@@ -297,7 +299,7 @@ function ab_rowHtml(n, trash) {
     + (typeof xl_badge === 'function' ? xl_badge(n) : '')  // 2.112.1 B (#2058): a live external link
     + (typeof abd_badge === 'function' ? abd_badge(n) : '')  // 2.353.0 D (#2759): a document (being recognised / to review)
     + (typeof dsc_folderBadge === 'function' ? dsc_folderBadge(n) : '');  // 2.1048.0 (#5821): a folder with a scan inbox
-  const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
+  const main = trash ? `<button type="button" class="abopen" data-ab="tropen" data-id="${esc(n.id)}">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`  // 2.1165.0 (#6115): a tap shows it (read only)
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete permanently')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button data-rowmenu="abrow" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
@@ -376,22 +378,66 @@ async function ab_newFolder(parent, space) {  // 2.199.0 A (#2742): parent = a f
 document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-abtadd]'); if (b) { e.preventDefault(); ab_newFolder(null, b.dataset.abtadd); } });  // 2.768.0 (#4888)
 // a request of an undo / redo step: the view follows, an error is a toast (api() shows it)
 async function ab_req(m, url, b) { try { await api(m, url, b); } catch { /* shown */ } ab_reload(); return {}; }
+// ---- 2.1165.0 (#6114): ONE way to upload for the file store and the documents (ab_upload, docs.js dc_upload). Before anything is
+// sent, what the server would refuse anyway stays out (empty, larger than its limit, a kind the place does not take: accept = an
+// input's accept list, '' = every kind); the rest goes up in portions (the server's limits per request), each with the progress
+// bar of upbar.js for any size (fd.upBar) and no second message; at the end ONE message with Undo and the list of what stayed out
+// and why (ab_upOut). Only a comfort: the server checks every file again and stays the judge.
+// review (job/4506): a file the browser names no type for (HEIC and the like) goes on, the server decides as before
+const ab_accOk = (f, accept) => !accept || !f.type || accept.split(',').map(a => a.trim().toLowerCase()).filter(Boolean).some(a => a.startsWith('.')
+  ? (f.name || '').toLowerCase().endsWith(a) : a.endsWith('/*') ? (f.type || '').toLowerCase().startsWith(a.slice(0, -1)) : (f.type || '').toLowerCase() === a);
+function ab_upCheck(files, accept) {
+  const mb = S.maxFileMb || 50, ok = [], out = [];
+  for (const f of [...(files || [])].filter(Boolean)) {
+    const why = !f.size ? tr('The file is empty') : f.size > mb * 1024 * 1024 ? tr('Larger than {0} MB', mb) : !ab_accOk(f, accept) ? tr('This kind of file cannot be added here') : '';
+    if (why) out.push({name: f.name || tr('File'), why}); else ok.push(f);
+  }
+  return {ok, out};
+}
+// the portions of one upload: at most n files and at most four times the size limit together (the request limit, upLimit)
+function ab_upParts(files, n) {
+  const max = (S.maxFileMb || 50) * 1024 * 1024 * 4 - 1024 * 1024, parts = [];  // review (job/4506): 1 MB room for the form's frame
+  let cur = [], sum = 0;
+  for (const f of files) {
+    if (cur.length && (cur.length >= n || sum + f.size > max)) { parts.push(cur); cur = []; sum = 0; }
+    cur.push(f); sum += f.size;
+  }
+  if (cur.length) parts.push(cur);
+  return parts;
+}
+// the files of the portions not sent after an error / Cancel: in the list with the reason
+const ab_upRest = (parts, i, x) => parts.slice(i).flat().map(f => ({name: f.name || tr('File'), why: x?.cancelled ? tr('Upload cancelled') : x?.message || tr('Not uploaded')}));
+// the list of what stayed out, where the progress bars are (upbar.js upBox): it stays until it is closed
+function ab_upOut(out) {
+  $('#upbars .upout')?.remove();
+  if (!out.length || typeof upBox !== 'function') return;
+  const el = document.createElement('div'); el.className = 'upbar upout'; el.setAttribute('role', 'status');
+  el.innerHTML = `<div class="uphead"><span class="upn">${esc(trn('{0} file was not uploaded:', '{0} files were not uploaded:', out.length))}</span><button type="button" class="upoutx" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button></div><ul class="upoutl">${out.slice(0, 20).map(o => `<li><b>${esc(o.name)}</b> <span class="muted">${esc(o.why)}</span></li>`).join('')}${out.length > 20 ? `<li class="muted">${esc(trn('and {0} more', 'and {0} more', out.length - 20))}</li>` : ''}</ul>`;
+  /** @type {HTMLElement} */ (el.querySelector('.upoutx')).addEventListener('click', () => { el.remove(); if (!document.querySelector('.upbar')) document.getElementById('upbars')?.remove(); });
+  upBox().appendChild(el);
+}
+// the message at the end: "3 files uploaded" (+ "· 2 not uploaded": the list says which)
+const ab_upMsg = (msg, out) => out.length ? `${msg} · ${trn('{0} not uploaded', '{0} not uploaded', out.length)}` : msg;
 async function ab_upload(files, target) {
-  files = [...(files || [])]; if (!files.length) return;
+  const {ok, out} = ab_upCheck(files); ab_upOut(out);
+  files = ok; if (!files.length) return;
   const lid = await ab_lockOf(target);  // 2.353.0 A (#2758): encrypted here; F (review N8): also a folder outside the view, never plain
   if (lid) return typeof fsl_upload === 'function' ? fsl_upload(files, target, lid) : ab_noFsl();
-  const fd = new FormData();
-  for (const f of files) fd.append('file', f, f.name);
-  if (target) fd.append('parent_id', String(target)); else fd.append('space', ab_curSpace());
-  const old = new Set((AB.data?.items || []).map(x => x.id));
-  toast(trn('Uploading {0} file…', 'Uploading {0} files…', files.length));
-  let j; try { j = await api('POST', '/api/files/upload', fd); } catch { return; }
-  ab_reload();
-  const created = (j.items || []).filter(x => !old.has(x.id) && x.version <= 1), ver = (j.items || []).length - created.length;
-  const msg = ver ? tr('{0} uploaded, {1} as a new version', (j.items || []).length, ver) : trn('{0} file uploaded', '{0} files uploaded', created.length);
-  if (!created.length) { toast(msg); return; }
-  offerUndo(msg, histAdd({label: tr('Upload'), undo: async () => { for (const x of created) await ab_req('DELETE', `/api/files/nodes/${x.id}`); return {}; },
-    redo: async () => { for (const x of created) await ab_req('POST', `/api/files/nodes/${x.id}/restore`); return {}; }}));
+  const old = new Set((AB.data?.items || []).map(x => x.id)), items = [], parts = ab_upParts(files, 50);
+  for (let i = 0; i < parts.length; i++) {
+    const fd = new FormData(); fd.upBar = true;  // 2.1165.0 (#6114): the bar for any size, no toast besides it
+    for (const f of parts[i]) fd.append('file', f, f.name);
+    if (target) fd.append('parent_id', String(target)); else fd.append('space', ab_curSpace());
+    let j; try { j = await api('POST', '/api/files/upload', fd); } catch (x) { out.push(...ab_upRest(parts, i, x)); break; }
+    items.push(...(j.items || []));
+  }
+  ab_reload(); ab_upOut(out);
+  if (!items.length) return;
+  const created = items.filter(x => !old.has(x.id) && x.version <= 1), vers = items.filter(x => !created.includes(x) && x.version > 1);
+  const msg = ab_upMsg(vers.length ? tr('{0} uploaded, {1} as a new version', items.length, vers.length) : trn('{0} file uploaded', '{0} files uploaded', created.length), out);
+  // one step back for all: the new files into the trash, a new version back to the one before (as Restore version does)
+  offerUndo(msg, histAdd({label: tr('Upload'), undo: async () => { for (const x of created) await ab_req('DELETE', `/api/files/nodes/${x.id}`); for (const x of vers) await ab_verStep(x, x.version - 1); return {}; },
+    redo: async () => { for (const x of created) await ab_req('POST', `/api/files/nodes/${x.id}/restore`); for (const x of vers) await ab_verStep(x, x.version); return {}; }}));
 }
 async function ab_rename(n) {
   if (n.locked && n.lock_id !== n.id) return typeof fsl_rename === 'function' ? fsl_rename(n) : ab_noFsl();  // 2.353.0 A (#2758); F (review N8): never plain
@@ -442,6 +488,39 @@ async function ab_purge(n) {
   if (!await askConfirm(tr('Delete “{0}” permanently?', n.name), tr('All versions are removed. This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
   try { await api('DELETE', `/api/files/nodes/${n.id}?purge=1`); } catch { return; }
   AB.sel.delete(n.id); ab_reload(); toast(tr('Deleted permanently'));
+}
+// ---- 2.1165.0 (#6115): the trash in plain words, and a node in it to look at
+// the note under the trash: how long deleted things stay (the server's period), or that they stay until deleted for good
+const ab_trashNote = d => d.purge_on === false || trashKeeps() ? tr('Deleted items stay here until you delete them permanently.')
+  : trn('Deleted items stay here for {0} day, then they are deleted permanently.', 'Deleted items stay here for {0} days, then they are deleted permanently.', d.trash_days);
+// a file in the trash read once more (GET .../content?trash=1: read only, people only); '' = no viewer for its kind
+const ab_trashUrl = (n, dl) => `/api/files/nodes/${n.id}/content?trash=1${dl ? '&dl=1' : ''}`;
+const ab_trashKind = n => n.kind === 'file' && !n.locked && !n._enc && !upLocked(n) ? ab_verKind(n, {mime: n.mime, size: n.size}) : '';
+function ab_trashSee(n) {
+  const k = ab_trashKind(n), o = {url: ab_trashUrl(n), name: n.name, size: n.size, dlUrl: ab_trashUrl(n, true)};
+  if (k === 'pdf' && typeof pdfView === 'function') pdfView(o);
+  else if (k === 'img' && typeof pdfView === 'function') pdfView({...o, img: o.url, kind: 'img'});
+  else if (k === 'text') textView({url: o.dlUrl, name: n.name, size: n.size, md: isMdFile(n), ext: attExt(n)});
+}
+// the details of a node in the trash (a tap on its row, its address #ablage/<id>): "In the trash" with Restore on top, its facts,
+// a picture right there, a PDF / text to view - read only: no new version, no sharing, no tags, no Open of the living file
+function ab_trashDetails(n) {
+  $('.abdlg')?.remove();
+  const k = ab_trashKind(n), w = ab_canWrite(n.role);
+  const md = modal(`<div class="lhdr"><h3>${/*html-ok*/ ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
+    <div class="shint keep abtrashed" role="status">${ic('trash', 's')}<span>${esc(tr('In the trash'))}</span>${w ? `<span class="spacer"></span><button type="button" class="btn sm pri" data-abd="restore">${ic('undo', 's')} ${tr('Restore')}</button>` : ''}</div>
+    ${(n.crumbs || []).length > 1 ? `<div class="muted abpath">${esc(tr('Was in: {0}', (n.crumbs || []).slice(0, -1).map(c => c.name).join(' / ')))}</div>` : ''}
+    <div class="abfacts">${n.kind !== 'folder' ? `<span>${esc(fmtSize(n.size || 0))}</span>` : ''}${n.deleted_at ? `<span>${esc(tr('Deleted on {0}', ab_when(n.deleted_at)))}</span>` : ''}${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}</div>
+    ${k === 'img' ? `<div class="abtrimg"><img src="${esc(ab_trashUrl(n))}" alt="${esc(n.name)}" loading="lazy"></div>` : ''/* sprung-ok: fixed box, ablage.css .abtrimg */}
+    ${k ? `<div class="row"><button type="button" class="btn sm" data-abd="see">${ic('eye', 's')} ${tr('Preview')}</button></div>` : ''}
+    <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
+  md.classList.add('abdlg', 'abtrdlg'); md.dataset.abid = String(n.id);
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
+    const b = e.target.closest('[data-abd]'); if (!b) return;
+    if (b.dataset.abd === 'see') ab_trashSee(n);
+    else if (b.dataset.abd === 'restore') { modalClose(md); ab_restore(n); }
+  });
 }
 function ab_newVersion(n) {
   if (n.locked) return typeof fsl_newVersion === 'function' ? fsl_newVersion(n) : ab_noFsl();  // 2.353.0 A (#2758); F (review N8): never plain
@@ -569,6 +648,7 @@ async function ab_wikiRefs(box, id) {
 }
 async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
+  if (n.in_trash || n.deleted_at) { ab_trashDetails(n); return; }  // 2.1165.0 (#6115): no new version, no sharing
   if (ab_viewOk(n)) { $('.abdlg')?.remove(); dc_open(n.id, {tab: 'hist'}); return; }  // 2.768.0 (#4888): a file: the view
   if (typeof fsl_prep1 === 'function') await fsl_prep1(n);  // 2.353.0 A (#2758)
   $('.abdlg')?.remove();
@@ -609,13 +689,14 @@ document.addEventListener('click', e => {
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
-  if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_selPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
+  if ((a === 'open' || a === 'tropen') && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_selPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
   if (a === 'open' && n) { if (n.kind === 'folder') go('ablage/' + n.id); else ab_openFile(n); return; }
   if (a === 'menu' && b.closest('.dc-card')) { ab_cardMenu(b.closest('.dc-card'), b); return; }  // 2.768.0 (#4888): a card's "…" = its menu with "Select" on top
   if (a === 'menu' && n && b.closest('.ablist') && ab_selMany(n.id)) { ab_selMenu(b); return; }  // 2.768.0 (#4888): a chosen row of several: the selection's menu
   if (a === 'menu' && n) { ab_menu(b, n); return; }
   if (a === 'share') { e.preventDefault(); e.stopPropagation(); ab_share(+b.dataset.id); return; }  // 2.558.0 (#4693): the names / "Share" on top
   if (a === 'scandone-x') { AB.scanDone = null; ab_draw(); return; }
+  if (a === 'tropen' && n) { ab_trashDetails(n); return; }  // 2.1165.0 (#6115)
   if (a === 'restore' && n) ab_restore(n);
   if (a === 'purge' && n) ab_purge(n);  // 2.589.0 (#4875)
   if (a === 'trash-empty') abm_purge(null);
@@ -676,8 +757,11 @@ document.addEventListener('dragover', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideOver(e); return; }
   const files = [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e), t = e.target.closest('[data-abdrop]');  // 2.750.0 (#4879)
   if (AB.drag && t && ab_dropOk(t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop)) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }  // 2.750.0 (#4879): its own folder takes nothing
-  if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
+  if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); v.dataset.abdroptxt = tr('Drop here - lands in “{0}”', ab_dropName(t)); }  // 2.1165.0 (#6114): the frame says where
 });
+// 2.1165.0 (#6114): the folder a drop of files lands in (the drop below: the folder under the pointer, else the open one / the space)
+const ab_dropName = t => { const id = t ? (t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop) : S.route.nid || null;
+  return id ? ab_item(id)?.name || (AB.data?.crumbs || []).find(c => c.id === id)?.name || AB.data?.node?.name || '' : ab_spaceName(ab_curSpace()); };
 document.addEventListener('dragleave', e => { if (e.target.classList?.contains('abview') && !e.target.contains(e.relatedTarget)) e.target.classList.remove('abdrop'); });
 document.addEventListener('drop', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideDrop(e); return; }
@@ -969,6 +1053,7 @@ async function abm_trash(ns, o = {}) {
   const cur = ok.find(n => n.id === S.route.nid && S.route.mod === 'ablage');  // the open folder went: its parent
   if (cur) go(cur.parent_id ? 'ablage/' + cur.parent_id : ab_home(AB.data?.space || ab_nodeSp(cur))); else ab_relist();
   if (!ids.length) return null;
+  if (o.leave) await o.leave();  // 2.1165.0 (#6115): the page left first (the document view): the message belongs to the one it goes back to
   const post = async url => { for (let i = 0; i < ids.length; i += 500) { try { await api('POST', url, {ids: ids.slice(i, i + 500)}); } catch { /* shown */ } } ab_relist(); return {}; };
   const what = ok.length === 1 ? tr('“{0}” moved to the trash', ok[0].name) : trn('{0} item moved to the trash', '{0} items moved to the trash', ok.length);
   offerUndo([what, fs_keptText(kept), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: ok.length === 1 ? tr('Delete “{0}”', ok[0].name) : tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
@@ -977,7 +1062,7 @@ async function abm_trash(ns, o = {}) {
 }
 // ---- 2.589.0 (#4875): the trash: "Empty trash" on top, several rows back or for good (POST /api/files/trash/purge: only what
 // the person owns goes, the rest stays and is counted)
-const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_selTools(d)}<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button></div>` : '';
+const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_selTools(d)}${d.items.some(n => n.role === 'owner') ? `<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button>` : '' /* 2.1165.0 (#6115): only with something the person may delete (abm_purge: owners) */}</div>` : '';
 function ab_trashBar() {
   const ns = ab_selVals(), all = (AB.data?.items || []).length;
   const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],

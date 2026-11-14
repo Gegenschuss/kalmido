@@ -4,7 +4,7 @@
 'use strict';
 
 const ctOn = () => feat('contacts');
-const CT_LINK = [['waiting', N_('Waiting on')], ['responsible', N_('Assignee')], ['about', N_('About')]];
+const CT_LINK = [['waiting', N_('Waiting on')], ['responsible', N_('Assignee')], ['about', N_('About|contact link')]];  // 2.1165.0 (#6116): its own key ('About' alone is the About page)
 function ctAv(c, cls = 'avatar ctav') {
   return c.photo && typeof c.photo === 'string' && c.photo.startsWith('data:image/') ? `<span class="${cls} pic"><img src="${esc(c.photo)}" alt="" loading="lazy" decoding="async"></span>`
     : `<span class="${cls}">${esc(initials(c.fn || c.org || '?'))}</span>`;
@@ -15,7 +15,7 @@ function linksDetailHtml(t, ro) {
   const cts = ctOn() ? (S.tcontacts || {})[t.id] || [] : [];
   const ctShow = pz_show(t, 'client', cts.length);  // 2.412.0 (#3552): the project's property Client and contacts
   const kinds = Object.fromEntries(CT_LINK);
-  const ctHtml = ctOn() && ctShow ? `<div class="lkgrp"><span class="lklab">${tr('Contacts')}</span><div class="lkitems">${cts.map(x => `<span class="lkchip ctlk"><button type="button" class="linkbtn" data-ctgo="${x.contact_id}">${ic('user', 's')}<span>${esc(x.fn)}</span></button><span class="muted">${esc(tr(kinds[x.kind] || 'About'))}</span>${ro ? '' : `<button type="button" class="iconbtn" data-ctunlink="${x.contact_id}" aria-label="${esc(tr('Remove the link to {0}', x.fn))}">${ic('x', 's')}</button>`}</span>`).join('')}
+  const ctHtml = ctOn() && ctShow ? `<div class="lkgrp"><span class="lklab">${tr('Contacts')}</span><div class="lkitems">${/*html-ok*/ cts.map(x => `<span class="lkchip ctlk"><button type="button" class="linkbtn" data-ctgo="${x.contact_id}">${ic('user', 's')}<span>${esc(x.fn)}</span></button><span class="muted">${esc(tr(kinds[x.kind] || 'About|contact link'))}</span>${ro ? '' : `<button type="button" class="iconbtn" data-ctunlink="${x.contact_id}" aria-label="${esc(tr('Remove the link to {0}', x.fn))}">${ic('x', 's')}</button>`}</span>`).join('')}
     ${ro ? '' : `<button type="button" class="attadd" data-act="ct-link">${ic('plus', 's')}<span>${tr('Link a contact')}</span></button>`}</div></div>` : '';
   const evHtml = typeof evTaskHtml === 'function' ? evTaskHtml(t, ro) : '';
   return ctHtml || evHtml ? `<div class="dsec lksec"><h5>${tr('People and dates')}</h5>${ctHtml}${evHtml}</div>` : '';
@@ -23,14 +23,15 @@ function linksDetailHtml(t, ro) {
 function ctLinkPop(anchor, tid) {
   const p = openPop(anchor, `<div class="ctpick"><div class="row"><input id="ctp-q" type="search" placeholder="${esc(tr('Search contacts'))}" aria-label="${esc(tr('Search contacts'))}" autocomplete="off"></div>
     <div class="seg ctpk" role="radiogroup" aria-label="${esc(tr('Kind of link'))}">${CT_LINK.map(([k, n], i) => `<button type="button" role="radio" data-ctpk="${k}" class="${i === 2 ? 'on' : ''}" aria-checked="${i === 2}">${tr(n)}</button>`).join('')}</div>
-    <div class="ctpl" id="ctp-l" role="listbox" aria-label="${esc(tr('Contacts'))}"><div class="muted">${tr('Loading…')}</div></div>
+    <div class="ctpl" id="ctp-l" role="listbox" aria-label="${esc(tr('Contacts'))}">${/*html-ok*/ loadingHtml('row')}</div>
     <button type="button" class="linkbtn" data-ctpnew>${ic('plus', 's')} ${tr('New contact')}</button></div>`);
   let kind = 'about', seq = 0;
   const find = async q => {
     const s = ++seq;
-    let j; try { j = await api('GET', `/api/contacts?limit=30&q=${encodeURIComponent(q || '')}`); } catch { return; }
+    // 2.1165.0 (#6121): a failed search says so with "Try again" (no endless "Loading"); nothing found = the shared empty block
+    let j; try { j = await api('GET', `/api/contacts?limit=30&q=${encodeURIComponent(q || '')}`); } catch (e) { if (s === seq && $('#ctp-l') && e?.message !== 'auth') $('#ctp-l').innerHTML = errorState({title: tr('Contacts could not be loaded'), size: 'row', retry: () => { if ($('#ctp-l')) $('#ctp-l').innerHTML = loadingHtml('row'); find(q); }}); return; }
     if (s !== seq || !$('#ctp-l')) return;
-    $('#ctp-l').innerHTML = j.items.length ? j.items.map(c => `<button type="button" role="option" class="ctrow" data-ctpick="${c.id}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn)}</b><small class="muted">${esc(c.org || c.email || c.phone || '')}</small></span></button>`).join('') : `<div class="muted">${tr('No contact matches.')}</div>`;
+    $('#ctp-l').innerHTML = j.items.length ? j.items.map(c => `<button type="button" role="option" class="ctrow" data-ctpick="${c.id}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn)}</b><small class="muted">${esc(c.org || c.email || c.phone || '')}</small></span></button>`).join('') : emptyState({icon: 'search', title: tr('No contact matches.'), size: 'row'});
   };
   find('');
   p.oninput = e => { if (e.target.id === 'ctp-q') { clearTimeout(p._t); p._t = setTimeout(() => find(e.target.value.trim()), 180); } };
