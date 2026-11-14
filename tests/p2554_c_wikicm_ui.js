@@ -173,7 +173,12 @@ const ROUND = '---\ntags: demo\n---\n# Title  \n\nSome **bold** word and `code`.
     await signin('rita');
     await nav(B + `#wiki/${OP}`);
     check(await until(`!!document.querySelector('#wk-md') && document.querySelector('#wk-md').textContent.includes('Read me')`), 'no right: the page is read');
-    check(await ev(`!document.querySelector('#wk-cm') && !document.querySelector('[data-wk="pmenu"]') && !document.querySelector('[data-wk="pen"]')`), 'no right: no editor, no menu, no pen');
+    // 2.1151.0 (#5524): a reader's "…" holds the downloads (PDF / Word) and nothing that changes the page (was: no menu)
+    check(await ev(`!document.querySelector('#wk-cm') && !document.querySelector('[data-wk="pen"]')`), 'no right: no editor, no pen');
+    await click(`document.querySelector('[data-wk="pmenu"]')`);
+    check(await until(`!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`), 'no right: the "…" opens');
+    const roItems = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim())`);
+    check(roItems.includes('Download as PDF') && !roItems.some(t => /^(Rename…|Delete|Edit as Markdown|Read-only)$/.test(t)), 'no right: only the downloads in the "…" ' + JSON.stringify(roItems));
   }, false);
   console.log(`p2554_c_wikicm_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
