@@ -34,7 +34,9 @@ from ..accounts.login import addr_key, seal, unseal
 
 ADS_SEAL = "addr-share"  # purpose of email_seal / email_key
 ADS_MAX = 200  # open rows one person may have typed in
-ADS_PER_ADDR = 50  # open rows of one address (all sharers): the replay at its sign-in stays short (review #5658 F4)
+ADS_PER_ADDR = 50  # open rows of one address (review #5658 F4: the replay at its sign-in stays short, ADS_REDEEM per sign-in)
+# 2.1145.0 (#6062, Fable review 2.1138 F9): ADS_PER_ADDR counts the rows ONE sharer typed in for the address -- counted over all
+# sharers, one person could fill it and so block the address for everybody else
 ADS_REDEEM = 50  # rows replayed per sign-in / proof (the next one takes the rest)
 ADS_DAYS = 180  # an open row nobody redeemed goes after this
 # the parts of a share's request that are kept for its replay (review #5658 F7: no free-form body)
@@ -82,7 +84,7 @@ def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path="", org_id=
     with system_ctx(c):  # counts only; the rows written are the sharer's own (row-level security checks the insert)
         old = c.execute(f"SELECT id FROM obj_addr_shares WHERE {where}", args).fetchone()
         full = not old and (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (by,)).fetchone()[0] >= ADS_MAX
-                            or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (key,)).fetchone()[0] >= ADS_PER_ADDR)
+                            or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=? AND created_by=?", (key, by)).fetchone()[0] >= ADS_PER_ADDR)
     if full:
         return False
     try:
@@ -159,7 +161,8 @@ def ads_back(c, rv):
     x = ads_taken_row(rv)
     with system_ctx(c):  # 2.1115.0 (#5967): review (N2) - the limits of ads_open hold for the Undo too (counts only)
         full = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (x["created_by"],)).fetchone()[0] >= ADS_MAX
-                or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (x["email_key"],)).fetchone()[0] >= ADS_PER_ADDR)
+                or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=? AND created_by=?", (x["email_key"], x["created_by"])).fetchone()[0]
+                >= ADS_PER_ADDR)  # 2.1145.0 (#6062): per sharer
     if full:
         return False
     try:
@@ -258,8 +261,14 @@ def _rows_of(uid):
             if not u or not em or em != (u["email_proved"] or "") or u["disabled"] or (u["kind"] or "user") == "agent":
                 return em, []
             c.execute("DELETE FROM obj_addr_shares WHERE created_at<?", (iso(now_utc() - timedelta(days=ADS_DAYS)),))
-            rows = [dict(x) for x in c.execute(f"SELECT * FROM obj_addr_shares WHERE email_key=? ORDER BY id LIMIT {ADS_REDEEM}",
-                                               (addr_key(c, ADS_SEAL, em),)).fetchall()]
+            # 2.1145.0 (#6062, Fable review 2.1145 F4): ADS_PER_ADDR counts per sharer now -- the rows taken in turns of the sharers
+            # (each one's first, then each one's second, ...), so one sharer's rows that stay open (not bound yet, not gone) never
+            # keep another sharer's rows out of every sign-in's ADS_REDEEM
+            rows = [dict(x) for x in c.execute(
+                "SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY created_by ORDER BY id) AS ads_turn FROM obj_addr_shares "
+                f"WHERE email_key=?) t ORDER BY ads_turn, id LIMIT {ADS_REDEEM}", (addr_key(c, ADS_SEAL, em),)).fetchall()]
+            for x in rows:
+                x.pop("ads_turn", None)
         c.commit()
         return em, rows
 

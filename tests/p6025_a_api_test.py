@@ -10,6 +10,8 @@ freelancer-matrix: wiki
  - #6027 M2: an address whose account has the page by name already gets an entry of its own, bound once the name share ends
  - #6027 N3: at the limit of shares by address (ADS_MAX) both kinds get the same refusal
  - #6027 N1: the Undo of an open share whose address was proved in between makes the share at once
+ - #6062 (2.1145.0, Fable review 2.1138 F2/F3/F4/F9/F11): by address and by name are rows of their own in both orders, also in
+   the Undo and in the file store's dialog; ADS_PER_ADDR counts per sharer; old history lines with the account are left out
 usage: p6025_a_api_test.py <datadir>      (KMT_NOSTART=1 / P6025A_NOSTART=1: a running server)"""
 import sys
 
@@ -144,5 +146,75 @@ check(r.ok and r.json().get("id") == ln["id"], f"#6027 N1: the Undo answers as f
 check("Late proof" in shared_with(L) and not dbx("SELECT 1 FROM obj_addr_shares WHERE kind='wiki' AND ref_id=?", (PN,)),
       "#6027 N1: the share is made at once (no open row left until her next sign-in)")
 check([s["user"]["name"] for s in people(PN)] == ["lena@example.com"], "#6027 N1: the dialog still shows the address")
+
+# ================================================================ #6062 (2.1145.0): by address, then by name
+P2 = page("Address then name")
+check(share_mail(P2, "uma@example.com").ok, "(setup) uma's address: a share that found her account")
+r = F.post(B + "/api/wiki/shares", json={"page_id": P2, "kind": "person", "user_id": UID})
+check(r.status_code == 201 and r.json()["user"].get("id") == UID and not r.json()["user"].get("by_email"),
+      f"#6062 F2: the share by name answers with her name, not the address {r.status_code} {r.text[:200]}")
+check(sorted(bool(s["user"].get("by_email")) for s in people(P2)) == [False, True],
+      f"#6062 F2: two entries (by address and by name), as for an open address {[s['user'] for s in people(P2)]}")
+# Fable review 2.1145 F1: the address typed again while both live changes its entry, never a third (open) one
+check(share_mail(P2, "uma@example.com").ok and len(people(P2)) == 2, f"#6062 F1: typed again, still two entries {[s['user'] for s in people(P2)]}")
+# ... and by name + an open entry (M2), the share by name ends, the address typed again: one entry, as for any address
+PC = page("Open then bound")
+check(F.post(B + "/api/wiki/shares", json={"page_id": PC, "kind": "person", "user_id": UID}).status_code == 201, "(setup) uma by name")
+check(share_mail(PC, "uma@example.com").ok and len(people(PC)) == 2, "(setup) the address beside it (open, M2)")
+check(F.delete(B + f"/api/wiki/shares/{next(s for s in people(PC) if not s['user'].get('by_email'))['id']}").ok, "(setup) the share by name ends")
+check(share_mail(PC, "uma@example.com").ok and [s["user"]["name"] for s in people(PC) if not s.get("revoked")] == ["uma@example.com"]
+      and not dbx("SELECT 1 FROM obj_addr_shares WHERE kind='wiki' AND ref_id=?", (PC,)),
+      f"#6062 F1: one entry for the address (the open row went when it found the account) {[s['user'] for s in people(PC)]}")
+# F3: the Undo of the share by address after the share by name (it answered 409: the address is that account)
+P3 = page("Undo after name")
+check(share_mail(P3, "uma@example.com").ok, "(setup) uma by address")
+ua = next(s for s in people(P3) if s["user"].get("by_email"))
+check(F.delete(B + f"/api/wiki/shares/{ua['id']}").ok, "(setup) the share by address ends")
+check(F.post(B + "/api/wiki/shares", json={"page_id": P3, "kind": "person", "user_id": UID}).status_code == 201, "(setup) uma by name")
+r = F.post(B + f"/api/wiki/shares/{ua['id']}/restore")
+check(r.ok and r.json().get("id") == ua["id"], f"#6062 F3: the Undo brings the share by address back {r.status_code} {r.text[:200]}")
+check(sorted(bool(s["user"].get("by_email")) for s in people(P3) if not s.get("revoked")) == [False, True],
+      f"#6062 F3: ... beside the share by name {[s['user'] for s in people(P3)]}")
+r = F.delete(B + f"/api/wiki/shares/{ua['id']}")
+check(r.ok and F.post(B + f"/api/wiki/shares/{ua['id']}/restore").ok, f"#6062 F3: Redo / Undo again work {r.status_code}")
+# the other way round: the Undo of the share by name while one by address lives
+un = next(s for s in people(P3) if not s["user"].get("by_email"))
+check(F.delete(B + f"/api/wiki/shares/{un['id']}").ok, "(setup) the share by name ends")
+r = F.post(B + f"/api/wiki/shares/{un['id']}/restore")
+check(r.ok and r.json().get("id") == un["id"], f"#6062 F3: the Undo of the share by name is not held by the one by address {r.status_code} {r.text[:200]}")
+# F4: the file store's dialog shares the node with her: a row of its own, the hidden one is not taken over / logged
+N3 = node_of(P3)
+hid = dbx("SELECT f.id FROM fs_shares f JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? AND k.email<>''", (N3, UID))
+r = F.post(B + f"/api/files/nodes/{N3}/shares", json={"user_id": UID, "role": "edit"})
+if r.status_code == 201:
+    check(hid and r.json().get("id") != hid[0][0] and dbx("SELECT role FROM fs_shares WHERE id=?", (hid[0][0],))[0][0] == "view",
+          f"#6062 F4: the file store's share does not take the row by address {r.json().get('id')} {hid}")
+    check(all(s.get("user_id") == UID for s in r.json().get("shares", []) if s.get("user_id")) and len(r.json().get("shares", [])) == 1,
+          f"#6062 F4: its dialog lists one share (the row by name), never the one by address {r.json().get('shares')}")
+else:
+    check(r.status_code in (403, 404, 409), f"#6062 F4: the file store's dialog refuses the knowledge node as before {r.status_code} {r.text[:200]}")
+# F9: ADS_PER_ADDR counts per sharer -- mia's 50 open rows of an address do not block frida's
+PM9 = M.post(B + "/api/wiki/pages", json={"space": "private", "path": "Mia's offer", "body": "x"}).json()["id"]
+check(M.post(B + "/api/wiki/shares", json={"page_id": PM9, "kind": "person", "email": "nobody9@example.com"}).ok, "(setup) mia shares by address")
+dbx("INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
+    "SELECT kind, NULL, owner_id, org_id, 'zz6062/' || g, CAST('{}' AS JSONB), email_seal, email_key, created_by, created_at "
+    "FROM obj_addr_shares, generate_series(1, 60) g WHERE id=(SELECT MAX(id) FROM obj_addr_shares WHERE created_by=?)", (MID,))
+P9 = page("Not blocked")
+check(share_mail(P9, "nobody9@example.com").ok and [s["user"]["name"] for s in people(P9)] == ["nobody9@example.com"],
+      f"#6062 F9: another sharer's rows of the address do not block it {[s['user'] for s in people(P9)]}")
+dbx("DELETE FROM obj_addr_shares WHERE path LIKE 'zz6062/%'")
+# F11: lines written before 2.1138 that name the account of a share by address go once at the start (one-shot
+# migr_addrlog6062), others stay; a share by name made afterwards keeps its line (Fable review 2.1145 F2: no read-time filter)
+fid = dbx("SELECT id FROM fs_shares WHERE node_id=? AND user_id=?", (NB, UID))[0][0]
+for act, det in (("share", f"user:{UID}:view"), ("unshare", str(fid)), ("share_change", f"{fid}:edit"), ("share", f"user:{VID}:view")):
+    dbx("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,0,?,?,?)", (NB, FID, act, det, "2026-11-01T10:00:00Z"))
+dbx("DELETE FROM settings WHERE key='migr_addrlog6062'")
+if fresh(env={"KALMIDO_API_RATE": "5000"}, prefix="P6025A", keep=True):
+    F = sess("frida")
+    check([x["detail"] for x in shares_log(NB)] == [f"user:{VID}:view"],
+          f"#6062 F11: the old lines with uma's account went at the start, the other line stays {shares_log(NB)}")
+    r = F.post(B + "/api/wiki/shares", json={"page_id": PB, "kind": "person", "user_id": UID})
+    check(r.status_code == 201 and f"user:{UID}:view" in [x["detail"] for x in shares_log(NB)],
+          f"#6062 F11: a share by name made now keeps its history line (as for any account) {r.status_code} {shares_log(NB)}")
 
 sys.exit(done("p6025_a_api"))

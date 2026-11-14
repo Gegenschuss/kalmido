@@ -2,7 +2,8 @@
 // 2.572.0 B (#4747) UI tests, Firefox at 390 px with touch: a phone's favourites are no row under the header any more but a
 // row over the tab bar. A swipe up on the tab bar opens it, a swipe down / a tile / a tap next to it / Escape closes it; a plain
 // tap on a tab never opens it; the grip is a button with aria-expanded (tap opens and closes); no grip while the tab
-// "Favourites" is pinned or a field has the focus (the keyboard). Invented data only. P2572B_SHOTS=dir: pictures.
+// "Favourites" is pinned or a field has the focus (the keyboard). 2.1150.0 (#6082): held, the grip slides sideways, the place
+// stays on this device. Invented data only. P2572B_SHOTS=dir: pictures.
 // freelancer-matrix: tasks  (frida has no organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -133,6 +134,48 @@ const GRIP = `!document.querySelector('#favgrip').classList.contains('hidden') &
     check(await ev(SHUT), 'the tab pinned: a swipe opens nothing');
     await ev(`(() => { LS.set('tabbar', tabIds().filter(x => x !== 'favs')); render(); return 1; })()`);
     check(await ready(ev, GRIP), 'the tab unpinned: the grip is back');
+
+    // 2.1150.0 (#6082): hold the grip (~400 ms), then slide: it moves sideways along the bar, this device keeps the place
+    // (tasks.favgripX, share of the width); a tap and a swipe up stay; a move before the hold ends moves nothing; the edges clamp
+    const GX = `(() => { const r = document.querySelector('#favgrip').getBoundingClientRect(); return Math.round(r.left + r.width / 2); })()`;
+    const HOLDMOVE = async (toX, hold = 550) => {
+      await ev(`(() => { const el = document.querySelector('#favgrip'), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
+        window.__gm = (type, X) => { const t = new Touch({identifier: 9, target: el, clientX: X, clientY: y}); el.dispatchEvent(new TouchEvent(type, {bubbles: true, cancelable: true, touches: type === 'touchend' ? [] : [t], targetTouches: type === 'touchend' ? [] : [t], changedTouches: [t]})); };
+        window.__gx = x; window.__gm('touchstart', x); return 1; })()`);
+      await sleep(hold);
+      await ev(`(() => { const x = window.__gx; for (let i = 1; i <= 5; i++) window.__gm('touchmove', x + (${toX} - x) * i / 5); window.__gm('touchend', ${toX});
+        document.querySelector('#favgrip').dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true})); return 1; })()`);  // the click a phone sends after the lift
+    };
+    check(Math.abs(await ev(GX) - 195) <= 2 && await ev(`localStorage.getItem('tasks.favgripX') === null`), '#6082: without a saved place the grip sits in the middle ' + await ev(GX));
+    await HOLDMOVE(80);
+    const mv = JSON.parse(await ev(`JSON.stringify({x: ${GX}, f: LS.get('favgripX', null), shut: ${SHUT}, moving: document.querySelector('#favgrip').classList.contains('moving')})`));
+    check(Math.abs(mv.x - 80) <= 2 && Math.abs(mv.f - 80 / 390) < 0.01 && mv.shut && !mv.moving, '#6082: held and slid, the grip moved to the finger, the place is saved, the row stayed shut ' + JSON.stringify(mv));
+    const ge = JSON.parse(await ev(`(() => { const r = document.querySelector('#favgrip').getBoundingClientRect(), t = document.querySelector('#tabs').getBoundingClientRect(); return JSON.stringify({edge: r.top < t.top && r.bottom > t.top}); })()`));
+    check(ge.edge, '#6082: moved, the grip stays on the top edge of the tab bar ' + JSON.stringify(ge));
+    await shot('p2572b-grip-moved.png');
+    // a tap still opens and closes, a swipe up on the moved grip still opens
+    await ev(`(() => { document.querySelector('#favgrip').click(); return 1; })()`);
+    check(await ready(ev, OPEN), '#6082: a tap on the moved grip opens the row');
+    await ev(`(() => { document.querySelector('#favgrip').click(); return 1; })()`);
+    check(await ready(ev, SHUT), '#6082: a second tap closes it');
+    await ev(SWIPE('#favgrip', -70));
+    check(await ready(ev, OPEN), '#6082: a swipe up on the moved grip opens the row');
+    check(Math.abs(await ev(GX) - 80) <= 2, '#6082: the swipe up did not move the grip ' + await ev(GX));
+    await ev(`(() => { fvd_set(false); return 1; })()`);
+    await ready(ev, SHUT);
+    // a quick sideways move without the hold moves nothing
+    await ev(SWIPE('#favgrip', 0, 150));
+    check(Math.abs(await ev(GX) - 80) <= 2, '#6082: a move without the hold leaves the grip where it is ' + await ev(GX));
+    // the place survives a reload of the app (this device's localStorage)
+    await nav(B + 'static/icon.svg'); await nav(B + '#today');
+    check(await ready(ev, `S.booted && document.querySelectorAll('#favup .fv2-tile').length === 4`) && await ready(ev, GRIP), '#6082: the app is back after the reload');
+    check(Math.abs(await ev(GX) - 80) <= 2, '#6082: after the reload the grip is still where it was put ' + await ev(GX));
+    // to the edge: the grip stays whole on the screen (2.25rem = 36 px off the edge)
+    await HOLDMOVE(2);
+    const eg = JSON.parse(await ev(`(() => { const r = document.querySelector('#favgrip').getBoundingClientRect(); return JSON.stringify({l: Math.round(r.left), c: ${GX}, f: LS.get('favgripX', null)}); })()`));
+    check(eg.l >= 0 && Math.abs(eg.c - 36) <= 2 && eg.f < 0.02, '#6082: at the edge the grip is clamped, whole on the screen ' + JSON.stringify(eg));
+    await ev(`(() => { localStorage.removeItem('tasks.favgripX'); fvd_gripPlace(null); return 1; })()`);
+    check(Math.abs(await ev(GX) - 195) <= 2, '#6082: no saved place (reset): the grip is back in the middle');
 
     // a computer / tablet: the favourites stay in the head bar, no grip
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 760}});

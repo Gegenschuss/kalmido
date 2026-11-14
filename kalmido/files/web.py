@@ -933,14 +933,18 @@ def files_share_add(nid):
     pool = {"user_id": t["people"], "group_id": t["groups"], "agent_id": t["agents"]}[key]
     if not any(x["id"] == tid for x in pool):
         return err(tr("Only people, groups and agents of the same workspace can get a share"), 409)
-    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0", (nid, tid)).fetchone()  # #4739
-    if not old and c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND COALESCE(list_own, 0)=0", (nid,)).fetchone()[0] >= SHARE_MAX:
+    # 2.1145.0 (#6062, Fable review 2.1138 F4): a share by e-mail address of the knowledge dialog (FS_NOT_ADDR) is no row of this
+    # dialog -- not taken over, raised and logged as "the same target again", not counted for SHARE_MAX: this share gets a row of
+    # its own beside it (the answer and the limit must not tell that the address belongs to this account)
+    na = f" AND {FS_NOT_ADDR.format(a='fs_shares')}"
+    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0{na}", (nid, tid)).fetchone()  # #4739
+    if not old and c.execute(f"SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND COALESCE(list_own, 0)=0{na}", (nid,)).fetchone()[0] >= SHARE_MAX:
         return err(tr("Too many shares"), 409)
     from ..core.objects import obj_node_share  # core/objects.py imports this module at its top
     # 2.747.0 (#5246): the share row itself through the core (the checks above are the file store's own: checked=True;
     # the members dialog's rows of a list stay apart, list_own); it writes the log line
     sid = obj_node_share(c, me(), n, key, tid, role, exp, org=n["org_id"] or None, checked=True,
-                         match=(" AND COALESCE(list_own, 0)=0", ()))
+                         match=(" AND COALESCE(list_own, 0)=0" + na, ()))
     if lr_ is None and old and lists:
         c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))
     elif lr_ is not None:

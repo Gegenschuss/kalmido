@@ -12,7 +12,7 @@
 // view modes and remembered filters of this device; never the language, the sign-in, the cache or the offline queue
 const RS_LOCAL = ['lookLocal', 'sideGroups', 'sideFold', 'sideOpenG', 'collapsed', 'sbbOpen', 'sbbFold', 'sbbUnfold', 'mdOpen', 'rings',
   'vmode', 'agband', 'tabbar', 'chatFloat', 'chatPos', 'calMode', 'tvMode', 'statsMode', 'timeScope', 'timePeriod', 'newsFilter',
-  'newsKind', 'jobsFilter'];
+  'newsKind', 'jobsFilter', 'favgripX'];  // 2.1150.0 (#6082): favgripX = the place of the favourites' grip on the tab bar
 const RS_LOCAL_PRE = ['pw.', 'sort2.', 'lst.sort.', 'fcols.', 'lcw.'];
 const RS_UNDO = 'tasks.rsUndoLocal', RS_TOAST = 'tasks.rsToast';
 

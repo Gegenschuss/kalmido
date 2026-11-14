@@ -21,6 +21,7 @@ Functions of the interface (kalmido/docs and the import use them; signatures are
 fs_new_version, fs_read, fs_folder, fs_visible_sql, fs_log_add, fs_on_delete.
 """
 import hashlib
+import json
 import mimetypes
 import os
 import uuid
@@ -844,6 +845,42 @@ fs_change_hooks = []  # 2.352.0 A (#2748): f(c, nid, action) after every change 
 # ends both alike. a = the alias of fs_shares.
 FS_NOT_ADDR = ("NOT EXISTS (SELECT 1 FROM wiki_share_cards fk WHERE (fk.fs_share_id={a}.id OR fk.pair_id={a}.id) "
                "AND fk.email IS NOT NULL AND fk.email<>'')")
+
+
+def _fs_json(v):
+    return json.loads(v or "{}") if isinstance(v, (str, bytes)) else dict(v or {})
+
+
+def fs_addr_log_purge(c):
+    """2.1145.0 (#6062, Fable review 2.1138 F11, one-shot migr_addrlog6062 of core/db.py init_db): the history lines written
+    before 2.1138.0 (#6025, since then a share by e-mail address writes none) that name the account of a share by address --
+    "share user:<id>:…" of an account with a share by address on the node (live, or ended and still restorable in
+    obj_revoked; the pair of a folder share too), "unshare <id>" / "share_change <id>:…" of such a share -- go once. Once, not
+    left out at every read: a later line of a share by name of that account must stay (Fable review 2.1145 F2: its absence
+    would tell that the address is that account). Lines of a share by name of the same account from before go along (the two
+    cannot be told apart). -> how many went."""
+    pairs, sids = set(), set()
+    with system_ctx(c):  # across all accounts (a start step)
+        for r in c.execute(f"SELECT id, node_id, user_id FROM fs_shares WHERE user_id IS NOT NULL AND NOT {FS_NOT_ADDR.format(a='fs_shares')}").fetchall():
+            pairs.add((int(r["node_id"]), int(r["user_id"])))
+            sids.add((int(r["node_id"]), str(r["id"])))
+        mains = c.execute("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND kind='wiki' "
+                          "AND COALESCE(CAST(row_json AS JSONB)->'wiki_card'->>'email', '')<>''").fetchall()
+        more = [int(k["pair"]) for k in ((_fs_json(r["row_json"]).get("wiki_card") or {}) for r in mains) if str(k.get("pair") or "").isdigit()]
+        rows = list(mains) + (c.execute("SELECT id, row_json FROM obj_revoked WHERE id = ANY(CAST(? AS BIGINT[])) AND src='fs_shares'",
+                                        (more,)).fetchall() if more else [])
+        for r in rows:
+            d = _fs_json(r["row_json"])
+            if d.get("node_id") and d.get("user_id"):
+                pairs.add((int(d["node_id"]), int(d["user_id"])))
+                sids.add((int(d["node_id"]), str(d.get("id"))))
+        n = 0
+        for nid, uid in sorted(pairs):
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND action='share' AND detail ILIKE ?", (nid, f"user:{uid}:%")).rowcount or 0
+        for nid, sid in sorted(sids):
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND ((action='unshare' AND detail=?) OR (action='share_change' AND detail ILIKE ?))",
+                           (nid, sid, sid + ":%")).rowcount or 0
+    return n
 
 
 def fs_log_add(c, nid, action, detail="", uid=None):
