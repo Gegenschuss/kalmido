@@ -289,4 +289,5 @@ document.addEventListener('click', async e => {
   a.disabled = false;
 });
 // 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
-if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .bmcard, #view .bmrow:not(.rlrow)', '.iconbtn[data-bm="open"]');  // the details of a bookmark (card and row)
+// 2.1151.0 C (#3835): on a phone the symbols are hidden (bookmarks.css): the long press opens the menu of all of them (ms_btnMenu)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .bmcard, #view .bmrow:not(.rlrow)', '.iconbtn[data-bm="open"]', lm_keep, r => ms_btnMenu(r, '.bmacts .iconbtn, .iconbtn[data-bm="open"]', bm_item(+r.dataset.id)?.title));  // the details of a bookmark (card and row)

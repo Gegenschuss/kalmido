@@ -35,6 +35,12 @@
 .bmrow{display:flex;align-items:center;gap:.625rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
 .bmrow .bmbody{padding:0}
 @media (max-width:30rem){ .bmrow{flex-wrap:wrap}.bmrow .bmbody{flex:1 1 calc(100% - 3.625rem)}.bmrow .bmacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.458.0 (#3855): the buttons below the title, it keeps the width */
+/* 2.1151.0 C (#3835): phones: no symbols in a bookmark / read-later row or card, the title gets the width; a long press opens the
+   menu with the same actions (bookmarks.js, readlater.js). The buttons stay for screen readers (like .sr) */
+@media (max-width:767px){
+  .bmrow .bmacts,.bmrow>.iconbtn[data-bm="open"],.bmcard .bmfoot .bmacts,.bmcard .bmfoot>.iconbtn[data-bm="open"]{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .bmrow,.bmcard{-webkit-touch-callout:none}
+}
 .bmthumb{width:3rem;height:3rem;border-radius:var(--r-s);object-fit:cover;flex:none;background:var(--bg3)}
 .bmmore{align-self:center}
 .bmdlg .bmdpic{display:block;width:100%;height:12rem;object-fit:cover;border-radius:var(--r-s);margin-bottom:.5rem;background:var(--bg3)}  /* #5227: a fixed box -- the dialog does not grow when the picture arrives */
