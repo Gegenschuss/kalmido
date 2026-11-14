@@ -80,8 +80,9 @@ const D0 = day(0), D1 = day(1), D2 = day(2);
   await until(() => !d.querySelector('.modal.evmodal'));
   // a date without own change: the editor keeps its switch
   w.eval(`evEditor({ev: ${JSON.stringify(x)}, occ: '${D2}T08:00'})`);
-  md = await until(() => d.querySelector('.modal.evmodal [data-evsc="all"].on') && d.querySelector('.modal.evmodal'));
-  check(md && !md.querySelector('.evrep').hidden, 'a date without own change: the editor keeps "Only this date / All dates" and the repeat row');
+  // 2.1167.0 (#6153): preset "Only this date" (the repeat row comes with "All dates" chosen on purpose)
+  md = await until(() => d.querySelector('.modal.evmodal [data-evsc="one"].on') && d.querySelector('.modal.evmodal'));
+  check(md && md.querySelector('[data-evsc="all"]') && md.querySelector('.evrep').hidden, 'a date without own change: the editor keeps "Only this date / All dates", "Only this date" preset');
   if (md) click(w, md.querySelector('[data-evm="close"]'));
 
   // ---- 4. changing the series (title, time, place) leaves the changed date as it is
