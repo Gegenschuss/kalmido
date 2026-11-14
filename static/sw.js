@@ -26,19 +26,19 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/formguard.js', '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js',
   '/static/js/lyprop.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js',
   '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js',
-  '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js',
+  '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js',
   '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js',
   '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js',
   '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js',
   '/static/js/liste2echan.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/listcolor.js', '/static/js/wscolor.js',
   '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/oneway.js',
-  '/static/js/photometa.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js',
+  '/static/js/photometa.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js',
   '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js',
   '/static/js/assistant.js', '/static/js/dropany.js', '/static/js/keys.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supportview.js', '/static/js/oinvview.js', '/static/js/servers.js',
-  '/static/js/selfdelete.js', '/static/js/setreset.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/ctfold.js',
+  '/static/js/selfdelete.js', '/static/js/setreset.js', '/static/js/move.js', '/static/js/settings.js', '/static/js/contacts.js', '/static/js/ctfold.js',
   '/static/js/newsletter.js', '/static/js/office.js', '/static/js/office_docs.js', '/static/js/office_tree.js', '/static/js/office_import.js',
   '/static/js/office_sheet.js', '/static/js/office_parts.js', '/static/js/office_travel.js', '/static/js/office_cashflow.js',
   '/static/js/office_doctpl.js', '/static/js/office_logbook.js', '/static/js/office_cashbook.js', '/static/js/office_pipeline.js',
@@ -78,7 +78,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/trashui.js', '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/msgpop.js', '/static/js/offcache.js',
   '/static/js/shoot.js', '/static/js/splitview.js', '/static/js/codecheck.js', '/static/js/undolist.js', '/static/js/recent.js',
   '/static/js/office_walk.js', '/static/js/callsheet.js', '/static/js/quotes_dada.js', '/static/js/quotes_dada_es.js', '/static/js/quotes_dada_fr.js',
-  '/static/js/quotes_dada_it.js', '/static/js/quotes_dada_nl.js', '/static/js/helpview.js'];
+  '/static/js/quotes_dada_it.js', '/static/js/quotes_dada_nl.js', '/static/js/helpview.js', '/static/js/meetprop.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
