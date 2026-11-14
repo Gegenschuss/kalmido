@@ -195,4 +195,17 @@ r = export(Fr, FP, "docx")
 check(r.status_code == 200 and "Please pay" in zipfile.ZipFile(io.BytesIO(r.content)).read("word/document.xml").decode(), "#5524: ... and as Word")
 check(export(A, FP, "pdf").status_code == 404, "#5524: the admin of the instance does not read the freelancer's page")
 
+# ---- review (job/4457): pages built to stall the export answer fast (a padded huge table ran out of memory, unclosed marks
+# and the table's separator line were quadratic, cutting a long word was cubic)
+import time  # noqa: E402
+EVIL = ("|" + "c|" * 1000 + "\n|" + "-|" * 1000 + "\n" + "|\n" * 60000 + "\n"
+        + "*a " * 30000 + "\n\n" + "[[a " * 20000 + "\n\n|\n" + " " * 20000 + "x\n\n```\n" + "Q" * 20000 + "\n```\n")
+EP = page(Fr, "Stress page", EVIL, space="private")
+for fmt in ("pdf", "docx"):
+    t0 = time.time()
+    r = Fr.get(B + f"/api/wiki/pages/{EP}/export", params={"format": fmt}, timeout=120)
+    dt = time.time() - t0
+    check(r.status_code == 200 and dt < 40, f"#5524 review: the stress page exports as {fmt} in {dt:.1f} s ({r.status_code})")
+check(Fr.get(B + "/api/wiki/pages/" + str(EP)).ok, "#5524 review: the instance still answers after the stress export")
+
 sys.exit(kt.done("p21151_d_wiki_export"))

@@ -35,33 +35,39 @@ from .wkstyle import WIKI_STYLES, wst_get
 WKD_FORMATS = ("pdf", "docx")
 WKD_IMG_MAX = 40                 # pictures embedded per file (more: as their text)
 WKD_IMG_BYTES = 40 * 1024 * 1024  # ... and their stored bytes in all
+WKD_IMG_PX = 60_000_000           # ... and their pixels in all (review job/4457: small files can decode to huge pictures)
+WKD_IMG_LOOK = 200                # picture lines looked up at most (a missing file costs a query too)
+WKD_IMG_EDGE = 2000               # longest side of a picture in the Word file (pixels)
 WKD_URL_OK = re.compile(r"(?i)^(https?://|mailto:)[^\s<>\"]+$")
 WKD_FILE_RE = re.compile(r"^/api/wiki/files/(\d{1,15})(?:/|$)")
 
 
 # ---- Markdown -> blocks ---------------------------------------------------------------------------------------------
 # a run = (text, style, href): style a frozenset of "b" / "i" / "s" / "c" (code); href '' or a web / mail address
+# review (job/4457): every open-ended span is bounded ({1,WKD_SPAN}), an unclosed mark repeated over a long paragraph was
+# quadratic and held the interpreter lock for minutes; wkd_inline takes at most WKD_INLINE_MAX characters through it
 _INLINE = re.compile(
     r"(?P<esc>\\[\\`*_{}\[\]()#+\-.!|~>])"
-    r"|(?P<code>`+)(?P<codet>.+?)(?P=code)"
-    r"|!\[(?P<ialt>[^\]\n]*)\]\((?P<isrc>[^)\s]+)(?:\s+\"[^\"]*\")?\)"
-    r"|\[\[(?P<wl>[^\]|\n]+)(?:\|(?P<wlt>[^\]\n]+))?\]\]"
-    r"|\[(?P<lt>[^\]\n]+)\]\((?P<lh>[^)\s]+)(?:\s+\"[^\"]*\")?\)"
-    r"|<(?P<auto>(?:https?://|mailto:)[^>\s]+)>"
-    r"|(?P<bare>https?://[^\s<>()\[\]]+[^\s<>()\[\].,;:!?'\"])"
-    r"|(?P<br><br\s*/?>)"
-    r"|\*\*(?=\S)(?P<b1>.+?)(?<=\S)\*\*"
-    r"|(?<!\w)__(?=\S)(?P<b2>.+?)(?<=\S)__(?!\w)"
-    r"|~~(?=\S)(?P<st>.+?)(?<=\S)~~"
-    r"|\*(?=[^\s*])(?P<i1>.+?)(?<=[^\s*])\*"
-    r"|(?<!\w)_(?=[^\s_])(?P<i2>.+?)(?<=[^\s_])_(?!\w)")
+    r"|(?P<code>`{1,20})(?P<codet>.{1,500}?)(?P=code)"
+    r"|!\[(?P<ialt>[^\]\n]{0,300})\]\((?P<isrc>[^)\s]{1,2000})(?:\s+\"[^\"\n]{0,500}\")?\)"
+    r"|\[\[(?P<wl>[^\]|\n]{1,300})(?:\|(?P<wlt>[^\]\n]{1,300}))?\]\]"
+    r"|\[(?P<lt>[^\]\n]{1,300})\]\((?P<lh>[^)\s]{1,2000})(?:\s+\"[^\"\n]{0,500}\")?\)"
+    r"|<(?P<auto>(?:https?://|mailto:)[^>\s]{1,2000})>"
+    r"|(?P<bare>https?://[^\s<>()\[\]]{0,2000}[^\s<>()\[\].,;:!?'\"])"
+    r"|(?P<br><br\s{0,10}/?>)"
+    r"|\*\*(?=\S)(?P<b1>.{1,500}?)(?<=\S)\*\*"
+    r"|(?<!\w)__(?=\S)(?P<b2>.{1,500}?)(?<=\S)__(?!\w)"
+    r"|~~(?=\S)(?P<st>.{1,500}?)(?<=\S)~~"
+    r"|\*(?=[^\s*])(?P<i1>.{1,500}?)(?<=[^\s*])\*"
+    r"|(?<!\w)_(?=[^\s_])(?P<i2>.{1,500}?)(?<=[^\s_])_(?!\w)")
+WKD_INLINE_MAX = 20000  # characters of one paragraph read as Markdown; the rest of a longer one stays plain text
 
 
 def wkd_inline(s, style=frozenset(), href=""):
     """The runs of one line / paragraph of Markdown."""
     out, pos = [], 0
     s = str(s or "")
-    for m in _INLINE.finditer(s):
+    for m in _INLINE.finditer(s, 0, WKD_INLINE_MAX):
         if m.start() > pos:
             out.append((s[pos:m.start()], style, href))
         pos = m.end()
@@ -103,7 +109,8 @@ _TASK = re.compile(r"^\[([ xX])\]\s+(.*)$")
 _HR = re.compile(r"^ {0,3}([-*_])(?:\s*\1){2,}\s*$")
 _HEAD = re.compile(r"^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 _FENCE = re.compile(r"^ {0,3}(```+|~~~+)\s*([\w+-]*)")
-_TSEP = re.compile(r"^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$")
+_TSEP = re.compile(r"^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$")  # on the stripped line (review job/4457: no two \s* in a row)
+WKD_TCOLS, WKD_TCELLS = 40, 20000  # a table wider or larger is written as its text (a code block), never padded out
 _IMG_LINE = re.compile(r"^\s*!\[([^\]\n]*)\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)\s*$")
 
 
@@ -162,7 +169,7 @@ def wkd_blocks(text):
             para.clear()
             i += 1
             continue
-        if "|" in ln and i + 1 < len(lines) and _TSEP.match(lines[i + 1]) and "-" in lines[i + 1]:
+        if "|" in ln and i + 1 < len(lines) and _TSEP.match(lines[i + 1].strip()) and "-" in lines[i + 1]:
             flush()
             rows = [_cells(ln)]
             i += 2
@@ -170,6 +177,9 @@ def wkd_blocks(text):
                 rows.append(_cells(lines[i]))
                 i += 1
             n = max(len(r) for r in rows)
+            if n > WKD_TCOLS or n * len(rows) > WKD_TCELLS:  # review (job/4457): padding a huge table ran out of memory
+                out.append(("code", "\n".join(lines[i - len(rows) - 1:i])))
+                continue
             out.append(("table", [[wkd_inline(c) for c in r + [""] * (n - len(r))] for r in rows], True))
             continue
         if ln.lstrip().startswith(">"):
@@ -213,18 +223,19 @@ def wkd_blocks(text):
 def wkd_images(c, page, blocks):
     """{src: (stored bytes, mime)} of the block pictures that are files of this very page, readable, not SVG, not found
     infected; at most WKD_IMG_MAX / WKD_IMG_BYTES. Anything else stays text."""
-    from ..files.upsafe import up_marks
-    out, total = {}, 0
+    from ..files.scan import sc_locked, sc_waiting
+    out, total, px, looked = {}, 0, 0, 0
     for b in blocks:
-        if b[0] != "img" or b[1] in out or len(out) >= WKD_IMG_MAX:
+        if b[0] != "img" or b[1] in out or len(out) >= WKD_IMG_MAX or looked >= WKD_IMG_LOOK:
             continue
         m = WKD_FILE_RE.match(b[1])
         if not m:
             continue
+        looked += 1
         f = c.execute(f"SELECT * FROM wiki_files WHERE id=? AND page_id=? AND {live_sql()}", (int(m.group(1)), page["id"])).fetchone()
         if not f or not str(f["mime"] or "").startswith("image/") or "svg" in str(f["mime"]):
             continue
-        if (up_marks(c, "wiki", [f["id"]]).get(f["id"]) or {}).get("scan") == "infected":  # as wka_get (sc_guard): never opened
+        if sc_locked(c, "wiki", f["id"]) or sc_waiting(c, "wiki", f["id"]):  # as wka_get (sc_guard, review job/4457: strict mode too)
             continue
         if total + int(f["size"] or 0) > WKD_IMG_BYTES:
             continue
@@ -232,7 +243,15 @@ def wkd_images(c, page, blocks):
             raw = oc_read_file(c, os.path.join(ATT_DIR, f["path"]))
         except Exception:  # noqa: BLE001  (a missing / unreadable file: the picture stays text)
             continue
-        total += len(raw)
+        try:
+            from PIL import Image
+            with Image.open(io.BytesIO(raw)) as im:  # the header only: the size before anything is decoded
+                n = im.width * im.height
+        except Exception:  # noqa: BLE001  (not a picture after all: stays text)
+            continue
+        if px + n > WKD_IMG_PX:
+            continue
+        total, px = total + len(raw), px + n
         out[b[1]] = (raw, f["mime"])
     return out
 
@@ -317,12 +336,16 @@ def wkd_pdf(title, blocks, images, style=""):
                 out.append(cur)
                 cur, cw = [], 0.0
             while w > width and len(t) > 1:  # a word longer than the line: cut by characters
-                k = len(t)
-                while k > 1 and pdf_text_width(t[:k], size, "b" in sty) > width - cw:
-                    k -= 1
+                # review (job/4457): the widths of the characters summed in one pass (measuring every prefix again was cubic)
+                k, acc = 0, 0.0
+                for ch in t:
+                    cwd = pdf_text_width(ch, size, "b" in sty)
+                    if k and acc + cwd > width - cw:
+                        break
+                    acc, k = acc + cwd, k + 1
                 out.append(cur + [(t[:k], sty, href)])
                 cur, cw, t = [], 0.0, t[k:]
-                w = pdf_text_width(t, size, "b" in sty)
+                w = max(0.0, w - acc) if len(t) > 1 else pdf_text_width(t, size, "b" in sty)
             cur.append((t, sty, href))
             cw += w
         if cur:
@@ -533,6 +556,8 @@ def wkd_docx(title, blocks, images, style=""):
             if im.width * im.height > 30_000_000:
                 return None
             im.load()
+            if max(im.width, im.height) > WKD_IMG_EDGE:  # review (job/4457): not saved again at full size
+                im.thumbnail((WKD_IMG_EDGE, WKD_IMG_EDGE))
             if im.mode not in ("RGB", "RGBA", "L", "LA"):
                 im = im.convert("RGBA")
             buf = io.BytesIO()
