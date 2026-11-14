@@ -122,7 +122,8 @@ n = dbx("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (FID,))[0][0]
     "SELECT COUNT(*) FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id WHERE k.email<>'' AND f.created_by=?", (FID,))[0][0]
 dbx("INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
     "SELECT kind, NULL, owner_id, org_id, 'zz6027/' || g, CAST('{}' AS JSONB), email_seal, email_key, created_by, created_at "
-    "FROM obj_addr_shares, generate_series(1, ?) g WHERE id=?", (200 - n, row))
+    "FROM obj_addr_shares, generate_series(1, ?) g WHERE id=?",
+    (200 - n, dbx("SELECT id FROM obj_addr_shares WHERE kind='wiki' AND created_by=? ORDER BY id LIMIT 1", (FID,))[0][0]))
 PL = page("At the limit")
 ra, rb = share_mail(PL, "uma@example.com"), share_mail(PL, "nobody2@example.com")
 check(ra.status_code == rb.status_code == 409 and ra.json() == rb.json(),
