@@ -851,31 +851,36 @@ def _fs_json(v):
     return json.loads(v or "{}") if isinstance(v, (str, bytes)) else dict(v or {})
 
 
-def fs_addr_log_hidden(c, nid):
-    """2.1145.0 (#6062, Fable review 2.1138 F11): the history lines of node nid that name the account of a share by e-mail
-    address -- written before 2.1138.0 (#6025, since then such a share writes none): "share user:<id>:…" of an account with a
-    share by address on the node (live, or ended and still restorable in obj_revoked) and "unshare <share id>" of such a
-    share. -> (account ids, share ids as text). A line by name of the same account is left out with them (the account's
-    shares here are shown in the knowledge dialog)."""
-    users, sids = set(), set()
-    with system_ctx(c):  # the ids only, to leave lines out (obj_revoked keeps the card of an ended share in its row)
-        for r in c.execute(f"SELECT id, user_id FROM fs_shares WHERE node_id=? AND user_id IS NOT NULL AND NOT {FS_NOT_ADDR.format(a='fs_shares')}",
-                           (int(nid),)).fetchall():
-            users.add(int(r["user_id"]))
-            sids.add(str(r["id"]))
+def fs_addr_log_purge(c):
+    """2.1145.0 (#6062, Fable review 2.1138 F11, one-shot migr_addrlog6062 of core/db.py init_db): the history lines written
+    before 2.1138.0 (#6025, since then a share by e-mail address writes none) that name the account of a share by address --
+    "share user:<id>:…" of an account with a share by address on the node (live, or ended and still restorable in
+    obj_revoked; the pair of a folder share too), "unshare <id>" / "share_change <id>:…" of such a share -- go once. Once, not
+    left out at every read: a later line of a share by name of that account must stay (Fable review 2.1145 F2: its absence
+    would tell that the address is that account). Lines of a share by name of the same account from before go along (the two
+    cannot be told apart). -> how many went."""
+    pairs, sids = set(), set()
+    with system_ctx(c):  # across all accounts (a start step)
+        for r in c.execute(f"SELECT id, node_id, user_id FROM fs_shares WHERE user_id IS NOT NULL AND NOT {FS_NOT_ADDR.format(a='fs_shares')}").fetchall():
+            pairs.add((int(r["node_id"]), int(r["user_id"])))
+            sids.add((int(r["node_id"]), str(r["id"])))
         mains = c.execute("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND kind='wiki' "
-                          "AND COALESCE(CAST(row_json AS JSONB)->'wiki_card'->>'email', '')<>'' AND ((CAST(row_json AS JSONB)->>'node_id')=? "
-                          "OR (CAST(row_json AS JSONB)->'wiki_card'->>'pair') IS NOT NULL)", (str(int(nid)),)).fetchall()
-        pairs = [int(k["pair"]) for k in ((_fs_json(r["row_json"]).get("wiki_card") or {}) for r in mains)
-                 if str(k.get("pair") or "").isdigit()]
-        more = c.execute("SELECT id, row_json FROM obj_revoked WHERE id = ANY(CAST(? AS BIGINT[])) AND src='fs_shares'",
-                         (pairs,)).fetchall() if pairs else []
-    for r in list(mains) + list(more):
-        d = _fs_json(r["row_json"])
-        if str(d.get("node_id")) == str(int(nid)) and d.get("user_id"):
-            users.add(int(d["user_id"]))
-            sids.add(str(d.get("id")))
-    return users, sids
+                          "AND COALESCE(CAST(row_json AS JSONB)->'wiki_card'->>'email', '')<>''").fetchall()
+        more = [int(k["pair"]) for k in ((_fs_json(r["row_json"]).get("wiki_card") or {}) for r in mains) if str(k.get("pair") or "").isdigit()]
+        rows = list(mains) + (c.execute("SELECT id, row_json FROM obj_revoked WHERE id = ANY(CAST(? AS BIGINT[])) AND src='fs_shares'",
+                                        (more,)).fetchall() if more else [])
+        for r in rows:
+            d = _fs_json(r["row_json"])
+            if d.get("node_id") and d.get("user_id"):
+                pairs.add((int(d["node_id"]), int(d["user_id"])))
+                sids.add((int(d["node_id"]), str(d.get("id"))))
+        n = 0
+        for nid, uid in sorted(pairs):
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND action='share' AND detail LIKE ?", (nid, f"user:{uid}:%")).rowcount or 0
+        for nid, sid in sorted(sids):
+            n += c.execute("DELETE FROM fs_log WHERE node_id=? AND ((action='unshare' AND detail=?) OR (action='share_change' AND detail LIKE ?))",
+                           (nid, sid, sid + ":%")).rowcount or 0
+    return n
 
 
 def fs_log_add(c, nid, action, detail="", uid=None):

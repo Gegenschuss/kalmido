@@ -21,7 +21,6 @@ from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
 from .store import download_name  # 2.750.0 (#4876)
 from .store import FS_NOT_ADDR  # 2.1138.0 (#6025)
-from .store import fs_addr_log_hidden  # 2.1145.0 (#6062)
 from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
@@ -388,17 +387,8 @@ def _inherited_shares(c, chain):
     return out
 
 
-def _log_uid(detail):
-    """The account of a history line "share user:<id>:<role>" (None for any other)."""
-    p = str(detail or "").split(":")
-    return int(p[1]) if len(p) >= 2 and p[0] == "user" and p[1].isdigit() else None
-
-
 def _log(c, nid):
     rows = c.execute("SELECT * FROM fs_log WHERE node_id=? ORDER BY id DESC LIMIT ?", (nid, LOG_MAX)).fetchall()
-    hu, hs = fs_addr_log_hidden(c, nid) if any(r["action"] in ("share", "unshare") for r in rows) else (set(), set())
-    if hu or hs:  # 2.1145.0 (#6062): old lines naming the account of a share by e-mail address
-        rows = [r for r in rows if not ((r["action"] == "share" and _log_uid(r["detail"]) in hu) or (r["action"] == "unshare" and r["detail"] in hs))]
     names = _names(c, [r["user_id"] for r in rows])
     return [{"user_id": r["user_id"], "name": names.get(r["user_id"], ""), "agent": bool(r["agent"]), "action": r["action"],
              "detail": r["detail"], "at": r["at"]} for r in rows]
