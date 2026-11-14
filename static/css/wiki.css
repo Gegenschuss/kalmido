@@ -85,9 +85,8 @@ a.wklink.wkmissing{opacity:.65;border-bottom-style:dashed}
 .wkac button.on,.wkac button:hover{background:var(--accent-soft)}
 .wktpl{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.5rem}
 .wkmen{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;font-size:var(--fs-s)}
-/* 2.99.0 B (#2183): the page menu shows on hover / keyboard focus of the title row; touch devices always see it */
-@media (hover:hover){.nthead [data-wk="pmenu"]{opacity:0;transition:opacity .2s}.nthead:hover [data-wk="pmenu"],.nthead:focus-within [data-wk="pmenu"],.nthead [data-wk="pmenu"][aria-expanded="true"]{opacity:1}}
-@media (prefers-reduced-motion:reduce){.nthead [data-wk="pmenu"]{transition:none}}
+/* 2.99.0 B (#2183) showed the page menu only on hover of the title row; 2.1163.0 (#6089): it is the page's only menu now (no area
+   bar above the page, a reader's way to History / Copy link): always in sight */
 /* 2.123.0 C (#2103, #2107, #2108): the editor's insert bar, files of the file store, links to files / tables, checkbox lines -> tasks */
 .wembar{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin-bottom:.375rem}
 /* 2.276.0 B (#3043): knowledge is written in the normal font (notes keep theirs); the formatting bar stays one row and scrolls sideways */
