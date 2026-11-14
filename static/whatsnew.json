@@ -1,6 +1,20 @@
 {
  "versions": [
   {
+   "version": "2.1136.0",
+   "date": "2026-11-14",
+   "items": [
+    {
+     "de": "Neue Chat-Nachrichten von Menschen und fertige Antworten deiner Agenten erscheinen kurz als kleine Karte oben, egal wo du in Kalmido bist - ein Tipp öffnet den Chat.",
+     "en": "New chat messages from people and finished answers of your agents briefly show as a small card at the top, wherever you are in Kalmido - a tap opens the chat."
+    },
+    {
+     "de": "Das Popup schaltest du je Gerät unter Einstellungen > Benachrichtigungen aus.",
+     "en": "You can switch the pop-up off per device in Settings > Notifications."
+    }
+   ]
+  },
+  {
    "version": "2.1131.0",
    "date": "2026-11-14",
    "items": [
@@ -1331,24 +1345,6 @@
     {
      "de": "Reisekosten rechnen jetzt auch Auslandsreisen aus 2023 und 2024.",
      "en": "Travel expenses now also calculate trips abroad from 2023 and 2024."
-    }
-   ]
-  },
-  {
-   "version": "2.626.0",
-   "date": "2026-11-07",
-   "items": [
-    {
-     "de": "Dokument-Regeln sind jetzt Abläufe: auch bei Änderungen oder X Tage nach Datum, mit Aufgabe, Benachrichtigung und Webhook.",
-     "en": "Document rules are now flows: also on changes or X days after a date, with task, notification and webhook."
-    },
-    {
-     "de": "Das Postfach eines Bereichs holt Anhänge per Mail-Regel als Dokumente ab und verschiebt oder markiert die Mail danach.",
-     "en": "A workspace mailbox fetches attachments as documents by mail rule and then moves or flags the mail."
-    },
-    {
-     "de": "In der Liquidität benennst du eine Fixkosten-Kategorie mit dem Stift auf einmal um oder legst zwei zusammen.",
-     "en": "In cash flow you rename a fixed cost category at once with the pencil or merge two."
     }
    ]
   }

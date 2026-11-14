@@ -21,7 +21,19 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.1135.0] - 2026-11-14
+## [2.1136.0] - 2026-11-14
+
+Package 2.1130 (Bündel: In-App-Popup für neue Chat-Nachrichten von Mensche).
+### Added
+- In-app pop-up for new chat messages (#6057): a new message of another person in the team chat (project conversation, channel, group, direct message, a thread you take part in) or a finished answer / question of an agent shows as a small card at the top edge wherever you are in the app (picture, sender, project, first line). A tap opens the chat; it goes by itself after a few seconds, the x, Esc or a swipe sideways close it earlier. Several messages in quick succession become one card ("3 new messages from …"). Never for the chat that is open, never for your own messages, never for an agent's progress lines; no bell entry. Screen readers announce it.
+- Settings > Notifications > In the app: "Pop-up for new messages" (on by default, per device).
+- While a window of the app is in front (visible and focused) with the pop-up on, this device shows no extra system notification for a chat push (on Safari / the iPhone Home Screen app it is shown silently and closed at once, so the push subscription stays valid). The server marks those pushes (`chat: 1` in the Web Push payload: team chat messages, finished answers / questions of agents); every other push, including an agent's budget or approval notices and job progress lines, is unchanged.
+- `GET /api/msgpop` (web app only, people only): the new unread chat messages of others above the ids the window knows; nothing is marked read.
+
+Package 2.1133 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- CI: the full run of the live train's release push is no longer cancelled by a later merge-queue landing on main; that push gets its own concurrency group per run, every other push on main still replaces the one before (#6061)
 
 Package 2.1121 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ).
 
@@ -82,6 +94,10 @@ Package 2.1118 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Changed
 - Database: the 53 old yes / no columns (archived, enabled, active, pinned, is_default, users.disabled / is_admin, lists.is_inbox, tasks.locked, ...) are real `BOOLEAN` instead of numbers 0 / 1 (`core/colbool.py`; the start turns an existing database once, rebuilding the partial indexes that compared them with 0 / 1). The app, the web app and the agents' API keep reading and writing 0 / 1 for exactly these fields (`core/pg.py`), so no answer changes. One way: the type does not turn back; a version before 2.1118 cannot run on the turned database (restore the backup taken before the update). `office_agreements.archived` stays a number (three states, 2 = deleted) (#5952).
 - SQL of every area compares these columns as booleans (`NOT archived`, `true` / `false` in writes, sums through `CAST AS INTEGER`); the list state trigger works with both types (#5952).
+
+## [2.1135.0] - 2026-11-14
+
+Not released (the CI of this version was red); its changes are listed under 2.1136.0.
 
 ## [2.1134.0] - 2026-11-14
 
@@ -393,7 +409,8 @@ Not released (the CI of this version was red); its changes are listed under 2.11
 
 Not released (the CI of this version was red); its changes are listed under 2.1103.0.
 
-[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1135.0...HEAD
+[Unreleased]: https://github.com/Kalmido/kalmido/compare/v2.1136.0...HEAD
+[2.1136.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1136.0
 [2.1135.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1135.0
 [2.1134.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1134.0
 [2.1131.0]: https://github.com/Kalmido/kalmido/releases/tag/v2.1131.0
