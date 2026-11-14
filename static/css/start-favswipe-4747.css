@@ -4,7 +4,11 @@
    Neither on a computer / tablet, nor where the tab bar is away (keyboard, typing, a child, mini windows, full screen tables). */
 #favgrip,#favup{display:none}
 @media (max-width:767px){
-  #favgrip:not(.hidden){display:block;position:fixed;left:50%;bottom:calc(var(--tabs-bot) - .75rem);z-index:42;width:3.5rem;height:1.875rem;margin-left:-1.75rem;padding:0;border:0;background:none;cursor:pointer;touch-action:none}
+  #favgrip:not(.hidden){display:block;position:fixed;left:clamp(2.25rem,var(--favgrip-x,50%),calc(100% - 2.25rem));bottom:calc(var(--tabs-bot) - .75rem);z-index:42;width:3.5rem;height:1.875rem;margin-left:-1.75rem;padding:0;border:0;background:none;cursor:pointer;touch-action:none;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
+  /* 2.1150.0 (#6082): held, the grip follows the finger sideways (favtiles.js fvd_grip*; --favgrip-x = this device's place, kept
+     off the edges by the clamp above); while it moves the tab lifts a little in the accent */
+  #favgrip.moving::before{border-color:var(--accent);transform:translateY(-.125rem)}
+  #favgrip.moving > svg.i{color:var(--accent);transform:translateY(-.125rem)}
   /* 2.1108.0 (#5965): the grip was a bare grey line ("what is that?"): now a small tab growing out of the bar's top edge with the
      favourites' star (favtiles.js fvd_sync), so it reads as "pull up the favourites"; the open row shows the slim accent line */
   #favgrip::before{content:'';position:absolute;left:50%;bottom:calc(.75rem - 1px);width:2.75rem;height:1.0625rem;margin-left:-1.375rem;box-sizing:border-box;border:1px solid var(--line);border-bottom:0;border-radius:.625rem .625rem 0 0;background:var(--bg2)}
