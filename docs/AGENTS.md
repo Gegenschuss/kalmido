@@ -1305,7 +1305,9 @@ stays on the task; the answer names it in `move_ttype` (the type key) - tell the
 
 - Contact (vCard / CSV) and calendar (ICS) imports change only the fields the file holds. A contact or event changed here after
   its last import and later than the file's `REV` / `LAST-MODIFIED` stays as it is; the answer counts it in `kept_newer` - tell
-  the person instead of importing again.
+  the person instead of importing again. A card without `REV` keeps such a contact too (`kept_norev`); 2.1151.0: the import
+  dialog of the app has the switch *Take over cards without a change date too* (form field `norev=1` of
+  `POST /api/books/{id}/import`), then those cards win (`taken_norev`). The agents' import keeps the rule without the switch.
 - Documents: date, due date, amount and currency set by a person or an agent stay on "Recognise again" and on a new file
   version. A document's answer lists them in `hand`; the redo answer names the ones it kept in `kept`. Emptying a value hands it
   back to the recognition.

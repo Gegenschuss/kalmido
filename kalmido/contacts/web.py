@@ -314,7 +314,7 @@ def op_contact_restore(c, uid, cid):
     return op_contact(c, uid, cid)
 
 
-def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name="", photos=True):
+def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=False, name="", photos=True, norev=False):
     need_book(c, bid, write=True)
     if len(raw) > VCF_MAX:
         raise BadInput(tr("The file is too large (at most {0} MB)", VCF_MAX // (1024 * 1024)))
@@ -332,8 +332,8 @@ def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=Fa
         cards = split_vcards(text)
     since = ctx_max_id(c, bid)  # 2.119.1 A (#2084): the contacts after it are the new ones (likely duplicates in the answer)
     if bg and len(cards) > IMPORT_SYNC_MAX:
-        return lv_import_start(c, uid, bid, cards, since, photos)
-    res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards, photos=15 if photos else 0)  # 2.306.0 C (#2889): photos=False = no fetching; 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
+        return lv_import_start(c, uid, bid, cards, since, photos, norev)
+    res = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards, photos=15 if photos else 0, norev=norev)  # 2.1151.0 D (#4562): norev  # 2.306.0 C (#2889): photos=False = no fetching; 2.41.0 (#1437): commits per batch; 2.47.3: 15 s photo budget
     c.commit()
     if csv_ok:
         res.update(ctx_import_dupes(c, uid, bid, since))
@@ -369,7 +369,7 @@ def _lv_guard(uid, qc):
         raise Denied(429, tr("Too many imports, please wait a few minutes"))
 
 
-def lv_import_start(c, uid, bid, cards, since=None, photos=True):
+def lv_import_start(c, uid, bid, cards, since=None, photos=True, norev=False):
     iid = secrets.token_urlsafe(12)
     st = {"import_id": iid, "user_id": uid, "book_id": bid, "state": "running", "total": min(len(cards), CONTACTS_PER_BOOK), "done": 0,
           "created": 0, "updated": 0, "unchanged": 0, "errors": 0, "error": "", "started_at": time.time(), "ended_at": None}
@@ -378,13 +378,13 @@ def lv_import_start(c, uid, bid, cards, since=None, photos=True):
         for k in [k for k, v in _IMP.items() if v["ended_at"] and now - v["ended_at"] > 3600]:
             _IMP.pop(k, None)
     ctx = c.ctx  # the starter's row-level-security context goes with the run
-    bgj_add(LV_KIND, st, ctx, uid, bid, cards, since, photos, user_id=uid, lock=LV_KIND, guard=lambda qc: _lv_guard(uid, qc),
+    bgj_add(LV_KIND, st, ctx, uid, bid, cards, since, photos, norev, user_id=uid, lock=LV_KIND, guard=lambda qc: _lv_guard(uid, qc),
             progress=st)
     return lv_import_public(st)
 
 
 @bgj_fn(LV_KIND, tries=1, long=True)  # 2.370.3 (#2760): commits per batch, so a lost run is "interrupted", never run twice
-def lv_import_row(st, ctx, uid, bid, cards, since=None, photos=True):
+def lv_import_row(st, ctx, uid, bid, cards, since=None, photos=True, norev=False):  # 2.1151.0 D (#4562): norev (a row of the version before has none)
     # review 3: the person's organisations as they are now (the row may have waited), the role as at the start
     c = connect()
     try:
@@ -393,7 +393,7 @@ def lv_import_row(st, ctx, uid, bid, cards, since=None, photos=True):
         c.rollback()
     finally:
         c.close()
-    lv_import_run(st, (ctx[0], orgs, ctx[2]), uid, bid, cards, since, photos)
+    lv_import_run(st, (ctx[0], orgs, ctx[2]), uid, bid, cards, since, photos, norev)
 
 
 def _lv_put(st, **kw):
@@ -408,7 +408,7 @@ def _lv_put(st, **kw):
         print("contacts import: progress", type(e).__name__, flush=True)
 
 
-def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
+def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True, norev=False):
     # 2.138.4 C (#2377): a pool connection per batch (taken, given back after the batch's commit) instead of one for the
     # whole run, each with the starter's row-level-security context; the photo budget and the counts run across the batches.
     over = len(cards) - CONTACTS_PER_BOOK
@@ -425,7 +425,7 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
             c.set_ctx(*ctx)
             # batch: a block that hits the book's limit keeps what it stored; photos > 0: a used-up budget keeps old pictures
             part = import_vcards(c, uid, bid, None, batch=IMPORT_BATCH, cards=cards[i:i + IMPORT_BATCH],
-                                 photos=max(1e-3, t_end - time.monotonic()) if photos else 0, before=res["created"] + res["updated"])
+                                 photos=max(1e-3, t_end - time.monotonic()) if photos else 0, before=res["created"] + res["updated"], norev=norev)
             c.commit()
             c.close()
             c = None
@@ -437,6 +437,8 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
                 res["kept_newer"] = res.get("kept_newer", 0) + part["kept_newer"]
             if part.get("kept_norev"):       # 2.533.0 (#4318) B41
                 res["kept_norev"] = res.get("kept_norev", 0) + part["kept_norev"]
+            if part.get("taken_norev"):      # 2.1151.0 D (#4562)
+                res["taken_norev"] = res.get("taken_norev", 0) + part["taken_norev"]
             if part.get("kept_names"):
                 res["kept_names"] = (res.get("kept_names", []) + part["kept_names"])[:20]
             _lv_put(st, done=min(i + IMPORT_BATCH, len(cards)), **res)
@@ -644,7 +646,8 @@ def books_import(bid):
         return err(tr("No file"))
     # 2.119.1 A (#2080): a CSV file too; ?preview=1 answers its columns, the form field mapping = a field per column
     r = op_import(db(), me(), bid, raw, bg=bg, csv_ok=True, mapping=None if got else request.form.get("mapping"), preview=preview, name=name,
-                  photos=request.form.get("photos") != "0")  # 2.306.0 C (#2889): "Import contact photos" off = the server fetches no pictures
+                  photos=request.form.get("photos") != "0",  # 2.306.0 C (#2889): "Import contact photos" off = the server fetches no pictures
+                  norev=request.form.get("norev") == "1")  # 2.1151.0 D (#4562): "Take over cards without a change date too"
     if got:
         r["files"] = got[1]
     return (jsonify(r), 202) if "import_id" in r else jsonify(r)

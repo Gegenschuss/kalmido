@@ -1271,7 +1271,7 @@ def dva_imp_changed_here(old):
 DVA_KEPT_NAMES = 20  # 2.533.0 (#4318) B41: contacts named in the answer that kept their newer values
 
 
-def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0, before=0):
+def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0, before=0, norev=False):
     """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
     2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
     the version bumped once per batch; batch=N commits every N cards (a large import keeps what it did and never holds the
@@ -1279,8 +1279,11 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
     2.47.3 (#1738): photos=N (seconds of budget; only the file import) fetches PHOTO links of Google's image server; an existing
     contact that already has a picture keeps it, so importing the same file again only adds the missing ones.
     2.363.2 (#3106): + bad (the first unreadable cards) and over_limit (cards beyond CONTACTS_PER_BOOK), only when there are
-    any; before = cards of this file stored by earlier calls (the limit's message counts them)."""
+    any; before = cards of this file stored by earlier calls (the limit's message counts them).
+    2.1151.0 D (#4562): norev=True (the import dialog's switch "Take over cards without a change date too", off by default) =
+    a card without a REV overwrites a contact changed here as well (counted as taken_norev); a card with a REV keeps its rule."""
     res = {"created": 0, "updated": 0, "unchanged": 0, "errors": 0}
+    norev_over = bool(norev) and not src_digest  # a subscription's sync (src_digest) never takes it
     kept = 0                                 # 2.273.0 C (#3048): contacts changed here after the card's REV (not overwritten)
     cards = split_vcards(text) if cards is None else cards
     bk = c.execute("SELECT occ_list_id, src_id FROM books WHERE id=?", (book_id,)).fetchone()
@@ -1346,7 +1349,10 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             if f or ext is not None:
                 # 2.533.0 (#4318) B41: without a REV a contact changed here is not overwritten silently either: it keeps its
                 # values and is named (kept_norev + kept_names), like the one newer than the card's REV
-                norev = not v.get("rev") and dva_imp_changed_here(old)
+                norev_here = not v.get("rev") and dva_imp_changed_here(old)
+                norev = norev_here and not norev_over  # 2.1151.0 D (#4562): the switch takes the card over
+                if norev_here and norev_over:
+                    res["taken_norev"] = res.get("taken_norev", 0) + 1
                 if norev or (v.get("rev") and _imp_newer_here(v["rev"], old)):
                     kept += 1
                     res["kept_norev"] = res.get("kept_norev", 0) + (1 if norev else 0)
