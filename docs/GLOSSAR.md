@@ -402,6 +402,7 @@ The file store ("Ablage"): folders, files, shares, locks, scan, tags, views and 
 - `kalmido/files/fskern.py` - File-store nodes on the one trash of the core (stage 3): registration, purge hook, receipts under legal retention stay locked
 - `kalmido/files/fslock.py` (`fsl`) - Locked folders of the file store ("Ablage")
 - `kalmido/files/fsmove.py` (`fsm`) - Files, folders (with everything in them)
+- `kalmido/files/fsreceipts.py` - the point "Receipts" below the folder tree of the file store -- a list of references, no copies
 - `kalmido/files/fsref.py` (`fs`) - Reference nodes -- an object of another area (an office document, a sheet ...)
 - `kalmido/files/fsroots.py` (`fs`) - The root folder of an area in a workspace
 - `kalmido/files/fsshnames.py` - The short list "Shared with Anna, Ben · agent X"

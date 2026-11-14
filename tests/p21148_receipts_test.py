@@ -139,7 +139,7 @@ check(coll(Fr, "receipts", f"org:{ORG}").status_code == 404, "#4895: an organisa
 check(coll(Fr, "rcnope").status_code == 404, "#4895: an unknown part 404")
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude"}).json()
 r = requests.get(B + "/api/files/collections/receipts", headers={**H, "Authorization": "Bearer " + ag.get("token", "")})
-check(r.status_code in (403, 404), f"#4895: an agent gets nothing {r.status_code}")
+check(bool(ag.get("token")) and r.status_code in (401, 403, 404) and "groups" not in r.text, f"#4895: an agent gets nothing {r.status_code}")
 
 Fr.patch(B + "/api/settings", json={"features": NOBUDGET})
 check([x["key"] for x in rc_of(top(Fr))["subs"]] == ["rcoffice", "rcmeals"], "#4895: the module budget off: no Household")
