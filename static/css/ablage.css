@@ -25,3 +25,17 @@
   .abdl>.abdlrow{grid-template-columns:minmax(0,1fr) auto}
   .xl-row{position:relative}  /* the dialog's link rows: one "…" (multisel.js ms_dots), the three symbols .ms-phsr */
 }
+/* 2.1162.0 (#6107): file rows on phones and tablets (also in the trash and while choosing): the name keeps at least one
+   readable line, nothing lies over it. The trash's Restore / Delete permanently are symbols there (the words in title /
+   aria-label), side by side and never shrunk into each other; the marks of a row (text recognised, shared with ...) show only
+   their symbol (a tap explains it, the label is the aria-label) and give way before the name does */
+.abtacts{display:inline-flex;align-items:center;gap:.25rem;flex:none}
+.abtact{flex:none;white-space:nowrap}
+@media (max-width:64rem){
+  .abrow>.abopen{min-width:min(9rem,45%)}
+  .abrow>.abbadges{flex:0 1 auto;min-width:0;overflow:hidden}
+  .abrow .abbadges .scnmark>span,.abrow .abbadges .abshw>span,.abrow .abbadges .abshby>span{display:none}
+  .abrow .abbadges .scnmark.ftxtnone{display:none}  /* no symbol of its own: nothing to show in a narrow row */
+  .abtact .abtl{display:none}
+  .abtact{min-width:2.75rem;min-height:2.75rem;justify-content:center;padding:0 .5rem}
+}

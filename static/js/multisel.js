@@ -9,7 +9,9 @@
 function ms_barHtml(id, attr, n, hint, btns) {
   // 2.66.0 A (#1835): min = the ticks a button needs (Merge: 2)
   const btn = ([k, i, lab, cls = '', min = 1]) => `<button type="button" class="mbb ${cls}" data-${attr}="${k}" title="${esc(lab)}" aria-label="${esc(lab)}" ${n >= min || k === 'all' ? '' : 'disabled'}>${ic(i, 's')}<span class="mbl">${esc(lab)}</span></button>`;
-  return `<div id="${id}" class="mselbar" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? trh('{0} selected', n) : hint}</span>
+  // 2.1162.0 (#6107): four buttons and more do not fit with words on a narrow phone (German: "Herunterladen"): ms4 / ms5 show
+  // only their symbols there (app.css), the word stays in title / aria-label
+  return `<div id="${id}" class="mselbar${btns.length >= 5 ? ' ms4 ms5' : btns.length === 4 ? ' ms4' : ''}" role="toolbar" aria-label="${esc(tr('Selection'))}"><span class="mcount" role="status">${n ? trh('{0} selected', n) : hint}</span>
     ${btns.map(btn).join('')}
     <button type="button" class="iconbtn mbx" data-${attr}="close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button></div>`;
 }
