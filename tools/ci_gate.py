@@ -49,6 +49,9 @@ import urllib.request
 STAGE_RE = re.compile(r"^Test suites \d+/\d+ (full|push)\b")
 SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push)( hart)?\b")  # #5324: " hart" = a shard of the hard groups (ci.yml, #4557)
 SUITE_ANN_RE = re.compile(r"^suite ([A-Za-z0-9_.-]+) failed$")  # tests/run_all.sh: ::error title=suite NAME failed::...
+# #6054: tests/run_all.sh ended the shard after KALMIDO_RED_STREAK red suites in a row - the suites after them did not run
+STOP_ANN_RE = re.compile(r"^shard stopped after \d+ red suites in a row$")
+STOPPED = "(shard stopped)"  # the mark suites_from_titles() adds: the shard's other suites are untested
 SCANNERS = ("audit", "gitleaks", "secret", "bandit", "semgrep", "trivy")  # a red step of the Lint job is hard only as one of these
 # review 2.767.0 (#5324): the steps a scanner needs before it runs (install, the pin / OSV check) - red or not run = hard as well
 SCAN_PREP = ("install scanners*", "pinned dependencies*")
@@ -59,6 +62,14 @@ QUEUE_SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push|queue)( hart)?\b
 QUEUE_GATE = "Merge queue gate"
 ANN_MAX = 10  # #5787 review 7: GitHub keeps at most 10 error annotations per step (tests/run_all.sh names a red suite by one)  # #5787: the job name of ci.yml - a required check of the ruleset, keep it as it is
 SOFT_CONCL = ("failure", "cancelled")  # #5600: the run conclusions judge_soft looks at (cancelled = a newer push cut the run)
+
+
+def suites_from_titles(titles):
+    """The red suites a shard names in its annotation titles; None = a suite title that does not parse (unknown = hard).
+    #6054: + STOPPED when the shard stopped after a red streak (its other suites did not run)."""
+    if any(t.startswith("suite ") and not SUITE_ANN_RE.match(t) for t in titles):
+        return None
+    return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m] + ([STOPPED] if any(STOP_ANN_RE.match(t) for t in titles) else [])
 
 
 def stage(job_names):
@@ -178,6 +189,9 @@ def judge_soft(jobs, suites_of, pats, grp):
         su = suites_of(j)
         if su is None:
             return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), info
+        if STOPPED in su:  # #6054: a soft shard stopped after a red streak - its other (soft) suites stay untested, like a cut one
+            su = [x for x in su if x != STOPPED]
+            info["cut"].append("%s (stopped after a red streak)" % j.get("name"))
         if c == "failure" and not su:
             return False, "%s red without a named suite (unknown = hard)" % j.get("name"), info
         if c != "failure":  # cancelled (time limit, #5600: or a newer push) / timed out: its other suites stay untested (the train counts it soft too)
@@ -243,6 +257,8 @@ def judge_queue(event, needs, jobs, suites_of, pats, grp):
         su = suites_of(j)
         if su is None:
             return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), soft
+        if STOPPED in su:  # #6054: the suites after the red streak did not run = unknown = hard (like a cancelled shard)
+            return False, "%s stopped after a red streak: its other suites did not run (unknown = hard)" % j.get("name"), soft
         if not su:
             return False, "%s red without a named suite (unknown = hard)" % j.get("name"), soft
         if len(su) >= ANN_MAX:  # review 7: GitHub keeps at most 10 error annotations per step - more red suites are not all named
@@ -364,10 +380,7 @@ def queue_gate(tree):
             anns = api("/repos/%s/check-runs/%s/annotations?per_page=100" % (repo, job["id"]))
         except Exception:  # noqa: BLE001 - not readable = unknown = hard
             return None
-        titles = [(x.get("title") or "").strip() for x in anns or []]
-        if any(t.startswith("suite ") and not SUITE_ANN_RE.match(t) for t in titles):
-            return None
-        return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m]
+        return suites_from_titles([(x.get("title") or "").strip() for x in anns or []])
 
     # review 10: the hard list of the queue's base too (the entry cannot make its own red suite soft by editing the list)
     pats = sorted(set(patterns(tree)) | set(base_patterns(tree, os.environ.get("QUEUE_BASE_SHA", ""))))
@@ -431,10 +444,8 @@ def main():
             anns = api("/repos/%s/check-runs/%s/annotations?per_page=100" % (repo, job["id"]))
         except Exception:  # noqa: BLE001 - not readable = unknown = hard
             return None
-        titles = [(x.get("title") or "").strip() for x in anns or []]
-        if any(t.startswith("suite ") and not SUITE_ANN_RE.match(t) for t in titles):
-            return None  # review (#5324): a suite title that does not parse = not readable = hard
-        return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m]
+        # review (#5324): a suite title that does not parse = not readable = hard (None)
+        return suites_from_titles([(x.get("title") or "").strip() for x in anns or []])
 
     def judge(rid):
         if "pats" not in hard:
