@@ -293,7 +293,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   const rsz = async ev => { await sleep(400); await frames(ev); };
   const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
   const SMALL = `(() => { const out = []; for (const e of document.querySelectorAll('#view button, #view a[href], #view [role=button], #view input:not([type=hidden]), #view select')) {
-      const r = e.getBoundingClientRect(); if (!r.width || r.bottom < 0 || r.top > innerHeight || e.closest('.md, .cbub, p')) continue;
+      const r = e.getBoundingClientRect(); if (r.width <= 1 /* 2.1151.0 (#3835): hidden for the eye on a phone, kept for screen readers */ || r.bottom < 0 || r.top > innerHeight || e.closest('.md, .cbub, p')) continue;
       if (e.tagName === 'INPUT' && /text|search/.test(e.type)) continue; const row = e.closest('.trow'); if (row && e.matches('.ttl')) continue;
       let w = r.width, h = r.height; for (const p of ['::before', '::after']) { const ps = getComputedStyle(e, p); if (ps.content !== 'none' && ps.position === 'absolute') { w = Math.max(w, parseFloat(ps.width) || 0); h = Math.max(h, parseFloat(ps.height) || 0); } }
       if (w < 43.5 || h < 43.5) out.push((e.dataset.act || e.className || e.tagName) + ' ' + Math.round(r.width) + 'x' + Math.round(r.height)); } return out.slice(0, 8); })()`;
