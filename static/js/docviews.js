@@ -151,11 +151,12 @@ function dcv_routeSync() {
 }
 const dcv_changed = () => !!DC.dv && !!DCV.applied && DCV.applied.id === DC.dv && !!(DC.q.trim() || dc_fEntries().length || DC.vsort?.k !== DCV.applied.sort?.k || DC.vsort?.d !== DCV.applied.sort?.d);  // 2.857.0 (#5518): a search on top of the view, another sort
 // the documents' bar: "Save view"; in a view: its name, a mark when the search differs from what it keeps, its menu
+// 2.1163.0 (#6111): a saved view has the bookmark, the funnel stays the Filter's alone (no two funnels in the bar)
 function dcv_barHtml() {
   const v = DC.dv ? dcv_get(DC.dv) : null;
-  if (!v) return `<button type="button" class="btn sm dcv-save" data-dcv="save">${ic('filter', 's')} <span>${esc(tr('Save view'))}</span></button>`;
+  if (!v) return `<button type="button" class="btn sm dcv-save" data-dcv="save">${ic('bookmark', 's')} <span>${esc(tr('Save view'))}</span></button>`;
   const ch = dcv_changed();
-  return `<span class="dcv-cur"><button type="button" class="btn sm on dcv-name" data-dcv="menu" data-dcvid="${v.id}" aria-haspopup="menu">${ic('filter', 's')} <span>${esc(v.title)}</span>${ch ? `<span class="dcv-dirty" title="${esc(tr('Changed since it was saved'))}">*</span>` : ''}</button>${ch && v.role !== 'view' ? `<button type="button" class="btn sm pri" data-dcv="update" data-dcvid="${v.id}">${esc(tr('Update view'))}</button>` : ''}</span>`;
+  return `<span class="dcv-cur"><button type="button" class="btn sm on dcv-name" data-dcv="menu" data-dcvid="${v.id}" aria-haspopup="menu">${ic('bookmark', 's')} <span>${esc(v.title)}</span>${ch ? `<span class="dcv-dirty" title="${esc(tr('Changed since it was saved'))}">*</span>` : ''}</button>${ch && v.role !== 'view' ? `<button type="button" class="btn sm pri" data-dcv="update" data-dcvid="${v.id}">${esc(tr('Update view'))}</button>` : ''}</span>`;
 }
 
 // ---- writes (the core's routes: version check, history, trash with undo)
