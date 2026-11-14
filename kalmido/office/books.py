@@ -146,7 +146,8 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
-    day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
+    # 2.1115.0 (#5951): rc_receipts.paid_at is a DATE (doc_meta.doc_date text): its day as text, for both types
+    day = "COALESCE(NULLIF(CAST(r.paid_at AS text), ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(CAST(r.paid_at AS text), ''))"
     if paid is not None:  # 2.603.0 (#4927): the receipts of the strict basis, whatever their own days say
         ids = sorted(paid)[:20000] or [0]
         rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
@@ -204,7 +205,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with
                     **({"src": pl["src"], "ref": pl["ref"]} if pl is not None else {})})  # 2.603.0 (#4927)
     if gaps is not None and with_undated:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
         undated = c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
-                           "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "
+                           "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(CAST(r.paid_at AS text), ''), NULLIF(d.doc_date, '')) IS NULL "
                            "ORDER BY r.node_id LIMIT 1000", (ws,)).fetchall()  # review N4: bounded (named, not all of them)
         acc = fs_roles_many(c, [r["node_id"] for r in undated], uid)  # 2.546.0 (#4186)
         for r in undated:
@@ -273,7 +274,7 @@ def bk_receipts_edge(c, oid, s, a, b, by, lines, uid=None, gaps=None, with_undat
     cand = sorted(n for n, x in lines.items() if a <= x["day"] <= b)[:20000]  # 2.764.0 (#5314): bounded as bk_receipts(paid)
     if not cand:
         return rows
-    day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
+    day = "COALESCE(NULLIF(CAST(r.paid_at AS text), ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(CAST(r.paid_at AS text), ''))"
     own = {r["node_id"]: r["day"] for r in c.execute(f"SELECT r.node_id, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                                                       f"WHERE d.ws=? AND r.node_id IN ({','.join('?' * len(cand))})", (bk_ws(c, oid), *cand)).fetchall()}
     moved = {n: lines[n] for n in cand if strict(own.get(n))}
@@ -478,7 +479,7 @@ def bk_fees_paid(c, oid, frm, to, home):
     """2.545.0 (#4387): the paid fees of finalised reminders in [frm, to] (ISO days): [{doc_id, number, date, amount (Decimal,
     home currency)}]. The day = reminder_fee_paid_at (set when a person marks the fee paid), before 2.545 the reminder's date.
     A reminder fee is damages, not a sale: no VAT, not in the VAT return (the tax advisor checks, #1153)."""
-    day = "COALESCE(NULLIF(reminder_fee_paid_at, ''), date)"
+    day = "COALESCE(NULLIF(CAST(reminder_fee_paid_at AS text), ''), date)"  # 2.1115.0 (#5951): DATE
     out = []
     for r in c.execute(f"SELECT id, number, currency, fx_rate, reminder_fee, {day} AS day FROM office_docs WHERE org_id=? AND kind='reminder' "
                        f"AND locked_at IS NOT NULL AND {live_sql()} AND trial=0 AND reminder_fee > 0 AND reminder_fee_state='paid' AND {day}>=? AND {day}<=? "

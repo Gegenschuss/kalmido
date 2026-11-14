@@ -54,7 +54,8 @@ def ses_touch(c, token_hash):
             for k in [k for k, v in _seen.items() if now - v >= SES_TOUCH]:
                 _seen.pop(k, None)
     t = now_utc()
-    n = c.execute("UPDATE sessions SET last_seen_at=? WHERE token_hash=? AND last_seen_at<?",
+    # 2.1115.0 (#5951): last_seen_at is TIMESTAMPTZ, NULL = never seen (was ''; NULL < x is no row)
+    n = c.execute("UPDATE sessions SET last_seen_at=? WHERE token_hash=? AND (last_seen_at IS NULL OR last_seen_at<?)",
                   (iso(t), token_hash, iso(t - timedelta(seconds=SES_TOUCH)))).rowcount
     if n:
         c.commit()  # only the session row is written so far in this request

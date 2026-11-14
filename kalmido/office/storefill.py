@@ -37,7 +37,7 @@ def osf_todo(c, after, n):
     Quotations are left out: finalising never stores them (ledger.ofx_finalize), they stay rendered from their snapshot."""
     with system_ctx(c):
         return [(r[0], r[1]) for r in c.execute(
-            f"SELECT id, org_id FROM office_docs WHERE id>? AND {live_sql()} AND kind<>'offer' AND COALESCE(locked_at, '')<>'' AND COALESCE(pdf_sha256, '')='' "
+            f"SELECT id, org_id FROM office_docs WHERE id>? AND {live_sql()} AND kind<>'offer' AND locked_at IS NOT NULL AND COALESCE(pdf_sha256, '')='' "
             "ORDER BY id LIMIT ?", (after, n)).fetchall()]
 
 

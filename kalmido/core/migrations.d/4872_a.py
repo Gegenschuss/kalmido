@@ -4,8 +4,8 @@ suggestions as stored, sealed ones stay sealed) with the run's token, learn_at w
 empties it after 24 h. Columns with a DEFAULT only: older versions ignore them."""
 MIGRATIONS = [
     ("doc_meta", "learn_prev", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS learn_prev TEXT NOT NULL DEFAULT ''"),
-    ("doc_meta", "learn_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS learn_at TEXT NOT NULL DEFAULT ''"),
+    ("doc_meta", "learn_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS learn_at TIMESTAMPTZ"),  # 2.1115.0 (#5951): NULL = nothing to take back
 ]
 AFTER = [
-    "CREATE INDEX IF NOT EXISTS ix4872_doc_meta_learn ON doc_meta(learn_at) WHERE learn_at <> ''",
+    "CREATE INDEX IF NOT EXISTS ix4872_doc_meta_learn ON doc_meta(learn_at) WHERE learn_at IS NOT NULL",
 ]

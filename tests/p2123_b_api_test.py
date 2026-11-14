@@ -177,16 +177,90 @@ check(A.get(B + f"/api/wiki/pages/{plan}").json().get("shares") == 1 and A.get(B
       "#2104: the page's share count")
 r = A.get(B + "/api/wiki/shares", params={"page": plan})
 j = r.json()
-# 2.1106.0 (#5833): since 2.1071.0 (#5658) the share to the unknown address above stays open (obj_addr_shares) and the dialog
-# lists it as invited, read-only, in the same shape as the address that found its account (no account oracle) - two entries
-sh = {x["user"]["name"]: x for x in j.get("shares") or []}
-check(r.ok and j.get("person") is True and set(sh) == {"dave@example.com", "nobody@example.com"}
-      and all(x["direct"] is False and x["folder"] is True and x["path"] == "Customer A" for x in sh.values()),
-      "#2104: the page's dialog shows the folder's share as inherited " + r.text[:1500])
-pshare = sh.get("dave@example.com", {}).get("id", 0)
-check(sh.get("dave@example.com", {}).get("user") == {"id": None, "name": "dave@example.com", "by_email": True}
-      and sh.get("nobody@example.com", {}).get("user") == {"id": None, "name": "nobody@example.com", "by_email": True},
-      "#2104 / #5658: a share made by e-mail address shows the typed address, not the account - the open one alike " + r.text[:300])
+# 2.1115.0 (#5967): nobody@ (typed in above, no account) is listed as well since #5658 (an open share, the same card as dave@'s)
+dvs = [x for x in j.get("shares", []) if x["user"].get("name") == "dave@example.com"]
+check(r.ok and j.get("person") is True and len(j["shares"]) == 2 and all(x["direct"] is False and x["folder"] is True for x in j["shares"])
+      and {x["user"]["name"] for x in j["shares"]} == {"dave@example.com", "nobody@example.com"},
+      "#2104: the page's dialog shows the folder's shares as inherited " + r.text[:300])
+pshare = dvs[0]["id"] if dvs else 0
+check(dvs and dvs[0]["user"] == {"id": None, "name": "dave@example.com", "by_email": True},
+      "#2104: a share made by e-mail address shows the typed address, not the account " + r.text[:300])
+# 2.1115.0 (#5967): a share by address to nobody's account (open, core/addrshare.py) looks like one that found an account:
+# the same keys, the maker's name, ids of one form, the same end and Undo -- nothing tells the sharer which address has an account
+EID = re.compile(r"e[A-Za-z0-9_-]{34}")
+TSF = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00")
+
+
+def same_shape(s, where, path_q):
+    """The share by address to dave@ (an account) and the one to nobody@ (none) of the dialog at path_q -> (dave's, nobody's)."""
+    r = s.get(B + "/api/wiki/shares", params=path_q)
+    ppl = {x["user"]["name"]: x for x in r.json().get("shares", []) if x["kind"] == "person"} if r.ok else {}
+    dv, nb = ppl.get("dave@example.com", {}), ppl.get("nobody@example.com", {})
+    check(dv and nb and set(dv) == set(nb), f"#5967 {where}: both shares by address have the same keys {sorted(set(dv) ^ set(nb))} {ppl}")
+    hide = ("kind", "space", "folder", "expires_at", "expired", "revoked", "created_by", "created_by_name", "views", "last_used_at",
+            "ended", "images", "direct")
+    check(all(dv.get(k) == nb.get(k) for k in hide) and dv.get("created_by_name"),
+          f"#5967 {where}: and the same values, the maker's name on both {[(k, dv.get(k), nb.get(k)) for k in hide if dv.get(k) != nb.get(k)]}")
+    check(EID.fullmatch(str(dv.get("id"))) and EID.fullmatch(str(nb.get("id"))) and TSF.fullmatch(str(dv.get("created_at")))
+          and TSF.fullmatch(str(nb.get("created_at"))) and dv["user"].keys() == nb["user"].keys() and dv["user"]["id"] is None is nb["user"]["id"],
+          f"#5967 {where}: ids and times of one form {dv.get('id')} {nb.get('id')} {dv.get('created_at')} {nb.get('created_at')}")
+    return dv, nb
+
+
+def end_and_back(s, where, path_q, dv, nb):
+    """Both end and come back (Undo) with the same answers; the old id forms p<n> / a<n> of a share by address are refused."""
+    for x in (dv, nb):
+        r = s.delete(B + f"/api/wiki/shares/{x['id']}")
+        check(r.ok and r.json().get("revoked") is True and set(r.json()) == set(dv) - {"direct"},
+              f"#5967 {where}: {x['user']['name']} ends with the same answer {r.status_code} {r.text[:200]}")
+    left = {x["id"] for x in s.get(B + "/api/wiki/shares", params=path_q).json().get("shares", [])}
+    check(dv["id"] not in left and nb["id"] not in left, f"#5967 {where}: both are gone from the dialog")
+    for x in (dv, nb):
+        r = s.post(B + f"/api/wiki/shares/{x['id']}/restore")
+        check(r.ok and r.json().get("id") == x["id"] and not r.json().get("revoked"), f"#5967 {where}: Undo brings {x['user']['name']} back {r.status_code} {r.text[:200]}")
+    back = {x["id"] for x in s.get(B + "/api/wiki/shares", params=path_q).json().get("shares", [])}
+    check(dv["id"] in back and nb["id"] in back, f"#5967 {where}: both are listed again under their ids")
+    me_ = s.get(B + "/api/state").json()["me"]["id"]
+    fid = sql("SELECT max(k.fs_share_id) FROM wiki_share_cards k JOIN fs_shares f ON f.id=k.fs_share_id WHERE k.email<>'' AND f.created_by=?", (me_,))[0][0]
+    aid = sql("SELECT max(id) FROM obj_addr_shares WHERE kind='wiki' AND created_by=?", (me_,))[0][0]
+    check(s.patch(B + f"/api/wiki/shares/p{fid}", json={}).status_code == 404 and s.patch(B + f"/api/wiki/shares/a{aid}", json={}).status_code == 404,
+          f"#5967 {where}: the forms p<n> / a<n> of a share by address are refused (no probing by number)")
+
+
+dv5, nb5 = same_shape(A, "page dialog", {"page": plan})
+end_and_back(A, "page dialog", {"page": plan}, dv5, nb5)
+# 2.1115.0 (#5967): review (M1) - shared again with the same address: time and place stay for both kinds (the open one took
+# the second time and went to the end). The rows are dated back first, so "the same second" cannot hide it.
+OLD_AT = "2026-01-02T03:04:05+00:00"
+sql("UPDATE obj_addr_shares SET created_at=? WHERE kind='wiki' AND created_by=?", (OLD_AT, ALICE), write=True)
+sql("UPDATE fs_shares SET created_at=? WHERE created_by=? AND id IN (SELECT fs_share_id FROM wiki_share_cards WHERE email<>'')", (OLD_AT, ALICE), write=True)
+
+
+def addr_order():
+    r = A.get(B + "/api/wiki/shares", params={"page": plan})
+    return [(x["user"]["name"], x["created_at"]) for x in r.json().get("shares", []) if x["user"].get("by_email")]
+
+
+before = addr_order()
+for em in ("nobody@example.com", "dave@example.com"):
+    r = share(A, space="private", folder="Customer A", kind="person", email=em)
+    check(r.ok and r.json().get("by_email") is True, f"#5967: {em} shared a second time {r.status_code} {r.text[:200]}")
+after = addr_order()
+check(len(before) == 2 and all(t == OLD_AT for _n, t in before) and after == before,
+      f"#5967: shared again, order and created_at stay for both kinds {before} -> {after}")
+# 2.1115.0 (#5967): review (N2) - the Undo of an open share keeps ADS_PER_ADDR as a new one does: over the limit it does not
+# come back (409 "Already shared", the answer of a bound share that cannot come back), under it it does
+nb_row = sql("SELECT id FROM obj_addr_shares WHERE kind='wiki' AND created_by=? ORDER BY id DESC LIMIT 1", (ALICE,))[0][0]
+sql("INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
+    "SELECT kind, ref_id, owner_id, org_id, 'zz5967/' || g, body, email_seal, email_key, created_by, created_at "
+    "FROM obj_addr_shares, generate_series(1, 50) g WHERE id=?", (nb_row,), write=True)
+r = A.delete(B + f"/api/wiki/shares/{nb5['id']}")
+check(r.ok and r.json().get("revoked") is True, f"#5967: nobody@ ended {r.status_code} {r.text[:200]}")
+r = A.post(B + f"/api/wiki/shares/{nb5['id']}/restore")
+check(r.status_code == 409, f"#5967: over ADS_PER_ADDR the Undo does not bring it back {r.status_code} {r.text[:200]}")
+sql("DELETE FROM obj_addr_shares WHERE path LIKE 'zz5967/%'", write=True)
+r = A.post(B + f"/api/wiki/shares/{nb5['id']}/restore")
+check(r.ok and r.json().get("id") == nb5["id"], f"#5967: under the limit the Undo works again {r.status_code} {r.text[:200]}")
 deep = page(A, "private", "Customer A/Deep", ">" * 3000 + " deep\n\n" + "**" * 1500 + "x" + "**" * 1500)
 r = Da.get(B + f"/api/wiki/shared/pages/{deep}")
 check(r.ok and "deep" in r.json().get("html", ""), f"#2104: deeply nested quotes / emphasis render (no recursion error) {r.status_code}")
@@ -294,6 +368,11 @@ check(Fr.delete(B + f"/api/wiki/shares/{fsid}").ok and Fr.post(B + f"/api/wiki/s
 check(Fr.patch(B + f"/api/wiki/shares/{fsid}", json={"expires": time.strftime("%Y-%m-%d", time.localtime(time.time() + 86400 * 3))}).ok,
       "#2104: the freelancer sets an expiry")
 check(Fr.get(B + "/api/wiki/shared").ok and Fr.get(B + "/api/wiki/shared/pages/999999").status_code == 404, "#2104: the freelancer's own Shared with me")
+r = share(Fr, space="private", folder="Offer", kind="person", email="nobody@example.com")
+check(r.ok and r.json() == {"ok": True, "by_email": True}, "#5967: the freelancer shares the folder with an address without account " + r.text[:200])
+fdv, fnb = same_shape(Fr, "freelancer", {"space": "private", "folder": "Offer"})
+end_and_back(Fr, "freelancer", {"space": "private", "folder": "Offer"}, fdv, fnb)
+
 sql("INSERT INTO wiki_spaces(owner_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (FID,), write=True)
 r = share(Fr, page_id=fp, kind="link")
 check(r.status_code == 409 and r.json().get("code") == "wiki_e2e_share", "#2104: a locked space shares nothing " + r.text[:200])

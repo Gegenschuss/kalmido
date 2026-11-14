@@ -83,7 +83,8 @@ def ads_open(c, kind, by, em, body, ref_id=None, owner_id=None, path="", org_id=
     try:
         with c.savepoint():
             if old:
-                c.execute("UPDATE obj_addr_shares SET body=CAST(? AS JSONB), created_by=?, created_at=? WHERE id=?", (data, by, iso(now_utc()), old["id"]))
+                # 2.1115.0 (#5967): review (M1) - shared again: its time and sharer stay, as a bound share (obj_node_share)
+                c.execute("UPDATE obj_addr_shares SET body=CAST(? AS JSONB) WHERE id=?", (data, old["id"]))
             else:
                 insert_id(c, "INSERT INTO obj_addr_shares(kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
                              "VALUES(?,?,?,?,?,CAST(? AS JSONB),?,?,?,?)", (kind, ref_id, owner_id, org_id, path or "", data, seal(c, ADS_SEAL, em), key, by,
@@ -124,6 +125,51 @@ def ads_row(c, aid):
 
 def ads_drop(c, aid):
     c.execute("DELETE FROM obj_addr_shares WHERE id=?", (int(aid),))
+
+
+def ads_take(c, x, by):
+    """2.1115.0 (#5967): an open row taken back in a dialog goes into obj_revoked (src obj_addr_shares, kind / ref_id = its
+    object) -- the Undo (ads_back) brings it back under its id, as a share bound to an account comes back (nothing tells the
+    two apart). The prune of obj_revoked ends it for good."""
+    from .objects import _revoked_add
+    _revoked_add(c, "obj_addr_shares", x, "unshare", by, org=x["org_id"], uid=x["owner_id"] or by, kind=x["kind"], ref_id=x["ref_id"])
+    ads_drop(c, x["id"])
+
+
+def ads_taken(c, kind, aid, uid):
+    """The obj_revoked row of open row aid (kind) that uid took back (ads_take, the newest), None without one."""
+    return c.execute("SELECT * FROM obj_revoked WHERE src='obj_addr_shares' AND kind=? AND user_id=? AND (CAST(row_json AS JSONB)->>'id')=? "
+                     "ORDER BY id DESC LIMIT 1", (kind, int(uid), str(int(aid)))).fetchone()
+
+
+def ads_taken_row(rv):
+    """The open row kept in obj_revoked row rv (a dict like a row of obj_addr_shares)."""
+    x = rv["row_json"]
+    return json.loads(x) if isinstance(x, str) else dict(x or {})
+
+
+def ads_back(c, rv):
+    """The Undo of ads_take: the row back under its id (its address, request and age as they were). False = it cannot come
+    back (the same address is open there again, its sharer is gone, ADS_MAX / ADS_PER_ADDR reached): obj_revoked keeps it."""
+    x = ads_taken_row(rv)
+    with system_ctx(c):  # 2.1115.0 (#5967): review (N2) - the limits of ads_open hold for the Undo too (counts only)
+        full = (c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE created_by=?", (x["created_by"],)).fetchone()[0] >= ADS_MAX
+                or c.execute("SELECT COUNT(*) FROM obj_addr_shares WHERE email_key=?", (x["email_key"],)).fetchone()[0] >= ADS_PER_ADDR)
+    if full:
+        return False
+    try:
+        with c.savepoint():
+            back = c.execute("INSERT INTO obj_addr_shares(id,kind,ref_id,owner_id,org_id,path,body,email_seal,email_key,created_by,created_at) "
+                             "VALUES(?,?,?,?,?,?,CAST(? AS JSONB),?,?,?,?) ON CONFLICT DO NOTHING RETURNING id",
+                             (int(x["id"]), x["kind"], x.get("ref_id"), x.get("owner_id"), x.get("org_id"), x.get("path") or "",
+                              x["body"] if isinstance(x.get("body"), str) else json.dumps(x.get("body") or {}), x["email_seal"],
+                              x["email_key"], x["created_by"], x["created_at"])).fetchone()
+    except Exception:  # noqa: BLE001  its sharer / object owner is gone (a foreign key): nothing to bring back
+        return False
+    if back is None:
+        return False
+    c.execute("DELETE FROM obj_revoked WHERE id=?", (rv["id"],))
+    return True
 
 
 def ads_repath(c, kind, owner_id, old, new):

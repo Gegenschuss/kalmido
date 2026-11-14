@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
-from ..core.pg import insert_id, st_ids
+from ..core.pg import insert_id, st_ids, ts_canon  # 2.1115.0 (#5951): ts_canon
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso
 from ..accounts.session import GATE, me
@@ -424,6 +424,19 @@ def _gs(v, n=300):
     return str(v or "")[:n]
 
 
+def _git_ts(v):
+    """2.1115.0 (#5951): a provider's point in time for a TIMESTAMPTZ column (git_prs.merged_at / updated_at): its canonical
+    form (core/pg.py ts_canon, the form the column reads back, so a poll compares equal), None when it is none or no time."""
+    s = _gs(v, 40).strip()
+    if not s:
+        return None
+    try:
+        parse_iso(s)
+    except (ValueError, TypeError):
+        return None
+    return ts_canon(s) or None
+
+
 def _git_web(u):
     """A link from the provider for the web app: http(s) only."""
     u = _gs(u, 500)
@@ -443,7 +456,7 @@ def git_pr_of(p):
     return {"number": p["number"], "title": _gs(p.get("title"), 500), "body": str(p.get("body") or "")[:GIT_PR_BODY_MAX],
             "state": "merged" if merged else "open" if p.get("state") == "open" else "closed",
             "author": _gs(user.get("login"), 100), "url": _git_web(p.get("html_url")), "head_ref": _gs(head.get("ref"), 250),
-            "head_sha": _gs(head.get("sha"), 64), "updated_at": _gs(p.get("updated_at"), 40) or None, "merged_at": _gs(p.get("merged_at"), 40) or None,
+            "head_sha": _gs(head.get("sha"), 64), "updated_at": _git_ts(p.get("updated_at")), "merged_at": _git_ts(p.get("merged_at")),  # 2.1115.0 (#5951)
             # 2.151.0 A (#2558): the merge (squash) commit of a merged one: its first version tag is the pull request's
             # (GitHub / Gitea send a test merge commit for open ones too: only kept once merged)
             "merge_sha": _gs(p.get("merge_commit_sha"), 64) if merged else ""}

@@ -428,7 +428,8 @@ def _receipts(c, z, sub):
     from ..docs.store import doc_open
     rows = c.execute("SELECT r.node_id, r.category, r.vat_pct, r.paid_at, d.doc_date, d.amount, d.currency, d.ws, n.name, n.deleted_at "
                      "FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
-                     "WHERE d.ws=? AND n.kind='file' ORDER BY COALESCE(NULLIF(d.doc_date, ''), r.paid_at), r.node_id", (sub["ws"],)).fetchall()
+                     "WHERE d.ws=? AND n.kind='file' ORDER BY COALESCE(NULLIF(d.doc_date, ''), CAST(r.paid_at AS text)), r.node_id",  # 2.1115.0 (#5951): paid_at DATE
+                     (sub["ws"],)).fetchall()
     out = []
     for r in rows:
         fn = f"receipts/{int(r['node_id'])}-{_safe_part(r['name'], 100)}"

@@ -726,7 +726,7 @@ def clean_doc(c, oid, b, cur, admin):
             f[k] = pt_text(b.get(k), k) if k == "project_title" else _text(b.get(k), k, mx)  # 2.431.0 B (#3594)
     for k in ("date", "valid_until", "service_from", "service_to", "due_date"):  # 2.36.2: period of service; 2.38.0: due date
         if k in b:
-            f[k] = _date(b.get(k), k)
+            f[k] = _date(b.get(k), k) or (None if k == "valid_until" else "")  # 2.1115.0 (#5951): valid_until is DATE, none = NULL
     nd = f.get("date", cur["date"])
     ndue = f.get("due_date", cur["due_date"] if "due_date" in cur.keys() else None)
     if nd and ndue and ndue < nd and ("date" in f or "due_date" in f):  # 2.38.0 review
@@ -1281,12 +1281,13 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
     role = office_role(c, g.user["id"], oid) if getattr(g, "user", None) is not None else None
     # 2.97.1 (#2224): with the company name; a document finalised before keeps the line it was printed with
     sender_line = co["sender_line"] if locked and "sender_line" in co else (" · ".join(x for x in (co.get("lines") or []) if x) if locked else ofx_sender_line(co))
+    # 2.1115.0 (#5951): valid_until is DATE (none = NULL); the model keeps "" for none, as the approval checksum (signoff.sig_doc_hash) was made
     m = {
         "kind": r["kind"], "lang": lang, "locked": locked, "locked_at": r["locked_at"] if locked else None,
         "pack_version": (r["pack_version"] or "") if locked else str(pack.get("version") or ""),
         "service_from": r["service_from"] or "", "service_to": r["service_to"] or "", "currency": cur, "fx_rate": t.get("fx_rate"), "fx_note": t.get("fx_note") or "", "vat_mode": t["vat_mode"],
         "raw_mode": t["raw_mode"], "status": r["status"], "number": r["number"], "date": r["date"], "date_text": _fd(r["date"]),
-        "valid_until": r["valid_until"], "valid_until_text": valid_text, "title": _offer_title_frozen(pack, L, lang) if locked else _offer_title(s, L, lang),  # 2.453.0 (#3816)
+        "valid_until": r["valid_until"] or "", "valid_until_text": valid_text, "title": _offer_title_frozen(pack, L, lang) if locked else _offer_title(s, L, lang),  # 2.453.0 (#3816)
         "project_title": r["project_title"], "project_ref": r["project_ref"],
         "company": {"name": co.get("name") or "", "name_lines": co.get("name_lines") or [], "lines": co.get("lines") or [], "contact_lines": co.get("contact_lines") or [],
                     "register_lines": co.get("register_lines") or [], "bank_lines": co.get("bank_lines") or [],
@@ -1767,7 +1768,7 @@ def odoc_duplicate(did):
     today = local_now().date()
     ts = iso(now_utc())
     row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=iso_ms(now_utc()), sent_at=None,
-               valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else "")
+               valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else None)  # 2.1115.0 (#5951): DATE, none = NULL
     if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
         row["version_of"] = r["version_of"] or r["id"]
         row["list_id"] = r["list_id"]  # 2.168.0 A (#2665): a new version stays in the project (an invoice's copy does not)

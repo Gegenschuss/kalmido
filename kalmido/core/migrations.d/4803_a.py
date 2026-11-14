@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS doc_flow_runs (
   trig TEXT NOT NULL, stamp TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'done', data TEXT NOT NULL DEFAULT '',
   task_id BIGINT, by_user BIGINT, -- no FK: the task / the person kept as history
   hook TEXT NOT NULL DEFAULT '', hook_attempt BIGINT NOT NULL DEFAULT 0, hook_next DOUBLE PRECISION NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL, undone_at TEXT);
+  created_at TIMESTAMPTZ NOT NULL, undone_at TIMESTAMPTZ);
 """
 AFTER = [
     "CREATE INDEX IF NOT EXISTS doc_flow_runs_node ON doc_flow_runs(node_id, id)",

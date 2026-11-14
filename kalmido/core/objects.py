@@ -782,6 +782,7 @@ def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=Non
     agents and the share limit (lists: the lock, the bridge); match = _share_match's SQL, extra = the kind's share_cols."""
     if key not in ("user_id", "group_id", "agent_id") or role not in ("view", "edit"):
         raise BadInput(tr("Invalid data"))
+    expires_at = expires_at or None  # 2.1115.0 (#5951): fs_shares.expires_at is TIMESTAMPTZ ('' = none = NULL)
     if key == "agent_id" and not checked:
         fsl_agent_share_guard(c, n["id"])  # 2.953 (#3348, review N13): on, in or above a locked folder
     mq, ma = match or ("", ())
@@ -878,7 +879,7 @@ def obj_node_reshare(c, revoked_id, *, owner, org):
         return None
     role = s.get("role") if s.get("role") in ("view", "edit") else "view"
     c.execute(f"INSERT INTO fs_shares(id,node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?,?)",
-              (int(s["id"]), n["id"], int(s[key]), role, s.get("expires_at"), s.get("created_by"), s.get("created_at") or iso(now_utc()),
+              (int(s["id"]), n["id"], int(s[key]), role, s.get("expires_at") or None, s.get("created_by"), s.get("created_at") or iso(now_utc()),
                s.get("by_role")))
     c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
     fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(s[key])}:{role}")
@@ -915,7 +916,7 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
         c.commit()  # 2.568.0 (#4739): the stale row goes for good (a refusal is not committed; both routes wrote nothing before)
         raise Denied(409, tr("Already shared"))
     sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
-                    (n["id"], int(s[key]), s.get("role") if s.get("role") in ("view", "edit") else "view", s.get("expires_at"),
+                    (n["id"], int(s[key]), s.get("role") if s.get("role") in ("view", "edit") else "view", s.get("expires_at") or None,
                      s.get("created_by"), s.get("created_at") or iso(now_utc()), s.get("by_role")))
     for k, v in extra.items():
         c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))

@@ -320,7 +320,8 @@ def state():
     with system_ctx(c):
         L = c.execute("SELECT snap, push_due, push_err, push_fails FROM git_issue_links WHERE conn_id=?", (cid,)).fetchone()
         k = c.execute("SELECT issue_error FROM git_conns WHERE id=?", (cid,)).fetchone()
-        cm = [list(r) for r in c.execute("SELECT id, remote_id, send_at<>'' FROM git_issue_comments WHERE conn_id=? ORDER BY id", (cid,))]
+        # 2.1115.0 (#5951): send_at is TIMESTAMPTZ, unmarked = NULL (was '')
+        cm = [list(r) for r in c.execute("SELECT id, remote_id, send_at IS NOT NULL FROM git_issue_comments WHERE conn_id=? ORDER BY id", (cid,))]
         c.commit()
     return {"title": json.loads(L["snap"]).get("title"), "due": L["push_due"], "err": L["push_err"], "fails": L["push_fails"],
             "ierr": k["issue_error"], "cm": cm, "now": time.time()}

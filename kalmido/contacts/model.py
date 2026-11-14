@@ -12,7 +12,6 @@ from datetime import date, datetime, timedelta
 from flask import has_request_context
 
 from ..core.objsearch import osr_ids_sql  # 2.981.0 (#5278)
-from ..core.coltype import ct_iso  # 2.1095.0 (#5306): a time column as the canonical text in SQL
 from ..core.i18n import lang, N_, tr
 from ..core.pg import insert_id, like_escape, st_ids, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
@@ -1361,7 +1360,7 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
         cid = contact_store(c, uid, book_id, f, cid=old["id"] if old else None, uid_=v["uid"], extra=ext, version=v["version"],
                             src_digest=dig if src_digest else None, bulk=bulk)
         if not src_digest:  # 2.273.0 F2 (#3048): the import marker (this write is not a change here)
-            c.execute(f"UPDATE contacts SET imp_at={ct_iso('updated_at')}, imp_rev=? WHERE id=?", (v.get("rev") or "", cid))
+            c.execute("UPDATE contacts SET imp_at=updated_at, imp_rev=? WHERE id=?", (v.get("rev") or "", cid))  # 2.1115.0 (#5951): both TIMESTAMPTZ
         have += 0 if old and not back else 1
         dirty = True
         res["updated" if old and not back else "created"] += 1

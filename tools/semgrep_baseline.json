@@ -1588,7 +1588,7 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/docs/store.py",
-   "code": "c.execute(f\"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at='', updated_at=? WHERE node_id=?\",",
+   "code": "c.execute(f\"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at=NULL, updated_at=? WHERE node_id=?\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
@@ -1596,7 +1596,7 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/docs/store.py",
-   "code": "c.execute(f\"UPDATE doc_meta SET {sets}, learn_prev='', learn_at='', updated_at=? WHERE node_id=?\", (*args, _now(), nid))",
+   "code": "c.execute(f\"UPDATE doc_meta SET {sets}, learn_prev='', learn_at=NULL, updated_at=? WHERE node_id=?\", (*args, _now(), nid))",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

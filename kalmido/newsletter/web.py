@@ -14,7 +14,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.db import body, db, err, iso, local_now, now_utc
-from ..core.pg import insert_id
+from ..core.pg import insert_id, ts_canon
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -387,7 +387,7 @@ def nwl_import_undo(c, uid, r):
             need_contact(c, cid, write=True)
         except Denied:
             row = None
-        if not row or row["nl_status"] != "yes" or row["nl_at"] != at:
+        if not row or row["nl_status"] != "yes" or ts_canon(row["nl_at"]) != ts_canon(at):  # 2.1115.0 (#5951): nl_at is TIMESTAMPTZ, at the stored text
             kept += 1
             continue
         N.nwl_set_status(c, cid, was, tr("Import undone"))

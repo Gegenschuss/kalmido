@@ -48,7 +48,7 @@ def au_billed(c, oid, ids):
     # (admin/oi_store.py _receipt): billed, invoice missing; a document deleted later still frees its receipts (billed_doc_id kept)
     rows = c.execute(f"SELECT r.node_id, r.billed_at, d.id AS doc_id, d.number, d.kind, d.org_id FROM rc_receipts r LEFT JOIN office_docs d "
                      f"ON d.id=r.billed_doc_id AND {live_sql('d')} WHERE r.ws=? AND r.node_id IN ({','.join('?' * len(ids))}) "
-                     f"AND (d.id IS NOT NULL OR (r.billed_doc_id IS NULL AND r.billed_at IS NOT NULL AND r.billed_at != ''))",
+                     f"AND (d.id IS NOT NULL OR (r.billed_doc_id IS NULL AND r.billed_at IS NOT NULL))",  # 2.1115.0 (#5951): TIMESTAMPTZ, never ''
                      [bk_ws(c, oid)] + ids).fetchall()
     return {r["node_id"]: ({"doc_id": r["doc_id"], "number": r["number"], "kind": r["kind"], "billed_at": r["billed_at"]} if r["org_id"] == oid
                            else {"doc_id": None, "number": None, "kind": None, "billed_at": r["billed_at"],
@@ -145,7 +145,7 @@ def au_unbill_post():
                                         [ws, *pos, *ids])}
         pids = pids + sorted(pos - busy)
     c.execute(f"UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL, billed_item_id=NULL WHERE ws=? AND node_id IN ({q}) AND NOT EXISTS "
-              f"(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND {live_sql('d')} AND d.trial=0 AND ((d.locked_at IS NOT NULL AND d.locked_at != '') OR d.status='sent'))",
+              f"(SELECT 1 FROM office_docs d WHERE d.id=rc_receipts.billed_doc_id AND {live_sql('d')} AND d.trial=0 AND (d.locked_at IS NOT NULL OR d.status='sent'))",
               [ws] + ids)  # 2.121.0 review M1: a sent document counts as final like in bill (ofx_need_editable); 2.144.10 (#2576, review): a trial one frees them
     removed = 0
     for did in docs:

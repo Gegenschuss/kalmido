@@ -234,7 +234,7 @@ def _op_account(c, uid):
     u = c.execute("SELECT id, kind, is_admin, disabled, created_at, storage_quota_mb FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent":
         return None
-    seen = c.execute("SELECT MAX(NULLIF(last_seen_at, '')) FROM sessions WHERE user_id=?", (uid,)).fetchone()[0]
+    seen = c.execute("SELECT MAX(NULLIF(CAST(last_seen_at AS text), '')::timestamptz) FROM sessions WHERE user_id=?", (uid,)).fetchone()[0]  # 2.1115.0 (#5951)
     orgs = _count(c, "SELECT COUNT(*) FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND o.personal_of IS NULL", (uid,))
     projects = _count(c, "SELECT COUNT(*) FROM lists WHERE owner_id=? AND NOT is_inbox", (uid,))
     own = u["storage_quota_mb"]

@@ -77,7 +77,7 @@ check(A.put(B + f"/api/lists/{OL}/members", json={"user_id": BOB, "role": "edit"
 PL = Bo.post(B + "/api/lists", json={"name": "Bob private", "org_id": None}).json()["id"]
 W0 = Bo.post(B + "/api/me/webhooks", json={"name": "old", "url": HOOK + "/old", "events": ["task.created"]}).json()["id"]
 W1 = Bo.post(B + "/api/me/webhooks", json={"name": "new", "url": HOOK + "/new", "events": ["task.created"]}).json()["id"]
-check(dbx("SELECT org_grace_until FROM webhooks WHERE id=?", (W1,))[0][0] == "", "#3391: a new personal webhook has no grace period")
+check(dbx("SELECT org_grace_until FROM webhooks WHERE id=?", (W1,))[0][0] is None, "#3391: a new personal webhook has no grace period")  # 2.1115.0 (#5951): a DATE, NULL = none (was '')
 dbx("UPDATE webhooks SET org_grace_until='2099-12-31' WHERE id=?", (W0,))  # what the migration gives the webhooks from before 2.380
 check(len(dbx("SELECT id FROM kalmido_migrations WHERE id IN ('webhooks.org_grace_until', 'webhooks.org_grace_until#2')")) == 2,
       "#3391: both migration steps (column + the grace of the existing webhooks) ran")
@@ -112,7 +112,7 @@ A.post(B + "/api/tasks", json={"list_id": OL, "title": "Org task three"})
 Bo.post(B + "/api/tasks", json={"list_id": PL, "title": "Private task two"})
 until(lambda: queued("Private task two"), 15)
 check(not queued("Org task two") & {W0, W1} and not queued("Org task three") & {W0, W1}, "#3391: after the last day no personal webhook gets the organisation's list")
-check(dbx("SELECT org_grace_until FROM webhooks WHERE id=?", (W0,))[0][0] == "", "#3391: the first event after the last day ends the grace for good")
+check(dbx("SELECT org_grace_until FROM webhooks WHERE id=?", (W0,))[0][0] is None, "#3391: the first event after the last day ends the grace for good")  # 2.1115.0 (#5951): NULL (was '')
 nw = [x for x in Bo.get(B + "/api/news").json()["items"] if x["kind"] == "whorgcut"]
 check(len(nw) == 1 and nw[0]["data"].get("org_id") == ORG and nw[0]["data"].get("webhook") == "old",
       f"#3391: one News item for the owner (not one per event): {nw}")

@@ -478,11 +478,11 @@ MT_WAIT_MAX = 50
 
 
 def mt_wait_suggestions(c, uid):
-    # 2.1095.0 (#5306): both sides as TIMESTAMPTZ (activity.created_at moved, tasks.waiting_at is still text)
+    # 2.1095.0 (#5306): both sides as TIMESTAMPTZ (activity.created_at moved, tasks.waiting_at too since 2.1115.0 #5951)
     rows = c.execute("""SELECT note, MAX(at) AS at FROM (
                           SELECT data->>'note' AS note, created_at::timestamptz AS at FROM activity
                            WHERE user_id=? AND kind='waiting' AND COALESCE(data->>'note', '')<>''
-                          UNION ALL SELECT wait_note, NULLIF(waiting_at, '')::timestamptz FROM tasks WHERE wait_by=? AND wait_note<>'' AND waiting_at IS NOT NULL
+                          UNION ALL SELECT wait_note, waiting_at FROM tasks WHERE wait_by=? AND wait_note<>'' AND waiting_at IS NOT NULL
                         ) x GROUP BY note ORDER BY MAX(at) DESC LIMIT 400""", (uid, uid)).fetchall()
     hidden = {r[0] for r in c.execute("SELECT note_key FROM wait_hidden WHERE user_id=?", (uid,))}
     out, seen = [], set()
@@ -526,9 +526,10 @@ def _wd_followups(c, users, S, LG, now):
     """The follow-up day of waiting tasks: push + News to the person it is for, followup_due to the following agents."""
     from ..notify.push import _wd_fail
     today = (now + timedelta(days=1)).date().isoformat()  # 2.368.3 (#2985): a clock ahead of the server's; _wd_followup decides
+    # 2.1115.0 (#5951): wait_until is a DATE, wait_fired stays TEXT (the day it fired) -> compared as text
     rows = c.execute(f"""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner FROM tasks t
                         JOIN lists l ON l.id=t.list_id WHERE t.waiting_at IS NOT NULL AND t.wait_until IS NOT NULL
-                        AND t.wait_until<=? AND t.wait_fired!=t.wait_until AND t.status=0 AND t.deleted_at IS NULL
+                        AND t.wait_until<=? AND t.wait_fired<>CAST(t.wait_until AS text) AND t.status=0 AND t.deleted_at IS NULL
                         AND {list_state_sql('l')}""", (today,)).fetchall()
     for t in rows:
         try:

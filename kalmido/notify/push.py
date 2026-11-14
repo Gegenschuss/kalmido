@@ -1172,7 +1172,7 @@ def _wd_habits(c, users, S, LG, now):
     # habit reminders
     today = now.date().isoformat()
     for h in c.execute("SELECT * FROM habits WHERE NOT archived AND deleted_at IS NULL AND (remind_at!='' OR remind_times!='') "
-                       "AND NOT (reminded_on=? AND reminded_hm='')", (today,)).fetchall():
+                       "AND NOT (reminded_on IS NOT DISTINCT FROM ? AND reminded_hm='')", (today,)).fetchall():  # 2.1115.0 (#5951): DATE, never = NULL
         try:
             _wd_habit(c, h, users, S, LG, now)
         except Exception as e:  # noqa: BLE001

@@ -4,7 +4,7 @@ what was chosen when it was asked for (JSON: per own project hand over to a memb
 paused own agents, the hashes of the cancel links). New columns only: an older version ignores them (the account stays
 disabled there, an admin can enable it again; the deletion runs once a newer version is back)."""
 MIGRATIONS = [
-    ("users", "delete_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_at TEXT"),
+    ("users", "delete_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_at TIMESTAMPTZ"),
     ("users", "delete_plan", "ALTER TABLE users ADD COLUMN IF NOT EXISTS delete_plan TEXT NOT NULL DEFAULT ''"),
 ]
 AFTER = [
