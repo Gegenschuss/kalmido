@@ -774,7 +774,7 @@ def obj_share_locks(c, pairs):
 
 
 def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=None, event=True, checked=False, match=None,
-                   extra=None):
+                   extra=None, log=True):
     """2.565.0 (#4717): the share row itself on reference node n (a row) -- obj_share's write, also for the old areas whose
     reference kind is the file store's own (wiki pages, tables: stage 4), which check who may share and with whom by their own
     rules first (the caller did). The same target again changes role / expiry; event=False: an agent hears of a new share from
@@ -804,7 +804,8 @@ def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=Non
             _agent_event(c, int(target), n, role)
     for k, v in (extra or {}).items():
         c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
-    fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(target)}:{role}")
+    if log:  # 2.1138.0 (#6025): a share by e-mail address of the knowledge dialog writes no line naming its account
+        fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(target)}:{role}")
     obj_forget()
     return sid
 
@@ -836,7 +837,7 @@ def obj_unshare(c, uid, kind, rid, sid, checked=False):
     return out
 
 
-def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="unshare"):
+def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="unshare", log=True):
     """2.565.0 (#4717): take share sid of reference node n (a row) back -- obj_unshare's step, also for the old areas of stage
     4 (the caller checked who may): the row goes into obj_revoked (restorable for OBJ_REVOKED_DAYS) and is deleted. Returns
     the obj_revoked id, None when node n has no such share."""
@@ -846,12 +847,13 @@ def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="u
     _revoked_prune(c)
     out = _revoked_add(c, "fs_shares", s, reason, uid, org=org, uid=s["user_id"] or s["agent_id"], kind=kind, ref_id=ref_id)
     c.execute("DELETE FROM fs_shares WHERE id=?", (s["id"],))
-    fs_log_add(c, n["id"], "unshare", str(s["id"]))
+    if log:  # 2.1138.0 (#6025)
+        fs_log_add(c, n["id"], "unshare", str(s["id"]))
     obj_forget()
     return out
 
 
-def obj_node_reshare(c, revoked_id, *, owner, org):
+def obj_node_reshare(c, revoked_id, *, owner, org, log=True):
     """2.937.0 (#5244, stage 7c): put the share row of obj_revoked revoked_id (src fs_shares, obj_node_unshare) back on its
     node under its OLD id -- obj_share_restore's step for a share of a node no kind names (a knowledge folder), after the
     area checked who may and that the person may still have it. The same id keeps an Undo / Redo of the area's dialog on
@@ -882,7 +884,8 @@ def obj_node_reshare(c, revoked_id, *, owner, org):
               (int(s["id"]), n["id"], int(s[key]), role, s.get("expires_at") or None, s.get("created_by"), s.get("created_at") or iso(now_utc()),
                s.get("by_role")))
     c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
-    fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(s[key])}:{role}")
+    if log:  # 2.1138.0 (#6025)
+        fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(s[key])}:{role}")
     obj_forget()
     return int(s["id"]), s
 
