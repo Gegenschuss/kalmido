@@ -18548,5 +18548,7 @@
   "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie.",
   "{0} new message from {1}": ["{0} neue Nachricht von {1}", "{0} neue Nachrichten von {1}"],
   "Pop-up for new messages": "Popup bei neuen Nachrichten",
-  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Eine neue Nachricht von einem Menschen oder eine fertige Antwort eines Agenten erscheint kurz am oberen Rand, egal wo du in Kalmido bist. Nur auf diesem Gerät; solange die App offen ist, kommt dafür hier kein zusätzlicher Push."
+  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Eine neue Nachricht von einem Menschen oder eine fertige Antwort eines Agenten erscheint kurz am oberen Rand, egal wo du in Kalmido bist. Nur auf diesem Gerät; solange die App offen ist, kommt dafür hier kein zusätzlicher Push.",
+  "No receipts here yet": "Hier gibt es noch keine Belege",
+  "Receipts stay in their area. Open one to view, change or book it there.": "Belege bleiben in ihrem Bereich. Öffne einen, um ihn dort anzusehen, zu ändern oder zu buchen."
 }

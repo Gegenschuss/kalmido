@@ -7,7 +7,7 @@
 // access). Entries are always positive with a kind ("in" / "out"); plan per category = its monthly limit, else the
 // recurring entries due that month; recurring entries are templates, booked by hand ("Booked"). Never visible to agents.
 // Server routes: /api/budget (kalmido/life/budget.py). Live: the area "budget" of /api/version (liveparts.js -> bg_live).
-const BG = {lid: null, month: null, data: null, home: null, loading: false, done: false, seq: 0, hseq: 0, stale: false};  // done: loaded once (no loop without a budget)
+const BG = {lid: null, month: null, data: null, home: null, loading: false, done: false, seq: 0, hseq: 0, stale: false, hm: null};  // done: loaded once (no loop without a budget)
 const BG_PER = {month: N_('monthly'), quarter: N_('quarterly'), year: N_('yearly')};
 const bg_month = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const bg_addMonth = (m, n) => { const [y, mo] = m.split('-').map(Number); return bg_month(new Date(y, mo - 1 + n, 1)); };
@@ -20,6 +20,7 @@ function bg_num(s) {
 }
 const bg_numStr = n => numField(n);  // 2.450.0 (#3770)
 const bg_lidOfHash = () => +(/^#budget\/(\d+)/.exec(location.hash)?.[1] || 0) || null;
+const bg_monthOfHash = () => /^#budget\/\d+\/(\d{4}-(0[1-9]|1[0-2]))$/.exec(location.hash)?.[1] || null;  // 2.1148.0 (#4895): budget/<list>/<YYYY-MM>
 const bg_url = (p = '') => `/api/budget/${BG.lid}${p}`;
 
 // ---- loading
@@ -89,8 +90,10 @@ function bg_homeCard() {
 // ---- the view
 function viewBudget() {
   if (typeof lifeModal !== 'function') { ld_later('life'); return `<div class="bgview"><p class="muted lempty">${tr('Loading…')}</p></div>`; }  // 2.65.0 (#1823): the dialogs use life.js (loaded on demand)
-  const hl = bg_lidOfHash();
+  const hl = bg_lidOfHash(), hm = bg_monthOfHash();
   if (hl && hl !== BG.lid) { BG.lid = hl; BG.data = null; BG.done = false; }
+  if (!hm) BG.hm = null;
+  else if (hm !== BG.hm) { BG.hm = hm; BG.month = hm; BG.data = null; BG.done = false; }  // 2.1148.0 (#4895): a receipt from Files opens its month (once per address)
   if (BG.stale && !$('.modal.bgdlg')) { BG.stale = false; BG.done = false; }
   if (!BG.done && !BG.loading) setTimeout(bg_load, 0);
   const d = BG.data;
