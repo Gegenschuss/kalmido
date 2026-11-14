@@ -35,7 +35,7 @@ function xl_rowHtml(l) {
   return `<div class="xl-row${l.expired ? ' xl-dead' : ''}" data-xlid="${l.id}">${ic(l.has_password ? 'lock' : 'link', 's')}<span class="xl-main"><span class="xl-name">${esc(l.label || tr('Link'))}</span><small class="muted">${esc(meta)}</small></span>
     <button type="button" class="iconbtn ms-phsr" data-xl="copy" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy the link {0}', l.label || ''))}">${ic('copy', 's')}</button>
     <button type="button" class="iconbtn ms-phsr" data-xl="regen" title="${esc(tr('New link'))}" aria-label="${esc(tr('New link'))}">${ic('key', 's')}</button>
-    <button type="button" class="iconbtn ms-phsr" data-xl="revoke" title="${esc(tr('Switch off'))}" aria-label="${esc(tr('Switch off'))}">${ic('x', 's')}</button>${ms_dots(':scope > .ms-phsr', l.label || tr('Link'))}</div>`;  // 2.1151.0 A (#3835): a dialog row on a phone: one "…" instead of the three (multisel.js ms_dots)
+    <button type="button" class="iconbtn ms-phsr" data-xl="revoke" title="${esc(tr('Switch off'))}" aria-label="${esc(tr('Switch off'))}">${ic('x', 's')}</button>${/*html-ok*/ ms_dots(':scope > .ms-phsr', l.label || tr('Link'))}</div>`;  // 2.1151.0 A (#3835): a dialog row on a phone: one "…" instead of the three (multisel.js ms_dots)
 }
 function xl_draw(box, n, j) {
   if (!box.isConnected) return;
