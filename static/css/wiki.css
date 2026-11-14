@@ -295,3 +295,23 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
   .wdxprint :is(h1,h2,h3,h4){break-after:avoid}
   @page{margin:20mm 22mm}
 }
+/* 2.1167.0 (#6086): the phone's breaks at the cause. The trash: the name keeps a line of its own and the two buttons go below it
+   when the row is narrow (like the share dialog's rows) - before, the name took what the buttons left and broke letter by letter */
+.wktrow .n{flex:1 1 12rem}
+.wktrow .oadmb{display:flex;flex-wrap:wrap;gap:.375rem;margin-left:auto}
+/* Select on a phone: the date leaves the row, so the name keeps its room (the row's "…" is already out on a phone, 2.1151.0 A;
+   the floating bar has Move and Delete) */
+@media (max-width:767px){.wkselrow .wkwhen,.wkselrow .wkmore{display:none}}
+/* a table in the editor: cells never narrower than their words (CodeMirror's lines break anywhere); the box scrolls sideways like
+   the read view's .mdtbl. The text column may not grow with a wide table (a flex item keeps its content's width by default):
+   it keeps the editor's width, so the table's box (max-width 100 %) scrolls instead of being cut off at the edge */
+.wkcm .cm-scroller>.cm-content{min-width:0}
+.wkcm .cm-wktbl{overscroll-behavior-x:contain}
+.wkcm .cm-wktbl :is(table,td,th){word-break:normal;overflow-wrap:normal}
+.wkcm .cm-wktbl :is(td,th){min-width:4ch}
+/* targets for a finger: the editor's boxes as big as the read view's (20 px, they sit inside the text line), the row "…" (a tablet;
+   a phone has the long press), the file buttons, the daily note's arrows and the history's Back at 44 px */
+@media (pointer:coarse){
+  .wkcm .cm-wkcb input{width:1.25rem;height:1.25rem;vertical-align:-.25em}
+  .wkrow .wkmore,.wkfiles .iconbtn,.wkday .iconbtn,.wkhhead .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+}
