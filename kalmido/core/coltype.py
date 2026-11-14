@@ -272,9 +272,9 @@ def ct_more_empty_indexes(c, table, col):
             continue
         head, cond = d.split(" WHERE ", 1)
         new = cond
-        for col in cols:
-            new = re.sub(rf"\(?\b{re.escape(col)}\s*<>\s*''(?:::text)?\)?", f"({col} IS NOT NULL)", new)
-            new = re.sub(rf"\(?\b{re.escape(col)}\s*=\s*''(?:::text)?\)?", f"({col} IS NULL)", new)
+        for one in cols:
+            new = re.sub(rf"\(?\b{re.escape(one)}\s*<>\s*''(?:::text)?\)?", f"({one} IS NOT NULL)", new)
+            new = re.sub(rf"\(?\b{re.escape(one)}\s*=\s*''(?:::text)?\)?", f"({one} IS NULL)", new)
         if new != cond:
             out.append((name, f"{head} WHERE {new}"))
     return out
