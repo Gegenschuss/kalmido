@@ -88,15 +88,19 @@ if (!process.env.P21167_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
 
 
     // ================= #6088 loading, failing, nothing here
+    // the failing answer is set in the loaded app, then the page opens by its hash (a full load would drop the replaced fetch, and
+    // set after the load the page had arrived already)
+    await nav(B + '?w=1280#wiki');
+    await until(`!!document.querySelector('#view .wkfolder, #view #wk-res')`, {timeout: 20000});
     await ev(FAIL(`/api/wiki/pages/${P.exp}$`));
-    await nav(B + '?w=1280#wiki/' + P.exp);
-    await ev(FAIL(`/api/wiki/pages/${P.exp}$`));
+    await ev(`(() => { location.hash = '#wiki/${P.exp}'; return 1; })()`);
     const er = await until(`(() => { const e = document.querySelector('#view .wkpage .eerr'); return e ? {t: e.textContent, retry: !!e.querySelector('[data-esretry]'), back: e.querySelector('a[data-navup]')?.getAttribute('href')} : null; })()`, {timeout: 20000});
     check(er && /The page could not be loaded/.test(er.t) && er.retry && er.back, `#6088 a page that fails to load: what failed, Try again and a way back ${JSON.stringify(er)}`);
     await shot('p21167a-loaderror-1280.png');
     await ev(FAILX);
     await ev(`(() => { document.querySelector('#view .wkpage [data-esretry]').click(); return 1; })()`);
-    check(await until(`/ProRes/.test(document.querySelector('#view .wkpage #wk-cm')?.textContent || '')`, {timeout: 20000}), '#6088 Try again: the page loads');
+    check(await until(`WK.pg?.id === ${P.exp} && !document.querySelector('#view .wkpage .eerr') && /ProRes/.test(document.querySelector('#view .wkpage')?.textContent || '')`, {timeout: 20000}), '#6088 Try again: the page loads')
+      || console.log('after Try again:', await ev(`JSON.stringify({pg: WK.pg?.id, err: WK.pgErr, errFor: WK.pgErrFor, hash: location.hash, view: (document.querySelector('#view .wkpage')?.textContent || '').slice(0, 300)})`));
     await nav(B + '?w=1280#wiki/999999');
     const na = await until(`(() => { const e = document.querySelector('#view .wkpage .enoacc'); return e ? {t: e.textContent, back: !!e.querySelector('a[data-navup]')} : null; })()`, {timeout: 20000});
     check(na && /does not exist/.test(na.t) && na.back, `#6088 a page that is not there: the no-access block with a way back ${JSON.stringify(na)}`);
