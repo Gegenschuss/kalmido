@@ -854,11 +854,11 @@ async function wko_draft(p, body, why) {
   WKO.cf[p.id] = {k: 'x:' + p.id, id: p.id, sp: p.space, mine, why, at: new Date().toISOString()};
   await wko_put(WKO.cf[p.id]);
 }
-function wk_savedHint(t) { WK.unsaved = 0; const s = $('#wk-saved'); if (s) { s.classList.remove('wkunsaved'); s.textContent = t; clearTimeout(s._t); s._t = setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 2500); } }
+function wk_savedHint(t) { WK.unsaved = 0; const s = $('#wk-saved'); if (s) { s.classList.remove('wkunsaved'); s.textContent = t; setTimeout(() => { if (s.isConnected && !s.classList.contains('wkunsaved')) s.textContent = ''; }, 2500); } }  // 2.1161.0 (#6088): a later "Not saved" stays
 // 2.1161.0 (#6088): a save that failed: "Not saved" stays in the footer (with Try again) until a save of the page works - before,
 // the toast went after a few seconds and the page looked saved. The page drawn again shows it too (wk_unsavedHtml)
 const wk_unsavedHtml = () => `${esc(tr('Not saved'))} · <button type="button" class="linkbtn" data-wk="resave">${esc(tr('Try again'))}</button>`;
-function wk_unsaved(id) { WK.unsaved = id; const s = $('#wk-saved'); if (s) { clearTimeout(s._t); s.classList.add('wkunsaved'); s.innerHTML = wk_unsavedHtml(); } }
+function wk_unsaved(id) { WK.unsaved = id; const s = $('#wk-saved'); if (s) { s.classList.add('wkunsaved'); s.innerHTML = wk_unsavedHtml(); } }
 // true = settled (mine saved or theirs taken), false = mine could not be saved, null = closed without a choice (as before: theirs shown)
 async function wk_conflict(mine, theirs, patch) {
   let took = false;
