@@ -56,7 +56,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const rowAt = i => ev(`(() => { const r = [...document.querySelectorAll('#view .trow .tmain')][${i}].getBoundingClientRect(); return {x: r.left + 40, y: r.top + r.height / 2}; })()`);
 
     // ================= #1055 long press = select, the bar
+    // 2.1151.0 (#3835): the long press opens the task's menu with "Select" on top; a tap on it selects the row
     let p = await rowAt(1); await hold(p.x, p.y, 700); await sleep(500);
+    const lpm = await ev(`(() => { const r = document.querySelector('#pop:not(.hidden) [data-act="cm-select"]')?.getBoundingClientRect(); return r ? {x: r.left + r.width / 2, y: r.top + r.height / 2} : null; })()`);
+    check(!!lpm, '#3835: the long press opens the task menu with "Select"');
+    if (lpm) { await hold(lpm.x, lpm.y, 60); await sleep(500); }
     const s1 = await ev(`(() => { const b = document.querySelector('#mbar'), r = b.getBoundingClientRect(); return {m: S.multiMode, n: S.multi.size, pop: !!document.querySelector('#pop:not(.hidden) [role="menuitem"]'), in: r.left >= 0 && r.right <= innerWidth + .5, lab: [...b.querySelectorAll('.mbb .mbl')].map(x => x.textContent).join('|'), grips: document.querySelectorAll('#view .trow .tgrip').length, gh: Math.round(document.querySelector('#view .trow .tgrip')?.getBoundingClientRect().height || 0)}; })()`);
     check(s1.m && s1.n === 1 && !s1.pop && s1.in && s1.lab === 'Move|Date|Complete|More', '#1055: a long press selects the row, the bar Move | Date | Complete | More ' + JSON.stringify(s1));
     check(s1.grips >= 8 && s1.gh >= 44, '#1055: while selecting every row has a grip (44 px) ' + JSON.stringify(s1));

@@ -230,7 +230,10 @@ const TABS = `(() => { ${VIS}
       await pass('project', `#l/${L}`, `!!document.querySelector('#view .trow[data-id="${T}"]')`);
       const row = await ev(`(() => { const e = document.querySelector('#view .trow[data-id="${T}"] .ttl') || document.querySelector('#view .trow[data-id="${T}"]'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
       await drag(row.x, row.y, 0, 0, 'touch', 650);
-      check(await until(`S.multiMode && S.multi.has(${T}) && !!document.querySelector('#mbar:not(.hidden)')`, {timeout: 5000}), tag('long press') + ': a long press on the task starts the selection with it');
+      // 2.1151.0 (#3835): the long press opens the task's menu, "Select" on top; that one starts the selection
+      check(await until(`!!document.querySelector('#pop:not(.hidden) [data-act="cm-select"]') && !S.multiMode`, {timeout: 5000}), tag('long press') + ': a long press on the task opens its menu with "Select"');
+      await tap('#pop:not(.hidden) [data-act="cm-select"]');
+      check(await until(`S.multiMode && S.multi.has(${T}) && !!document.querySelector('#mbar:not(.hidden)')`, {timeout: 5000}), tag('long press') + ': "Select" of that menu starts the selection with it');
       if (W < 768) {
         const r = await tap('#mbar [data-act="mb-menu"]');
         const m = r.ok && await until(`(${MENU})`, {timeout: 5000});

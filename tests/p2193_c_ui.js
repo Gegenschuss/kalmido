@@ -70,12 +70,13 @@ window.__secs = lid => secIds(lid).map(i => S.sections.find(s => s.id === i).nam
       await __sl(350); out.ghost = __ghosts(); out.move = !!document.querySelector('#tdmove');
       out.prev = __tev('touchmove', el, p.x, p.y + 2).defaultPrevented;
       __tev('touchend', el, p.x, p.y + 2); await __sl(300);
-      out.after = __ghosts(); out.multi = !!S.multiMode && S.multi.has(id);
-      S.multiMode = false; S.multi.clear(); render(); await __sl(300);
+      out.after = __ghosts(); out.menu = !!document.querySelector('#pop:not(.hidden) [data-act="cm-select"]') && !S.multiMode;
+      closePop(); S.multiMode = false; S.multi.clear(); render(); await __sl(300);
       return out; })()`);
     check(a.early === 0 && a.ghost >= 11 && a.move, `${tag}: no ghost during the hold, after it the row lifts (ghost, "Move to project") ` + JSON.stringify(a));
     check(a.prev, `${tag}: after the hold a touchmove below the threshold is the drag's (the page does not scroll) ` + JSON.stringify(a));
-    check(a.after === 0 && a.multi, `${tag}: held and let go without moving = the task is selected, no ghost left ` + JSON.stringify(a));
+    // 2.1151.0 (#3835): let go unmoved = the task's menu with "Select" on top (was: the task is selected)
+    check(a.after === 0 && a.menu, `${tag}: held and let go without moving = the task's menu with "Select", no ghost left ` + JSON.stringify(a));
 
     // 2) a move during the hold: a swipe, no drag
     const b = await ev(`(async () => { const id = ${T[2]}, el = __row(id), p = __at(el), out = {}, row = el.closest('.trow');
