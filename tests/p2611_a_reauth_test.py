@@ -120,9 +120,10 @@ age(stepup_at=now_iso(60).replace("+00:00", "Z"))
 r = reopen()
 check(r.ok and kinds_off() == [], f"#6028: a real step-up as TEXT with Z a minute ago -> goes {r.status_code} {r.text[:160]}")
 close()
-# 20 minutes ago written in +02:00: the text "12:30+02:00" sorts after "10:40+00:00", the moment is too old
+# 20 minutes ago written in +02:00: the text "12:30+02:00" sorts after "10:40+00:00", the moment is too old (a guard: ts_canon
+# already turned the zone before, fresh_within must keep that)
 age(stepup_at=time.strftime("%Y-%m-%dT%H:%M:%S+02:00", time.gmtime(time.time() - 20 * 60 + 2 * 3600)))
-check(reopen().status_code == 403, "#6028: another zone is read as its moment (the text compare took it as fresh)")
+check(reopen().status_code == 403, "#6028: another zone is read as its moment, 20 minutes ago is too old")
 age(created=now_iso(30), via="password")
 assert reopen().ok
 
