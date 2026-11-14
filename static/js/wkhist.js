@@ -127,7 +127,9 @@ function wks_snip(text, q) {
 const wks_frag = t => String(t).replace(/\[\[|\]\]|\*\*|__|~~|`/g, '');
 function wks_snipHtml(p, q) {
   const h = p.snippet ? p : typeof p.body === 'string' && p.body ? wks_snip(p.body, q) : null; if (!h?.snippet) return '';
-  const cs = Array.from(h.snippet), segs = []; let at = 0;
+  const cs = Array.from(h.snippet); let at = 0;
+  /** @type {Array<[string, number]>} */
+  const segs = [];
   for (const [a, b] of h.marks || []) { if (a < at) continue; segs.push([cs.slice(at, a).join(''), 0], [cs.slice(a, b).join(''), 1]); at = b; }
   segs.push([cs.slice(at).join(''), 0]);
   const ti = p.path ? wk_base(p.path).toLowerCase() : '';
