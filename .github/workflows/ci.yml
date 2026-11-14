@@ -12,7 +12,8 @@ on:
   # #4006 (GitHub step 3 of 6, decision 29.10.2026): an entry of the merge queue runs the push stage like a pull request
   # (tests/stages.py: against the queue's base commit); the release commit (VERSION changed) still gets the full run there.
   # The job "pr-lint" checks the commits of a pull request / queue entry. The concurrency group hangs on github.ref: every
-  # queue entry has its own gh-readonly-queue/... ref, so entries never cancel each other.
+  # queue entry has its own gh-readonly-queue/... ref, so entries never cancel each other; #6050: an entry whose group GitHub
+  # discarded (ref deleted) cancels its own run in the first step of its test shards.
   # #5787 (decision 12.11.2026, "only hard suites hold build and live"): a queue entry runs its own lean stage "queue" = the
   # hard suites (tests/hard_suites.txt) + the suites it touches, beside Lint, PR lint and semgrep; the required check is the job
   # "Merge queue gate" (green when those are green and no HARD suite is red - a soft red suite holds nothing, it is a task like
@@ -592,13 +593,48 @@ jobs:
     # CI red v2.560.0 (job/2867): the first full run with 20 fixed shards had 7 hard shards (~9 min) and 13 others - all 13 hit
     # the 60 min limit ("exceeded the maximum execution time"), their suites never finished. The other suites need ~900 shard
     # minutes (CI v2.551.0: 28 shards, 914 min) = ~70 min each on 13 shards; 90 leaves room, the plan stays at 20 (#4388)
+    # #6050: actions: write only for the first step below (cancel the own run of a discarded queue entry); the checkout keeps
+    # no token in .git/config (persist-credentials: false), so the suites never see it (the repository is public, a fetch
+    # needs no token)
+    permissions:
+      contents: read
+      actions: write
     strategy:
       fail-fast: false
       # #4557: [{shard, hart}] in shard order - the hard shards 1..H first, so they are queued before the others
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
+      # #6050 (decision 13.11.2026): a queue entry whose group GitHub discarded (its gh-readonly-queue/... ref is deleted, e.g.
+      # after a push of the live train on main) cancels its own run instead of holding runners: the concurrency group hangs on
+      # github.ref and every group has its own ref, so nothing else cancels it (13.11. 19:43: the old group pr-16 ran on while
+      # the new one waited, 4 runs active, 6 queued). Only a clear 404 for a gh-readonly-queue ref cancels; any other answer
+      # (network, rate limit) lets the shard run. Runs on main, tags, hotfix and nightly never get here (the step's if + the
+      # ref prefix). Before the checkout: the checkout of a deleted ref would fail only after its retries.
+      - name: Queue entry still in the queue (#6050)
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          QUEUE_REF: ${{ github.ref }}
+        run: |
+          case "$EVENT:$QUEUE_REF" in
+            merge_group:refs/heads/gh-readonly-queue/*) ;;
+            *) echo "not a merge queue entry ($EVENT $QUEUE_REF) - nothing to check"; exit 0 ;;
+          esac
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/ref/${QUEUE_REF#refs/}") || code=000
+          if [ "$code" != 404 ]; then
+            echo "queue ref $QUEUE_REF: HTTP $code - the entry runs"
+            exit 0
+          fi
+          echo "::warning title=queue entry discarded::$QUEUE_REF is gone (GitHub discarded the queue group) - cancelling run $GITHUB_RUN_ID"
+          gh run cancel "$GITHUB_RUN_ID" -R "$GITHUB_REPOSITORY" || echo "::warning::cancel failed - this shard stops anyway"
+          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false  # #6050: the job token may cancel runs - not for the suites
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
