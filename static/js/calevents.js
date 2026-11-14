@@ -317,7 +317,9 @@ async function evEditor(o = {}) {
   if (!cals.some(c => c.id === st.cal_id) && !dvw_cals(o).some(c => c.id === st.cal_id)) st.cal_id = cals[0].id;  // 2.52.0 (#1128): or a writable subscription
   if (!st.end) st.end = st.all_day ? addDays(st.start.slice(0, 10), 1) : evAddMin(st.start, 60);
   const single = evOccOwn(ev, o.occ);  // 2.484.0 (#3945): a changed date of a series: edited like a single event
-  let scope = o.occ ? (single ? 'one' : 'all') : null;
+  // 2.1167.0 (#6153): a date opened from a series changes only that date unless "All dates" is chosen on purpose (o.scope: the
+  // editor opened again after a conflict / a failed save keeps the choice it had)
+  let scope = o.occ ? (single ? 'one' : o.scope || 'one') : null;
   if (o.occ && ev) {  // opened from one date of a repeating event: that date's times are the ones shown for "Only this date"
     const ov = (ev.overrides || []).find(x => x.rid === o.occ);
     st.occStart = ov?.start || o.occ;
@@ -331,14 +333,15 @@ async function evEditor(o = {}) {
   const ppl = new Map(people.map(u => [u.id, u.display_name]));
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
+  const vS = scope === 'one' && st.occStart ? st.occStart : st.start, vE = scope === 'one' && st.occEnd ? st.occEnd : st.end;  // 2.1167.0 (#6153): the times shown
   const repK = evRepKey(st.rrule, st.start);
   const md = modal(`<div class="lhdr"><h3>${ev || o.dvw ? tr('Edit event') : tr('New event')}</h3><span class="spacer"></span><button class="iconbtn" data-evm="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
-    ${o.occ && !single ? `<div class="row"><span class="rlab">${tr('Change')}</span><div class="seg" role="radiogroup" aria-label="${esc(tr('Change'))}"><button type="button" role="radio" data-evsc="one" aria-checked="false">${tr('Only this date')}</button><button type="button" role="radio" data-evsc="all" class="on" aria-checked="true">${tr('All dates')}</button></div></div>` : ''}
+    ${o.occ && !single ? `<div class="row"><span class="rlab">${tr('Change')}</span><div class="seg" role="radiogroup" aria-label="${esc(tr('Change'))}"><button type="button" role="radio" data-evsc="one" ${scope === 'one' ? 'class="on" aria-checked="true"' : 'aria-checked="false"'}>${tr('Only this date')}</button><button type="button" role="radio" data-evsc="all" ${scope === 'all' ? 'class="on" aria-checked="true"' : 'aria-checked="false"'}>${tr('All dates')}</button></div></div>` : ''}
     <div class="row"><label for="ev-title">${tr('Title')}</label><input id="ev-title" maxlength="500" value="${esc(st.title)}" autocomplete="off" enterkeyhint="done"></div>
     <div class="row"><label for="ev-cal">${tr('Calendar')}</label><select id="ev-cal" data-sheet-ico="cal">${o.dvw ? '' : cals.map(c => `<option value="${c.id}" ${c.id === st.cal_id ? 'selected' : ''}>${esc(c.name)}${c.role !== 'owner' ? ' · ' + esc(c.owner_name || '') : ''}</option>`).join('')}${dvw_options(o, st.cal_id)}</select></div>
     <div class="row"><label for="ev-allday">${tr('All day')}</label><label class="swc"><input type="checkbox" id="ev-allday" ${st.all_day ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('All day'))}</span></label></div>
-    <div class="row evdt"><span class="rlab">${tr('Starts')}</span>${dateIn('ev-sd', st.start.slice(0, 10), {label: tr('Start date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-stm', st.all_day ? '09:00' : st.start.slice(11, 16), {label: tr('Start time'), clear: false})}</span></div>
-    <div class="row evdt"><span class="rlab">${tr('Ends')}</span>${dateIn('ev-ed', endDay(st.end), {label: tr('End date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${timeIn('ev-etm', st.all_day ? '10:00' : st.end.slice(11, 16), {label: tr('End time'), clear: false})}</span></div>
+    <div class="row evdt"><span class="rlab">${tr('Starts')}</span>${/*html-ok*/ dateIn('ev-sd', vS.slice(0, 10), {label: tr('Start date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${/*html-ok*/ timeIn('ev-stm', st.all_day ? '09:00' : vS.slice(11, 16), {label: tr('Start time'), clear: false})}</span></div>
+    <div class="row evdt"><span class="rlab">${tr('Ends')}</span>${/*html-ok*/ dateIn('ev-ed', endDay(vE), {label: tr('End date'), clear: false})}<span class="evtm" ${st.all_day ? 'hidden' : ''}>${/*html-ok*/ timeIn('ev-etm', st.all_day ? '10:00' : vE.slice(11, 16), {label: tr('End time'), clear: false})}</span></div>
     <div class="row evrep"><label for="ev-rep">${tr('Repeat')}</label><select id="ev-rep" data-sheet-ico="repeat">${EV_REP.map(([k, n]) => `<option value="${k}" ${k === repK ? 'selected' : ''}>${tr(n)}</option>`).join('')}${repK === 'custom' ? `<option value="custom" selected>${esc(repeatLabelBase(rrBase(st.rrule)))}</option>` : ''}</select>
       <select id="ev-repend" aria-label="${esc(tr('Repeat ends'))}" title="${esc(tr('Repeat ends'))}" ${repK ? '' : 'hidden'}><option value="">${tr('forever')}</option><option value="until" ${rrEnd(st.rrule).type === 'until' ? 'selected' : ''}>${tr('until a date')}</option><option value="count" ${rrEnd(st.rrule).type === 'count' ? 'selected' : ''}>${tr('a number of times')}</option></select>
       <span id="ev-reu" ${rrEnd(st.rrule).type === 'until' ? '' : 'hidden'}>${dateIn('ev-until', rrEnd(st.rrule).type === 'until' ? rrEnd(st.rrule).val : '', {label: tr('until a date'), clear: false})}</span>
@@ -359,7 +362,7 @@ async function evEditor(o = {}) {
     <div class="foot">${ev && evWrite(evCal(ev.cal_id)) ? `<button class="btn danger" data-evm="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-evm="close">${tr('Cancel')}</button><button class="btn pri" data-evm="save">${tr('Save')}</button></div>`);
   md.classList.add('evmodal');
   // 2.484.0 (#3945): a changed date of a series shows the rows of "Only this date" (after dvw_rows, which shows them again)
-  const rows = () => { dvw_rows(md); if (single) $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = true; };
+  const rows = () => { dvw_rows(md); if (scope === 'one') $('.evrep', md).hidden = $('.evatts', md).hidden = $('.evrems', md).hidden = true; };  // 2.1167.0 (#6153): also the preset "Only this date"
   const val = id => $('#' + id, md)?.value || '';
   const drawRems = () => {
     const ad = $('#ev-allday', md).checked, opts = ad ? EV_REM_DAY.map(x => x[0]) : EV_REM_TIMED;
@@ -394,11 +397,18 @@ async function evEditor(o = {}) {
     if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
     return body;
   };
-  const srv = o.cf?.raw || ev, dlg = ev && !o.dvw && typeof saveDialog === 'function' ? {base: objBase(form(scope), o.cf?.mine)} : null;
+  // 2.1167.0 (#6153): a base per choice of the switch (the shown one read from the form, the other one with its own times), so
+  // switching sends neither the times the switch put in nor the series' fields "Only this date" did not show as typed
+  const bases = {[scope]: form(scope)};
+  if (o.occ && !single) {
+    const sc2 = scope === 'one' ? 'all' : 'one', s2 = sc2 === 'one' ? st.occStart : st.start, e2 = sc2 === 'one' ? st.occEnd : st.end;
+    bases[sc2] = {...form(sc2), ...(st.all_day ? {start: s2.slice(0, 10), end: e2.slice(0, 10)} : {start: s2.slice(0, 16), end: e2.slice(0, 16)})};
+  }
+  const srv = o.cf?.raw || ev, dlg = ev && !o.dvw && typeof saveDialog === 'function' ? {get base() { return objBase(bases[scope] || bases[Object.keys(bases)[0]], o.cf?.mine); }} : null;
   const evAgain = (raw, mine, cf, err = '') => {  // the editor again on the current event, what was typed over it (err: why, #5461)
     const m = {...mine}; delete m.send_invites;
     if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf, unsaved: true, err}); }
-    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf, unsaved: true, err});  // 2.846.0 (#5465): unsaved = closing asks
+    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, scope, cf, unsaved: true, err});  // 2.846.0 (#5465): unsaved = closing asks
   };
   if (dlg) {  // lazy-ok-begin: dlg exists only once objsave.js is loaded (typeof saveDialog above, evEditor loads the module)
     const view = () => scope === 'one' ? (x => evOccView(x, o.occ)) : undefined, opened = () => scope === 'one' ? evOccView(srv, o.occ) : srv;
@@ -499,7 +509,7 @@ async function evEditor(o = {}) {
         // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
         const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
         evEditor(!ev ? {...o, ...body, attendees: atts, unsaved: true, err: why} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, unsaved: true, err: why}
-          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ, unsaved: true, err: why});
+          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ, scope, unsaved: true, err: why});
         return;
       }
       if (!ev && j?.id) {  // clickable before the range / the state come again
@@ -507,7 +517,11 @@ async function evEditor(o = {}) {
         for (const a of Object.values(S.evlinks || {})) for (const x of a) if (x.id === put.tmp) x.id = j.id;
       }
       calInvalidate(); render();
-      toast(ev ? tr('Event saved') : tr('Event created'));
+      // 2.1167.0 (#6153): saving a changed event offers Undo like dragging and deleting: the server's step of the PATCH (obj_undo,
+      // events/evundo.py: the row as it was - the series' old fields, or "Only this date" without its new own change; histAdd takes
+      // the group of the answer, j._ugid)
+      if (ev && j?._ugid > 0) offerUndo(tr('Event saved'), histAdd({label: body.title || ev.title || tr('(no title)'), res: j, post: () => { calInvalidate(); renderView(); }}));  // no group: nothing was written
+      else toast(ev ? tr('Event saved') : tr('Event created'));
     }
   });
   // 2.846.0 (#5465): Esc, X, Cancel and a click next to the dialog ask before typed input is lost (like fgModal: modalGuard);
