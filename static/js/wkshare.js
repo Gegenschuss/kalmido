@@ -73,7 +73,7 @@ function wsh_dlg(p, folder) {
 // "Links and earlier shares" of the one Share dialog (legacy: no new person share there, people come through the dialog)
 function wsh_fill(md, tgt, sp, folder, legacy) {
   const q = tgt.page_id ? `page=${tgt.page_id}` : `space=${encodeURIComponent(sp)}&folder=${encodeURIComponent(tgt.folder)}`;
-  md.innerHTML = `${legacy ? `<h4 class="wshleg">${ic('link', 's')} ${tr('Links and earlier shares')}</h4>` : ''}<div class="wsh-body"><div class="muted mhint">${tr('Loading…')}</div></div><div class="calerr" role="alert" data-wsh-err hidden></div>`;
+  md.innerHTML = `${legacy ? `<h4 class="wshleg">${ic('link', 's')} ${tr('Links and earlier shares')}</h4>` : ''}<div class="wsh-body">${/*html-ok*/ loadingHtml('sec')}</div><div class="calerr" role="alert" data-wsh-err hidden></div>`;
   /** @type {any} */ let j = null;
   /** @type {any[]|null} */ let users = null;
   const show = m => { const x = wsh$('[data-wsh-err]', md); if (x) { x.textContent = m || ''; x.hidden = !m; } };
@@ -87,7 +87,7 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
     if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This workspace is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
     const ppl = j.shares.filter(s => s.kind === 'person'), links = j.shares.filter(s => s.kind === 'link');
     const cand = legacy ? [] : (users || []).filter(u => !ppl.some(s => s.direct && s.user?.id === u.id));  // 2.200.0 B (#2747): people are chosen above, by e-mail address here
-    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read-only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>
+    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read-only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : emptyState({icon: 'users', title: tr('Not shared with anyone yet.'), size: 'row'})}</div>
       <div class="row shmail">${cand.length ? `<select id="wsh-user" aria-label="${esc(tr('Person'))}"><option value="">${tr('Select a person…')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name || u.username || '?')}</option>`).join('')}</select>` : ''}<input id="wsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-wsh="person">${ic('plus', 's')} ${tr('Add')}</button></div>`
       : legacy ? '' : `<div class="shint keep">${esc(tr('Every member of the organisation reads these pages already. For people outside it, use a public link.'))}</div>`;
     const pub = !j.enabled ? `<div class="shint keep">${esc(tr('Public links are switched off on this server'))}</div>`
@@ -102,7 +102,7 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
     box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read-only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4>${aiph}<div id="wsh-pub">${pub}</div>` + imgRow;
   };
   const load = async () => {
-    try { j = await calReq('GET', '/api/wiki/shares?' + q); } catch (x) { const b = wsh$('.wsh-body', md); if (b) b.innerHTML = `<div class="muted mhint">${esc(x.status === 404 ? tr('No links yet: a public link can be made once the folder holds a page.') : x.message)}</div>`; return; }
+    try { j = await calReq('GET', '/api/wiki/shares?' + q); } catch (x) { const b = wsh$('.wsh-body', md); if (b) b.innerHTML = x.status === 404 ? `<div class="muted mhint">${esc(tr('No links yet: a public link can be made once the folder holds a page.'))}</div>` : errorState({title: errText(x, tr('The shares could not be loaded')), size: 'sec', retry: () => { b.innerHTML = loadingHtml('sec'); load(); }}); return; }  // 2.1167.0 (#6088)
     if (j.person && !legacy && users === null) { users = []; try { users = (await api('GET', '/api/users')).users.filter(u => !u.disabled && !u.agent && u.id !== S.me?.id); } catch { /* offline: by e-mail address */ } }
     draw();
   };

@@ -315,3 +315,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
   .wkcm .cm-wkcb input{width:1.25rem;height:1.25rem;vertical-align:-.25em}
   .wkrow .wkmore,.wkfiles .iconbtn,.wkday .iconbtn,.wkhhead .iconbtn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
 }
+/* 2.1167.0 (#6088): a save that failed stays in the footer until a save works (wiki.js wk_unsaved) */
+#wk-saved.wkunsaved{color:var(--danger);font-weight:600}
+#wk-saved.wkunsaved .linkbtn{font-weight:400}
+@media (pointer:coarse){#wk-saved.wkunsaved .linkbtn{min-height:2.75rem}}
