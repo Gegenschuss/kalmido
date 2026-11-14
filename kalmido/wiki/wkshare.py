@@ -263,6 +263,12 @@ def wsh_rows(c, oid, owner, live=True):
     return list(links) + (wsh_people(c, owner, live) if not oid and owner else [])
 
 
+def wsh_live_rows(c, oid, owner):
+    """2.1138.0 (#6026): the live shares of a space as its mark, its counter and WSH_MAX see them -- wsh_rows and the open
+    shares by address of a private space that have not run out (an address without an account counts like one with)."""
+    return wsh_rows(c, oid, owner) + _wsh_open_live(c, oid, owner)
+
+
 def wsh_covers(r, path, pid=None):
     p, s = path.lower(), r["path"].lower()
     if p == s and not r["is_folder"] and pid is not None and r["page_id"] is not None:  # 2.360.0 D (#2496): WSH_COVER
@@ -274,7 +280,7 @@ def wsh_mark(c, oid, uid, pages):
     """GET /api/wiki: pages a live share covers get shared: 1 (the mark in the tree)."""
     if not pages:
         return
-    rows = wsh_rows(c, oid, uid)
+    rows = wsh_live_rows(c, oid, uid)  # 2.1138.0 (#6026): + the open shares by address
     if not rows:
         return
     for d in pages:
@@ -286,7 +292,7 @@ def wsh_count(c, r):
     """GET /api/wiki/pages/<id>: the number of live shares that cover the page (its mark)."""
     if r["path"].startswith("e2e1:"):
         return 0
-    return sum(1 for s in wsh_rows(c, r["org_id"], r["owner_id"]) if wsh_covers(s, r["path"], r["id"]))
+    return sum(1 for s in wsh_live_rows(c, r["org_id"], r["owner_id"]) if wsh_covers(s, r["path"], r["id"]))  # 2.1138.0 (#6026)
 
 
 def wsh_repath(c, oid, owner, old, new, folder):
@@ -641,7 +647,7 @@ def wsh_create():
         return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     exp = wsh_expiry(b.get("expires"))
     imgs = wsh_images(b.get("images", False))
-    if len(wsh_rows(c, oid, owner)) >= WSH_MAX:
+    if len(wsh_live_rows(c, oid, owner)) >= WSH_MAX:  # 2.1138.0 (#6026): the open shares by address count too
         raise BadInput(tr("Too many shares in this workspace (at most {0})", WSH_MAX))
     ts = iso(now_utc())
     page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
@@ -763,6 +769,19 @@ def _wsh_open(c, owner, path, folder, pid):
             e["direct"] = e["path"].lower() == path.lower() and e["is_folder"] == bool(folder)
         out.append(_wsh_open_out(e))
     return out
+
+
+def _wsh_open_live(c, oid, owner):
+    """2.1138.0 (#6026): the open shares by address of owner's private space that have not run out, as entries with path /
+    is_folder / page_id (wsh_covers); [] for an organisation's space (it has none)."""
+    if oid or not owner:
+        return []
+    rows = c.execute("SELECT * FROM obj_addr_shares WHERE kind='wiki' AND owner_id=? ORDER BY id LIMIT 500", (owner,)).fetchall()
+    if not rows:
+        return []
+    page_paths = _wsh_page_paths(c, owner, rows)
+    out = [_wsh_open_entry(c, x, page_paths, {}) for x in rows]
+    return [e for e in out if e is not None and not e["expired"]]
 
 
 def _wsh_open_need(c, n):

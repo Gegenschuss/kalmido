@@ -47,6 +47,7 @@ KINDS = {
                          "p2429_a_ablage_view_test.py: only the file store's own folders, the collections \"From <area>\" of the private workspace (2.429.0)"),
     "wiki": ("matrix", SUITE + ", p299_a_api_test.py: knowledge pages in the private workspace (create, change, search, export, trash; "
                        "2.99.0: page files, ZIP import with PDFs / pictures; 2.123.0: p2123_b_api_test.py shares of pages / folders, p2123_a_api_test.py page history, text search; 2.143.0: p2143_b_api_test.py the trash, delete for good, empty; "
+                       "2.1138.0: p6025_a_api_test.py shares by address hide whether the address has an account (mark, counter, file store, limits); "
                        "2.177.0: p2177_a_api_test.py the large ZIP import in pieces into the private workspace; "
                        "2.200.0: p2200_c_wiki_agent_test.py her own agent on pages / folders she shared with it, API v1; "
                        "2.488.0: p2488_wiki_files_v1_test.py her agent reads the files of her shared pages; "
