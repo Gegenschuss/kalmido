@@ -1366,7 +1366,9 @@ function cmCopyMenu(a, anchor = a) {  // 2.571.0 (#4608): also by a long press /
   const m = (S.tl?.comments || []).find(x => x.id === +a.dataset.cid); if (!m) return false;
   menu(anchor, [{label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment')},
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment', true)},
-    ...(anchor.closest('.cm') ? [rxMenuItem(anchor.closest('.cm'))] : [])]);
+    ...(anchor.closest('.cm') ? [rxMenuItem(anchor.closest('.cm'))] : []),
+    // 2.1151.0 B (#3835): the phone's comment has no symbols (start-comments.css): its long press menu holds Reply, Save as task, Edit, Delete
+    ...(isMobile() && anchor.closest('.cm') ? (b => b.length ? ['-', ...b] : [])(ms_btnItems(anchor.closest('.cm'), '.cacts .iconbtn:not([data-act="cm-copy"])')) : [])]);
   return true;
 }
 document.addEventListener('click', e => {
