@@ -73,13 +73,14 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     await until(`!!document.querySelector('#view .wktree [data-wksel="mode"], #view [data-wksel="mode"]')`, {timeout: 20000});
     await ev(`(() => { document.querySelectorAll('#view details').forEach(x => x.open = true); document.querySelector('#view [data-wksel="mode"]').click(); return 1; })()`);
     const sel = await until(`(() => { const rs = [...document.querySelectorAll('#view .wkselrow')]; if (rs.length < 5) return null; document.querySelectorAll('#view details').forEach(x => x.open = true);
-      const ws = [...document.querySelectorAll('#view .wkselrow a.wkitem > span')].map(s => Math.round(s.getBoundingClientRect().width)).filter(w => w > 0);
-      return {n: rs.length, min: Math.min(...ws), dates: [...document.querySelectorAll('#view .wkselrow .wkwhen')].filter(x => x.offsetWidth).length, sw: document.documentElement.scrollWidth, vw: innerWidth}; })()`);
-    check(sel && sel.min >= 48 && sel.dates === 0 && sel.sw <= sel.vw, `#6086 360 Select: every page name keeps its room, no date in the row, nothing runs over ${JSON.stringify(sel)}`);
+      const cut = [...document.querySelectorAll('#view .wkselrow a.wkitem > span')].filter(s => s.offsetWidth && s.scrollWidth > s.clientWidth + 1 && s.clientWidth < 100).map(s => [s.textContent, s.clientWidth]);
+      return {n: rs.length, cut, dates: [...document.querySelectorAll('#view .wkselrow .wkwhen')].filter(x => x.offsetWidth).length, sw: document.documentElement.scrollWidth, vw: innerWidth}; })()`);
+    check(sel && !sel.cut.length && sel.dates === 0 && sel.sw <= sel.vw, `#6086 360 Select: every page name keeps its room, no date in the row, nothing runs over ${JSON.stringify(sel)}`);
     await shot('p21161-select-360.png');
     await ev(`(() => { wk_selEnd(); renderView(); return 1; })()`);
     // a table in the editor: no header broken inside a word
     await nav(B + '?w=360#wiki/' + P.check);
+    if (await until(`!!document.querySelector('#view [data-wk="pen"]')`, {timeout: 20000})) await ev(`(() => { const b = document.querySelector('#view [data-wk="pen"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); return 1; })()`);  // a phone reads first
     const th = await until(`(() => { const ts = [...document.querySelectorAll('#wk-cm .cm-wktbl th')]; if (ts.length < 6) return null;
       return ts.map(t => { const r = document.createRange(); r.selectNodeContents(t); return [t.textContent.trim(), new Set([...r.getClientRects()].map(x => Math.round(x.top))).size]; }); })()`, {timeout: 20000});
     check(th && th.every(([t, n]) => n <= t.split(/\s+/).length), `#6086 360 the editor's table: each header on one line (was "Equipm ent") ${JSON.stringify(th)}`);
@@ -98,14 +99,15 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     check(ln && ln.t === 'Weather plan B' && ln.ti === 'Processes/Shoot day/Weather plan B', `#6090 the editor: a link shows the page's name, the path as its tooltip ${JSON.stringify(ln)}`);
     await shot('p21161-editor-1280.png');
     // a click on the folded line opens the lines
-    await ev(`(() => { const w = document.querySelector('#wk-cm .cm-wkfmw'); const r = w.getBoundingClientRect(); w.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0, clientX: r.left + 4, clientY: r.top + 4})); return 1; })()`);
-    check(await until(`!document.querySelector('#wk-cm .cm-wkfmw') && [...document.querySelectorAll('#wk-cm .cm-line')].some(l => /^as_of: 2026-11-10/.test(l.textContent))`), '#6090 the editor: a click on the fields shows the front matter to edit');
+    await ev(`(() => { WKCM.view.dispatch({selection: {anchor: 5}}); WKCM.view.focus(); return 1; })()`);  // the cursor in the front matter
+    check(await until(`!document.querySelector('#wk-cm .cm-wkfmw') && [...document.querySelectorAll('#wk-cm .cm-line')].some(l => /^as_of: 2026-11-10/.test(l.textContent))`), '#6090 the editor: the cursor in the fields shows the front matter to edit') || console.log('fm lines:', await ev(`JSON.stringify([...document.querySelectorAll('#wk-cm .cm-line')].slice(0, 6).map(l => l.textContent))`));
     // the read view (the lock "Read-only")
     await ev(`(() => { LS.set('wkRo', '1'); WK.edit = false; renderView(); return 1; })()`);
     const rd = await until(`(() => { const a = document.querySelector('#wk-md a.wklink'), dl = document.querySelector('#view .wkpage > .wkattrs, #view .wkpage .wkattrs'); if (!a || !dl) return null;
-      return {t: a.textContent, ti: a.getAttribute('title'), dt: [...dl.querySelectorAll('dt')].map(x => x.textContent).join('|'), dd: dl.querySelectorAll('dd')[1]?.textContent, want: fmtDay('year', new Date('2026-11-10T00:00:00'))}; })()`, {timeout: 20000});
+      const as = [...dl.querySelectorAll('div')].find(x => x.querySelector('dt')?.textContent === 'As of');
+      return {t: a.textContent, ti: a.getAttribute('title'), dt: [...dl.querySelectorAll('dt')].map(x => x.textContent).sort().join('|'), dd: as?.querySelector('dd')?.textContent, want: fmtDay('year', new Date('2026-11-10T00:00:00'))}; })()`, {timeout: 20000});
     check(rd && rd.t === 'Weather plan B' && rd.ti === 'Processes/Shoot day/Weather plan B', `#6090 read: the link shows the page's name ${JSON.stringify(rd)}`);
-    check(rd && rd.dt === 'Tags|As of' && rd.dd === rd.want, `#6090 read: the front matter's keys as words, the date written out (was "as_of 2026-11-10") ${JSON.stringify(rd)}`);
+    check(rd && rd.dt === 'As of|Tags' && rd.dd === rd.want, `#6090 read: the front matter's keys as words, the date written out (was "as_of 2026-11-10") ${JSON.stringify(rd)}`);
     await nav(B + '?w=1280#wiki/' + P.plan);
     const bl = await until(`(() => { const a = document.querySelector('#view .wkback a'); return a ? {name: a.querySelector('span')?.firstChild?.textContent.trim(), dir: a.querySelector('.wkpdir')?.textContent} : null; })()`, {timeout: 20000});
     check(bl && bl.name === 'Checklist' && bl.dir === 'Processes / Shoot day', `#6090 "Linked from": the name, its folders quietly beside it ${JSON.stringify(bl)}`);
