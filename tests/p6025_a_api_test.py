@@ -155,6 +155,16 @@ check(r.status_code == 201 and r.json()["user"].get("id") == UID and not r.json(
       f"#6062 F2: the share by name answers with her name, not the address {r.status_code} {r.text[:200]}")
 check(sorted(bool(s["user"].get("by_email")) for s in people(P2)) == [False, True],
       f"#6062 F2: two entries (by address and by name), as for an open address {[s['user'] for s in people(P2)]}")
+# Fable review 2.1145 F1: the address typed again while both live changes its entry, never a third (open) one
+check(share_mail(P2, "uma@example.com").ok and len(people(P2)) == 2, f"#6062 F1: typed again, still two entries {[s['user'] for s in people(P2)]}")
+# ... and by name + an open entry (M2), the share by name ends, the address typed again: one entry, as for any address
+PC = page("Open then bound")
+check(F.post(B + "/api/wiki/shares", json={"page_id": PC, "kind": "person", "user_id": UID}).status_code == 201, "(setup) uma by name")
+check(share_mail(PC, "uma@example.com").ok and len(people(PC)) == 2, "(setup) the address beside it (open, M2)")
+check(F.delete(B + f"/api/wiki/shares/{next(s for s in people(PC) if not s['user'].get('by_email'))['id']}").ok, "(setup) the share by name ends")
+check(share_mail(PC, "uma@example.com").ok and [s["user"]["name"] for s in people(PC) if not s.get("revoked")] == ["uma@example.com"]
+      and not dbx("SELECT 1 FROM obj_addr_shares WHERE kind='wiki' AND ref_id=?", (PC,)),
+      f"#6062 F1: one entry for the address (the open row went when it found the account) {[s['user'] for s in people(PC)]}")
 # F3: the Undo of the share by address after the share by name (it answered 409: the address is that account)
 P3 = page("Undo after name")
 check(share_mail(P3, "uma@example.com").ok, "(setup) uma by address")
@@ -193,11 +203,18 @@ P9 = page("Not blocked")
 check(share_mail(P9, "nobody9@example.com").ok and [s["user"]["name"] for s in people(P9)] == ["nobody9@example.com"],
       f"#6062 F9: another sharer's rows of the address do not block it {[s['user'] for s in people(P9)]}")
 dbx("DELETE FROM obj_addr_shares WHERE path LIKE 'zz6062/%'")
-# F11: lines written before 2.1138 that name the account of a share by address are left out, others stay
+# F11: lines written before 2.1138 that name the account of a share by address go once at the start (one-shot
+# migr_addrlog6062), others stay; a share by name made afterwards keeps its line (Fable review 2.1145 F2: no read-time filter)
 fid = dbx("SELECT id FROM fs_shares WHERE node_id=? AND user_id=?", (NB, UID))[0][0]
-for act, det in (("share", f"user:{UID}:view"), ("unshare", str(fid)), ("share", f"user:{VID}:view")):
+for act, det in (("share", f"user:{UID}:view"), ("unshare", str(fid)), ("share_change", f"{fid}:edit"), ("share", f"user:{VID}:view")):
     dbx("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,0,?,?,?)", (NB, FID, act, det, "2026-11-01T10:00:00Z"))
-check([x["detail"] for x in shares_log(NB)] == [f"user:{VID}:view"],
-      f"#6062 F11: old lines with uma's account are left out, the line by name stays {shares_log(NB)}")
+dbx("DELETE FROM settings WHERE key='migr_addrlog6062'")
+if fresh(env={"KALMIDO_API_RATE": "5000"}, prefix="P6025A", keep=True):
+    F = sess("frida")
+    check([x["detail"] for x in shares_log(NB)] == [f"user:{VID}:view"],
+          f"#6062 F11: the old lines with uma's account went at the start, the other line stays {shares_log(NB)}")
+    r = F.post(B + "/api/wiki/shares", json={"page_id": PB, "kind": "person", "user_id": UID})
+    check(r.status_code == 201 and f"user:{UID}:view" in [x["detail"] for x in shares_log(NB)],
+          f"#6062 F11: a share by name made now keeps its history line (as for any account) {r.status_code} {shares_log(NB)}")
 
 sys.exit(done("p6025_a_api"))
