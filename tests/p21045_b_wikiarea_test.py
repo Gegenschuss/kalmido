@@ -2,7 +2,7 @@
 # kalmido-suite: fresh
 """2.1045.0 B (#5823): a whole knowledge area shared with an agent at once + single folders excluded. Invented names only.
  - the share is the file store's (POST /api/files/nodes/<root "Knowledge">/shares): the root takes agent shares only (a
-   person 409), the private area only the person's own agent (an organisation's agent, another person's agent 409), an
+   person 409; 2.1160.0 #5862: a private area's root also people, p21160_wikiarea_person_test.py), the private area only the person's own agent (an organisation's agent, another person's agent 409), an
    encrypted area 409
  - the agent lists every page (paths from "Knowledge" on), reads and changes one, sees a page made later in a new folder
  - exclusion = the agent's data lock wiki_folders (PATCH /api/agents/<id>/data-lock): the folder and everything below it is
@@ -96,9 +96,9 @@ check(area(F)["may"] is True and area(F)["shares"] == [] and area(F)["pages"] ==
 
 r = F.get(B + f"/api/files/nodes/{ROOT}/share-targets")
 t = r.json()
-check(r.ok and [x["id"] for x in t["agents"]] == [DA] and t["people"] == [] and t["groups"] == [],
+# 2.1160.0 (#5862): a private area's root offers people too (p21160_wikiarea_person_test.py); still only her own agent, no group
+check(r.ok and [x["id"] for x in t["agents"]] == [DA] and t["groups"] == [],
       f"the root offers only her own agent: {t}")
-check(F.post(B + f"/api/files/nodes/{ROOT}/shares", json={"user_id": OID, "role": "view"}).status_code == 409, "a person: 409")
 check(F.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": TA, "role": "view"}).status_code == 409,
       "an organisation's agent never gets the private area (409)")
 check(F.post(B + f"/api/files/nodes/{ROOT}/shares", json={"agent_id": OA, "role": "view"}).status_code == 409,

@@ -251,6 +251,13 @@ folder and page of the area, also the ones added later; the agent's paths start 
 private space your own personal agent, in an organisation its agents; people keep getting single folders or pages. An
 area encrypted in the browser cannot be shared (a sentence instead of the dialog).
 
+**With a person (2.1160.0, #5862).** Your *private* area can also go to one person (the people you may share with, no
+groups), *Can view* or *Can edit*, with the same question before and the same exclusions below their name (*Who sees
+the whole knowledge area*). The person finds it under *Shared with me* as the folder "Knowledge" with your name; with
+*Can edit* they add pages and folders there, also at the top (the pages are yours). An organisation's area stays with
+its agents: guests and the accounting person never get the whole area, members read it anyway. A person's exclusions
+belong to their share (`PATCH /api/files/shares/<id>` `{"excluded": [folder ids]}`); ending the share ends them too.
+
 Single folders can be kept out for one agent: in the dialog below the agent *Excluded:* with *Exclude folders…*
 (several at once), or in a folder's menu *Exclude from the area share* / *Include again*. The folder then shows
 "not for <agent>". An excluded folder with everything in it -- also pages added later -- does not exist for that agent
@@ -258,7 +265,7 @@ Single folders can be kept out for one agent: in the dialog below the agent *Exc
 that you share with the agent on its own stays visible. Folders and pages below a whole-area share show
 "shared via: whole knowledge area" in their Share dialog. The exclusions are part of the agent's data lock
 (see [AGENTS.md](AGENTS.md#data-the-agent-never-sees)); only who may change the agent sets them.
-Route of the dialog's facts: `GET /api/wiki/area-share?space=private|org:<id>[&agent_id=]`.
+Route of the dialog's facts: `GET /api/wiki/area-share?space=private|org:<id>[&agent_id= | &user_id=]`.
 
 ## Sharing a page or a folder, read only
 

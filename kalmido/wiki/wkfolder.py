@@ -67,7 +67,8 @@ Interface (signatures fixed; parts B / C use them):
   Who manages the shares of a knowledge folder / page: who may write in its space (as the wiki_shares), besides the file
   store's owners (fs_area_rule share hook); a locked space shares nothing (409), its old nodes give nothing (above).
 2.1045.0 (#5823), a whole area at once: the root "Knowledge" itself may carry agent shares (fs_area_rule root_share; people,
-  groups and organisation access stay refused there, 409) -- _share_starts reads them for agents like a folder share, so every
+  groups and organisation access stay refused there, 409; 2.1160.0 #5862: a private area's root also person shares, _root_share,
+  with their own excluded folders in fs_shares.excl, _root_excl -- core/dlock.py dl_wiki_folders reads them like an agent's) -- _share_starts reads them for agents like a folder share, so every
   page below it counts, also later ones; the paths start at "Knowledge". Such pages are not cut by WKF_SHARED_MAX (the
   tree is read whole, at most WKF_TREE_MAX nodes); wkf_visible_sql then passes the ids as one array constant. The agent's
   excluded folders (data_lock wiki_folders, core/dlock.py dl_chain_cut) are left out of every share above them (_cut_below);
@@ -80,7 +81,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.access import Denied, acx_of, collab_all
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
-from ..core.dlock import dl_wiki_folders  # 2.1045.0 (#5823)
+from ..core.dlock import DL_WIKI_MAX, dl_wiki_folders  # 2.1045.0 (#5823); 2.1160.0 (#5862): DL_WIKI_MAX
 from ..core.errors import BadInput
 from ..core.i18n import N_, lang, tr
 from ..core.pg import IntegrityError, like_escape, system_ctx, write_lock
@@ -611,8 +612,36 @@ def _share(c, uid, n, strict):
     return owner == uid
 
 
+def _root_share(c, root):
+    """2.1160.0 (#5862): who may get the share of a whole knowledge area (its root): a private area also a person (one the
+    owner may share with: files/web.py _share_targets), an organisation's area its agents only -- guests and the accounting
+    person never get the whole area, members read it anyway (org_open)."""
+    return ("agent_id",) if root["org_id"] else ("agent_id", "user_id")
+
+
+def _root_excl(c, root_id, value, old=()):
+    """2.1160.0 (#5862): the folders kept out of a person's share of the whole area (fs_shares.excl) -> [node ids]: a list of
+    live folders of this tree below its root (400 else, at most DL_WIKI_MAX); one already on the list (old) may stay or go
+    also when it is gone by now (like an agent's data lock, agents/datalock.py)."""
+    if (not isinstance(value, list) or len(value) > DL_WIKI_MAX  # review 5: the limit before any read, ids in BIGINT's range
+            or any(isinstance(x, bool) or not isinstance(x, int) or not 0 < x < 2 ** 63 for x in value)):
+        raise BadInput(tr("Invalid value: {0}", "excluded"))
+    out = []
+    for nid in dict.fromkeys(value):
+        if nid not in old:
+            chain = fs_chain(c, nid)
+            if (not chain or chain[0]["kind"] != "folder" or len(chain) < 2 or chain[-1]["id"] != root_id
+                    or fs_deleted(chain)):
+                raise BadInput(tr("Invalid value: {0}", "excluded"))
+        out.append(nid)
+    if len(out) > DL_WIKI_MAX:
+        raise BadInput(tr("Invalid value: {0}", "excluded"))
+    return out
+
+
 fs_area_rule(WKF_AREA, kinds={("folder", None), ("ref", WKF_KIND)}, org_open=True, name=wkf_name, before=_before, after=_after,
-             share=_share, root_share=("agent_id",))  # 2.200.0 B (#2747): share; 2.1045.0 (#5823): the whole area with agents
+             share=_share, root_share=_root_share,  # 2.200.0 B (#2747): share; 2.1045.0 (#5823): the whole area with agents
+             excl=_root_excl)  # 2.1160.0 (#5862): a private area also with people, single folders kept out per person
 
 
 # ---------------------------------------------------------------- routes
@@ -668,8 +697,9 @@ def _share_starts(c, uid):
         chain = fs_chain(c, n["id"])
         if not chain or fs_deleted(chain) or _root_of_chain(c, chain) is None:
             continue
-        if chain[-1]["id"] == n["id"] and not agent:
-            continue  # 2.1045.0 (#5823): the share of a whole knowledge area (its root) is for agents only (wkf_area_ok)
+        if chain[-1]["id"] == n["id"] and not agent and chain[-1]["org_id"]:
+            continue  # 2.1045.0 (#5823): the share of an organisation's whole knowledge area (its root) is for agents only;
+            # 2.1160.0 (#5862): a private one also for people (_root_share)
         if not fs_role(c, n["id"], uid, chain=chain):
             continue  # the organisation boundary (an agent of another organisation, a person who left it)
         out.append((n, chain))

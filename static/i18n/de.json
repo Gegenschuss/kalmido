@@ -18567,5 +18567,11 @@
   "Previous slide": "Vorherige Folie",
   "Next slide": "Nächste Folie",
   "End presentation": "Präsentation beenden",
-  "Presentation: {0}": "Präsentation: {0}"
+  "Presentation: {0}": "Präsentation: {0}",
+  "Who sees the whole knowledge area": "Wer den gesamten Wissensbereich sieht",
+  "Nobody sees the whole knowledge area yet.": "Noch sieht niemand den gesamten Wissensbereich.",
+  "The person can change these pages.": "Die Person kann diese Seiten ändern.",
+  "The person can read these pages.": "Die Person kann diese Seiten lesen.",
+  "{0} no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with them on its own stays visible.": "{0} sieht diese Ordner und alles darin nicht mehr, auch was später dazukommt. Ein Ordner oder eine Seite darin, die du einzeln mit der Person teilst, bleibt sichtbar.",
+  "Shares your whole knowledge area with a person or an agent: every folder and page, also the ones added later. Single folders can be kept out afterwards.": "Teilt deinen gesamten Wissensbereich mit einer Person oder einem Agenten: jeden Ordner und jede Seite, auch spätere. Einzelne Ordner kannst du danach ausnehmen."
 }

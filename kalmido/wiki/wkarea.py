@@ -7,13 +7,15 @@ ones; never a locked space (_share: 409), never across the organisation boundary
 its person's own agents, an organisation's area only with its agents). Single folders are kept out per agent in its data lock
 (agents.data_lock wiki_folders, core/dlock.py dl_chain_cut).
 
-  GET /api/wiki/area-share?space=private|org:<id>[&agent_id=] -> {root, locked, may, limit, folders, pages,
-      shares: [{id, agent_id, name, role, expires_at, editable, excluded: [folder ids of this tree]}],
-      preview?: {agent_id, folders, pages, excluded}}
+  GET /api/wiki/area-share?space=private|org:<id>[&agent_id= | &user_id=] -> {root, locked, may, limit, folders, pages,
+      shares: [{id, agent_id, user_id, name, role, expires_at, editable, excluded: [folder ids of this tree]}],
+      preview?: {agent_id | user_id, folders, pages, excluded}}
       root     the area's root node (null: no tree yet -- the first folder / page makes it)
       may      the asker may manage the area's shares (else only {root, locked, may: false})
       folders / pages   how many the tree holds; limit: the tree is larger than one read (WKF_TREE_MAX) -- some pages left out
       shares   the agent shares on the root; editable: the asker may change that agent's data lock (its exclusions)
+               2.1160.0 (#5862): a private area's person shares too (user_id, agents last); their exclusions are the share's
+               own (fs_shares.excl, PATCH /api/files/shares/<id> {excluded}), editable for who manages the area
       preview  what agent_id would see through an area share now: folders / pages visible, excluded folders of this tree
 """
 from flask import jsonify, request
@@ -21,11 +23,11 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.access import Denied, live_sql
 from ..core.db import db
-from ..core.dlock import dl_wiki_folders
+from ..core.dlock import dl_excl_parse, dl_wiki_folders  # 2.1160.0 (#5862): dl_excl_parse
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..accounts.session import me
-from ..files.store import _now
+from ..files.store import FS_NOT_ADDR, _now  # 2.1160.0 (#5862): FS_NOT_ADDR
 from .pages import wiki_space
 from .wkfolder import WKF_KIND, WKF_TREE_MAX, _share, _space_locked, _subtree, _walk, wkf_root
 
@@ -95,21 +97,32 @@ def wkarea_get():
     out.update(may=True, limit=len(rows) >= WKF_TREE_MAX,
                folders=sum(1 for r in rows if r["kind"] == "folder" and r["id"] != root and r["id"] in fp and not fp[r["id"]][1]),
                pages=sum(1 for r in rows if r["kind"] == "ref" and r["id"] in fp and not fp[r["id"]][1]))
-    sh = c.execute("""SELECT s.id, s.agent_id, s.role, s.expires_at, u.display_name FROM fs_shares s JOIN users u ON u.id=s.agent_id
-                      WHERE s.node_id=? AND s.agent_id IS NOT NULL AND COALESCE(s.list_own, 0)=0 ORDER BY lower(u.display_name), s.id""",
+    # 2.1160.0 (#5862): a private area's person shares too (user_id; their exclusions are the share's own, fs_shares.excl)
+    sh = c.execute(f"""SELECT s.id, s.agent_id, s.user_id, s.role, s.expires_at, s.excl, u.display_name FROM fs_shares s
+                       JOIN users u ON u.id=COALESCE(s.agent_id, s.user_id)
+                       WHERE s.node_id=? AND (s.agent_id IS NOT NULL OR s.user_id IS NOT NULL) AND COALESCE(s.list_own, 0)=0
+                       AND {FS_NOT_ADDR.format(a="s")} ORDER BY s.agent_id IS NOT NULL, lower(u.display_name), s.id""",
                    (root,)).fetchall()
-    out["shares"] = [{"id": s["id"], "agent_id": s["agent_id"], "name": s["display_name"], "role": s["role"],
-                      "expires_at": s["expires_at"], "editable": _editable(c, s["agent_id"]),
-                      "excluded": sorted(x for x in dl_wiki_folders(c, s["agent_id"]) if x in ids)} for s in sh]
-    aid = request.args.get("agent_id")
-    if aid not in (None, ""):
+    out["shares"] = [{"id": s["id"], "agent_id": s["agent_id"], "user_id": s["user_id"] if not s["agent_id"] else None,
+                      "name": s["display_name"], "role": s["role"], "expires_at": s["expires_at"],
+                      "editable": _editable(c, s["agent_id"]) if s["agent_id"] else True,  # a person's: who manages the area
+                      "excluded": sorted(x for x in (dl_wiki_folders(c, s["agent_id"]) if s["agent_id"] else dl_excl_parse(s["excl"]))
+                                         if x in ids)} for s in sh]
+    for key in ("agent_id", "user_id"):  # 2.1160.0 (#5862): the dialog's question for a person as well
+        tid = request.args.get(key)
+        if tid in (None, ""):
+            continue
         try:
-            aid = int(aid)
+            tid = int(tid)
         except ValueError:
-            raise BadInput(tr("Invalid value: {0}", "agent_id")) from None
-        ex = {x for x in dl_wiki_folders(c, aid) if x in ids}
-        own = {r[0] for r in c.execute("""SELECT node_id FROM fs_shares WHERE agent_id=? AND node_id<>? AND COALESCE(list_own, 0)=0
-                                           AND (expires_at IS NULL OR expires_at > ?)""", (aid, root, _now()))} & ids
+            raise BadInput(tr("Invalid value: {0}", key)) from None
+        if key == "agent_id":
+            ex = {x for x in dl_wiki_folders(c, tid) if x in ids}
+        else:  # a person's share made now has no exclusions yet; one already there keeps its own
+            ex = {x for s in sh if s["user_id"] == tid and not s["agent_id"] for x in dl_excl_parse(s["excl"]) if x in ids}
+        own = {r[0] for r in c.execute(f"""SELECT node_id FROM fs_shares WHERE {key}=? AND node_id<>? AND COALESCE(list_own, 0)=0
+                                            AND (expires_at IS NULL OR expires_at > ?)""", (tid, root, _now()))} & ids
         nf, np = _visible(rows, root, ex, own)
-        out["preview"] = {"agent_id": aid, "folders": nf, "pages": np, "excluded": len(ex)}
+        out["preview"] = {key: tid, "folders": nf, "pages": np, "excluded": len(ex)}
+        break
     return jsonify(out)

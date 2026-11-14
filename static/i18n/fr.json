@@ -18567,5 +18567,11 @@
   "Previous slide": "Diapositive précédente",
   "Next slide": "Diapositive suivante",
   "End presentation": "Terminer la présentation",
-  "Presentation: {0}": "Présentation : {0}"
+  "Presentation: {0}": "Présentation : {0}",
+  "Who sees the whole knowledge area": "Qui voit tout l’espace de connaissances",
+  "Nobody sees the whole knowledge area yet.": "Personne ne voit encore tout l’espace de connaissances.",
+  "The person can change these pages.": "La personne peut modifier ces pages.",
+  "The person can read these pages.": "La personne peut lire ces pages.",
+  "{0} no longer sees these folders and everything in them, also what is added later. A folder or page inside that you share with them on its own stays visible.": "{0} ne voit plus ces dossiers ni leur contenu, ni ce qui y sera ajouté. Un dossier ou une page à l’intérieur que tu partages à part avec cette personne reste visible.",
+  "Shares your whole knowledge area with a person or an agent: every folder and page, also the ones added later. Single folders can be kept out afterwards.": "Partage tout ton espace de connaissances avec une personne ou un agent : chaque dossier et chaque page, y compris ceux ajoutés plus tard. Tu peux ensuite exclure des dossiers."
 }

@@ -75,7 +75,8 @@ def _shared_top(c, uid, chain):
     """Index in chain (node first) of the highest node shared with uid (an agent: with exactly it; a person: with them or a
     group of theirs), None without one. Expired shares do not count."""
     ids = [int(x["id"]) for x in chain]
-    if ids and _is_agent(c, uid):  # 2.1045.0 (#5823): the shares above an excluded knowledge folder give nothing there
+    if ids:  # 2.1045.0 (#5823): the shares above an excluded knowledge folder give nothing there; 2.1160.0 (#5862, Fable
+        # review 3): a person's token too (a whole private area shared with them, its exclusions)
         ids = dl_chain_cut(c, uid, ids)
     if not ids:
         return None
