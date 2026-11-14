@@ -178,7 +178,8 @@ const ROUND = '---\ntags: demo\n---\n# Title  \n\nSome **bold** word and `code`.
     await click(`document.querySelector('[data-wk="pmenu"]')`);
     check(await until(`!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`), 'no right: the "…" opens');
     const roItems = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim())`);
-    check(roItems.includes('Download as PDF') && !roItems.some(t => /^(Rename…|Delete|Edit as Markdown|Read-only)$/.test(t)), 'no right: only the downloads in the "…" ' + JSON.stringify(roItems));
+    // 2.1163.0 (#6087): plus everything that only reads (History, the links)
+    check(roItems.includes('Download as PDF') && roItems.includes('History') && roItems.includes('Copy link') && !roItems.some(t => /^(Rename…|Delete|Edit as Markdown|Read-only)$/.test(t)), 'no right: the "…" only reads (downloads, history, links) ' + JSON.stringify(roItems));
   }, false);
   console.log(`p2554_c_wikicm_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
