@@ -99,8 +99,8 @@ const closePop = w => w.eval('closePop()');
 
   // ================= phone: the project page
   w = await boot({hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}}); d = w.document;
-  await until(() => d.querySelector('#top [data-act="view-overview"]'));
-  d.querySelector('#top [data-act="view-overview"]').click();
+  await until(() => w.eval('typeof routeList === "function" && !!routeList()'));
+  await w.eval(`setListView(routeList(), 'overview')`);
   const msr = await until(() => d.querySelector('#view .povm'));
   check(msr && msr.querySelector('[data-pov="ms-edit"].ms-phsr') && msr.querySelector('.chk'), 'milestone: the edit symbol leaves the phone row (screen readers keep it), the tick stays');
   await press(w, msr.querySelector('.pmn'));

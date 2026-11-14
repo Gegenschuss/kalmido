@@ -422,8 +422,9 @@ function secHeadMenu(anchor, sid) {
   if (!canEditList(s.list_id)) { roToast(); return; }
   // 2.1151.0 B (#3835): the head's whole menu at once, its "+" (hidden on the phone) on top; up / down went (the head drags).
   // Was 2.46.1 (#1635): Move section up / down and "Section menu…"
-  const add = ms_btnItems(anchor, '.gadd');
-  sectionMenu(anchor, sid, add.length ? [...add, '-'] : []);
+  // the add button's own text; the call itself, not a click on it (the hold redraws the list, the button may be a new one by then)
+  const ab = anchor.querySelector('.gadd');
+  sectionMenu(anchor, sid, ab ? [{label: ab.getAttribute('aria-label') || '', icon: 'plus', fn: () => secAddOpen(+ab.dataset.sec || 0)}, '-'] : []);
 }
 let secDrag = null;
 const secOf = el => el.classList.contains('kcol') ? el.dataset.kcol : el.dataset.section;
