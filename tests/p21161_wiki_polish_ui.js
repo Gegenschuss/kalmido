@@ -99,7 +99,7 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     check(ln && ln.t === 'Weather plan B' && ln.ti === 'Processes/Shoot day/Weather plan B', `#6090 the editor: a link shows the page's name, the path as its tooltip ${JSON.stringify(ln)}`);
     await shot('p21161-editor-1280.png');
     // a click on the folded line opens the lines
-    await ev(`(() => { WKCM.view.dispatch({selection: {anchor: 5}}); WKCM.view.focus(); return 1; })()`);  // the cursor in the front matter
+    await ev(`(() => { WKCM.view.focus(); WKCM.view.dispatch({selection: {anchor: 5}}); return 1; })()`);  // the cursor in the front matter (focus first: a headless window sends no focus event, the update sees it)
     check(await until(`!document.querySelector('#wk-cm .cm-wkfmw') && [...document.querySelectorAll('#wk-cm .cm-line')].some(l => /^as_of: 2026-11-10/.test(l.textContent))`), '#6090 the editor: the cursor in the fields shows the front matter to edit') || console.log('fm lines:', await ev(`JSON.stringify([...document.querySelectorAll('#wk-cm .cm-line')].slice(0, 6).map(l => l.textContent))`));
     // the read view (the lock "Read-only")
     await ev(`(() => { LS.set('wkRo', '1'); WK.edit = false; renderView(); return 1; })()`);

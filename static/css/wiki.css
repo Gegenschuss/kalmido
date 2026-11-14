@@ -283,7 +283,9 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 /* Select on a phone: the date and the row's "…" leave the row (the floating bar has Move and Delete), so the name keeps its room */
 @media (max-width:767px){.wkselrow .wkwhen,.wkselrow .wkmore{display:none}}
 /* a table in the editor: cells never narrower than their words (CodeMirror's lines break anywhere); the box scrolls sideways like
-   the read view's .mdtbl */
+   the read view's .mdtbl. The text column may not grow with a wide table (a flex item keeps its content's width by default):
+   it keeps the editor's width, so the table's box (max-width 100 %) scrolls instead of being cut off at the edge */
+.wkcm .cm-scroller>.cm-content{min-width:0}
 .wkcm .cm-wktbl{overscroll-behavior-x:contain}
 .wkcm .cm-wktbl :is(table,td,th){word-break:normal;overflow-wrap:normal}
 .wkcm .cm-wktbl :is(td,th){min-width:4ch}
