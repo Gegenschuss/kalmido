@@ -295,3 +295,16 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
   .wdxprint :is(h1,h2,h3,h4){break-after:avoid}
   @page{margin:20mm 22mm}
 }
+
+/* 2.1166.0 (#4742, start care): moved here unchanged from app.css - these rules style only what this module draws
+   (their classes are used by its scripts alone), so they load with it (LD_CSS in static/js/lazyload.js) */
+.wkhsum{font-size:var(--fs-s);margin:.25rem 0}
+.wkamark{display:inline-flex;align-items:center;gap:.25rem;margin-left:.5rem;font-size:var(--fs-m);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wkaex{display:flex;flex-direction:column;gap:.25rem;padding:.5rem 0;border-top:1px solid var(--line)}
+.wkapick{display:flex;flex-direction:column;gap:.375rem;max-height:50vh;overflow:auto;margin-top:.5rem}
+.wshed{width:100%;min-height:16rem;font:inherit;font-family:var(--mono);font-size:var(--fs-b);resize:vertical}  /* 2.200.0 B (#2747) */
+.wshlink{margin:.25rem 0 .75rem}
+.wkemark{display:inline-flex;align-items:center;color:var(--accent);margin-left:.375rem;flex:none}
+.wkemark svg{width:var(--ic);height:var(--ic)}
+.wkelock{padding:.75rem}
+.wkeprog{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
