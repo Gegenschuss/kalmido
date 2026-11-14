@@ -62,6 +62,14 @@ check(not notices(Ni), "#4562: nina (in none of frida's projects) gets no notice
 check(not notices(Ve), "#4562: vera switched the project notices off: none")
 rows = dbx("SELECT user_id FROM notifications WHERE kind='orglist' AND data->>'action'='acctdel'")
 check(sorted(r[0] for r in rows) == [BOB], f"#4562: exactly one notice was written (bob's) {rows}")
+# review (job/4457): asking, taking back and asking again does not fill bob's bell -- his notice is still unread
+r = kt.sess().post(B + "/api/auth/delete-cancel", json={"username": "frida", "password": PW})
+check(r.ok, f"frida takes the request back with her password ({r.status_code} {r.text[:150]})")
+Fr = kt.sess("frida")
+r = Fr.post(B + "/api/account/delete", json={"password": PW, "lists": {str(L1): {"delete": True}, str(L2): {"to": HANS}}})
+check(r.ok, f"frida asks again ({r.status_code} {r.text[:200]})")
+rows = dbx("SELECT user_id FROM notifications WHERE kind='orglist' AND data->>'action'='acctdel'")
+check(len(rows) == 1, f"#4562 review: no second notice while bob's first is unread {rows}")
 
 # ================================================================== b) the vCard switch
 def card(uid, fn, email, rev=None):
