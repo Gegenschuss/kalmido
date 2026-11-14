@@ -1099,6 +1099,18 @@ document.addEventListener('click', async e => {
   else if (k === 'cfshow' && p) wko_cfShow(p);  // 2.169.0 (#2671)
   else if (k === 'pmenu' && p) menu(a, wk_pmenuItems(p));
 });
+// 2.1151.0 D (#5524): the page as a file for texts that go out, in the reading style it is shown in (the server makes it:
+// GET /api/wiki/pages/<id>/export; a space with the lock makes it in the browser, wkdoc.js loaded on demand)
+function wk_docItems(p) {
+  if (S.me?.kind === 'agent') return [];
+  const get = fmt => async () => {
+    if (WK.dirty) await wk_flush();
+    if (wk_e2e(p.space)) { loadModule('wkdoc').then(() => wdx_local(p, fmt)).catch(e => { if (e?.message) toast(e.message); }); return; }
+    const st = typeof wkst_of === 'function' ? wkst_of(p.space) : '';
+    const a = document.createElement('a'); a.href = `/api/wiki/pages/${p.id}/export?format=${fmt}&style=${encodeURIComponent(st)}`; a.download = ''; document.body.append(a); a.click(); a.remove();
+  };
+  return [{label: tr('Download as PDF'), icon: 'download', fn: get('pdf')}, {label: tr('Download as Word (.docx)'), icon: 'download', fn: get('docx')}];
+}
 // the page's "…"; 2.1108.0 (#5965): a phone adds the head bar's entries (it has no "…" of its own on a page), a page one may
 // only read shows just those
 function wk_pmenuItems(p) {
@@ -1121,18 +1133,6 @@ document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
 });
-// 2.1151.0 D (#5524): the page as a file for texts that go out, in the reading style it is shown in (the server makes it:
-// GET /api/wiki/pages/<id>/export; a space with the lock makes it in the browser, wkdoc.js loaded on demand)
-function wk_docItems(p) {
-  if (S.me?.kind === 'agent') return [];
-  const get = fmt => async () => {
-    if (WK.dirty) await wk_flush();
-    if (wk_e2e(p.space)) { loadModule('wkdoc').then(() => wdx_local(p, fmt)).catch(e => { if (e?.message) toast(e.message); }); return; }
-    const st = typeof wkst_of === 'function' ? wkst_of(p.space) : '';
-    const a = document.createElement('a'); a.href = `/api/wiki/pages/${p.id}/export?format=${fmt}&style=${encodeURIComponent(st)}`; a.download = ''; document.body.append(a); a.click(); a.remove();
-  };
-  return [{label: tr('Download as PDF'), icon: 'download', fn: get('pdf')}, {label: tr('Download as Word (.docx)'), icon: 'download', fn: get('docx')}];
-}
 // 2.554.0 (#4052): the page's "…" entries of the editor: the plain Markdown field as the way out, and the lock "Read-only"
 function wk_modeItems(p) {
   const asMd = WK.mdFor === p.id, ro = wk_ro(), sw = fn => async () => { await wk_flush(); fn(); renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); };
