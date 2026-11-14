@@ -18545,6 +18545,8 @@
   "Check the connection in the settings, or remove it.": "Prüfe die Verbindung in den Einstellungen oder entferne sie.",
   "Pop-up for new messages": "Popup bei neuen Nachrichten",
   "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Eine neue Nachricht von einem Menschen oder eine fertige Antwort eines Agenten erscheint kurz am oberen Rand, egal wo du in Kalmido bist. Nur auf diesem Gerät; solange die App offen ist, kommt dafür hier kein zusätzlicher Push.",
+  "Download as PDF": "Als PDF herunterladen",
+  "Download as Word (.docx)": "Als Word (.docx) herunterladen",
   "At most {0} recipients at once": "Höchstens {0} Empfänger auf einmal",
   "Call sheet sent to {0} recipient": ["Call Sheet an {0} Empfänger verschickt", "Call Sheet an {0} Empfänger verschickt"],
   "Call sheet: {0} – {1}": "Call Sheet: {0} – {1}",

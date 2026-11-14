@@ -4995,7 +4995,8 @@ page, case ignored) puts the text at the end of that heading's section instead; 
 *Changing part of a long text* below). A new page
 (`wiki_create`) needs a knowledge folder shared with the agent to edit (`folder_id`: the folder's id from `list_files`);
 `409` when a page of that name is already there. Renaming, moving, the trash, uploading / removing files of pages, shares,
-export / import and the encryption stay with people in the app.
+export / import (2.1151.0: also a page as PDF / Word, `GET /api/wiki/pages/{id}/export` - a file for people; an agent reads
+the same text as Markdown with `wiki_read`) and the encryption stay with people in the app.
 
 **Files of a page (2.488.0).** With `wiki:read` an agent lists the files people uploaded to a page shared with it (PDFs and
 pictures: `wiki_files` = id, name, mime, size, created_at, image) and reads one (`wiki_read_file`: as text by default - a
