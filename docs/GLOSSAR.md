@@ -847,6 +847,7 @@ Knowledge pages (wiki): pages, history, sharing, search, tags, folders and the l
 The start-up module.
 
 - `kalmido/startup.py` - Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git)
+- `kalmido/wiki/wkdoc.py` - one knowledge page as a PDF or a Word file (.docx), for texts that go out (decision of 10.11.2026: no word processor of its own, the Mark...
 
 ## Scripts (`static/js/`)
 
@@ -1185,6 +1186,7 @@ The start-up module.
 - `static/js/wkimport.js` (`wki`) - The ZIP import of knowledge pages for large archives (wiki.js wk_import)
 - `static/js/wklive.js` (`wklv`) - Slash commands of the knowledge editor, the task search, reading styles
 - `static/js/wkarea.js` (`wkar`) - The whole knowledge area shared with an agent: Share whole knowledge area…, Exclude folders…, the marks (#5823)
+- `static/js/wkdoc.js` - @ts-check
 - `static/js/wkshare.js` (`wsh`) - Read-only shares of knowledge pages (wiki.js)
 - `static/js/wktags.js` (`wkt`) - 2.371 tags of knowledge pages and the `
 - `static/js/workspace.js` (`ws`) - Workspaces: "Private" and the organisations a person belongs to, and the sidebar switch that shows one of them or all
