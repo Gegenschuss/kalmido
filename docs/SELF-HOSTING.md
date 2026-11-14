@@ -203,6 +203,15 @@ has an account: everything that is not findable gets the same answer. The addres
 person's own contacts on the server (they never leave it). Limits: 30 searches and 300 checked addresses per account and
 day, plus a brake per client address (`KALMIDO_DISC_PER_IP`, default 60 per 15 minutes). Agents and kid accounts cannot search and are never found.
 
+**Invitation links (2.1156).** In *Find people* a person can also invite someone without an account: *Invite by link* makes a
+one-time link with its QR code (14 days, at most 20 open links per account and 10 new ones a day, only its hash is stored).
+Whoever opens it creates a private account (never an organisation by its address, never admin or kid) and is connected with
+the inviting person: with mail (SMTP) after confirming the address by the mailed link, without mail at once with name,
+address and password (the link is the proof). Such an account needs no approval by an admin. An address that already has an
+account gets the same answer and no account. The switch *People without an account register with an invitation link*
+(Settings > Server > Sign-in) is on by default exactly when anyone may register; off, the app offers no such link. Agents and
+kid accounts cannot invite.
+
 `KALMIDO_INSTANCE_MODE` is deprecated: `organisation` (and an empty value) are ignored, only `shared` (no organisations,
 people see only their own contacts) still applies. `KALMIDO_ORG_NAME` only names the organisation the first-run setup
 creates. On the update from a server in the former mode *organisation* (one organisation, no variable), the first start

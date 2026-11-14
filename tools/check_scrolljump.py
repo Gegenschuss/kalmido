@@ -36,6 +36,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = os.path.join(ROOT, "tools", "scrolljump_baseline.json")
 OK_RE = re.compile(r"sprung-ok:\s*\S")
 DLG_RE = re.compile(r"modal\(|\.modal\b|dlg|dialog", re.I)
+# files that are dialogs throughout (their focus calls are in a dialog); 2.1156.0 (#4280): + listmodal.js, the project dialog moved
+# out of dialogs.js to load on demand
+DIALOG_FILES = ("dialogs.js", "listmodal.js")
 CALL = r"\s*(?:\?\.)?\s*\("  # f( and f?.(
 PATS = [("scrollIntoView", re.compile(r"\.scrollIntoView" + CALL)),
         ("scrollTo", re.compile(r"\.scroll(?:To|By)?" + CALL)),
@@ -95,7 +98,7 @@ def scan(src, rel=""):
             else:
                 hi = mid - 1
         return lo
-    dialogs = os.path.basename(rel) == "dialogs.js"
+    dialogs = os.path.basename(rel) in DIALOG_FILES
     for kind, pat in PATS:
         for m in pat.finditer(b):
             k = line_of(m.start())

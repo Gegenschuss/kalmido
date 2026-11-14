@@ -1223,6 +1223,9 @@ ROUTES = {
     "POST /api/disc/check": "discover", "POST /api/disc/requests": "discover", "POST /api/disc/requests/{}/{}": "discover",
     "DELETE /api/disc/requests/{}": "discover", "DELETE /api/disc/connections/{}": "discover",
     "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
+    # 2.1156.0 (#4550): a person's invitation links for people without an account (accounts/cinvite.py)
+    "GET /api/disc/invites": "discover", "POST /api/disc/invites": "discover", "DELETE /api/disc/invites/{}": "discover",
+    "POST /api/disc/invites/{}/restore": "discover", "POST /api/auth/cinv/check": "auth", "POST /api/auth/cinv/accept": "auth",
     # 2.48.0 (#1111): documents
     "GET /api/docs": "document", "GET /api/docs/facets": "document",  # 2.772.0 (#4890): p4890_a_api_test.py
     "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",

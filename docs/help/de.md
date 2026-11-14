@@ -254,6 +254,18 @@ Projekt, das du teilst, hat außerdem einen eigenen Chat.
 Was dann passiert: Angeheftete Nachrichten bleiben in der Leiste über den Nachrichten (höchstens fünf je Gespräch); ein
 Thread zeigt die Antworten auf diese eine Nachricht, und seine Beteiligten werden benachrichtigt.
 
+<!-- help: team#how-to-invite-someone-without-an-account-by-a-link src=0b47d08909 -->
+## Jemanden ohne Konto per Link einladen
+
+1. Wähle unter Einstellungen > Konto **Person finden…**.
+2. Wähle **Per Link einladen**, trag auf Wunsch ein, für wen er ist (siehst nur du), und tippe auf **Link erstellen**.
+3. Schick den Link mit **Kopieren** oder **Teilen**, oder lass die Person den QR-Code scannen.
+
+Was dann passiert: Wer den Link öffnet, legt mit Name und E-Mail-Adresse ein Konto an und ist sofort mit dir verbunden; du
+bekommst eine Benachrichtigung. Der Link funktioniert einmal und 14 Tage lang und wird nur direkt nach dem Erstellen
+angezeigt; **Zurückziehen** beendet einen offenen Link sofort. Wer schon ein Konto hat, öffnet ihn angemeldet und bestätigt
+die Verbindung. Ein Admin des Servers kann diese Links ausschalten (Einstellungen > Server > Anmeldung).
+
 <!-- help: budget#how-to-start-a-household-budget src=1116c1b0a8 -->
 ## Ein Haushaltsbudget anlegen
 

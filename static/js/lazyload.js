@@ -7,7 +7,7 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'setreset', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js; 2.593.0 (#4590): setreset.js
+  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'setreset', 'move', 'acctadm', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js; 2.593.0 (#4590): setreset.js; 2.1156.0 (#4280): move.js (Settings > Move and export everything, start budget), acctadm.js (account.js parts only the settings draw)
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
   office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree
@@ -112,11 +112,30 @@ const LD_MODS = {
   // 2.1030.0 (#5785): the quote's own texts of one interface language (after quotes, LD_NEED); only that language loads
   quotes_es: ['quotes_dada_es'], quotes_fr: ['quotes_dada_fr'], quotes_it: ['quotes_dada_it'], quotes_nl: ['quotes_dada_nl'],
   helpview: ['helpview'],  // 2.1086.0 (#5820): the view "Help" (#help), the user's how-to sections
+  cinvite: ['cinvite'],  // 2.1156.0 (#4550): invitation links for people without an account ("Find people", the page /#cinv/<token>)
+  signoff: ['signoff'],  // 2.1156.0 (#4280): approval links of a quotation / a list (office_docs.js sg_box, integrations.js sg_list_box; LD_NEED)
+  tagsview: ['tagsview'],  // 2.1156.0 (#4280): the tags overview (#tags, render.js viewTags; LD_VIEW)
+  listmodal: ['listmodal'],  // 2.1156.0 (#4280): the project dialog (dialogs.js before; LD_CALL listModal)
+  sharemodal: ['sharemodal'],  // 2.1156.0 (#4280): the Share dialog of a project (menus, palette, the project dialog, budget)
+  foldershare: ['foldershare'],  // 2.1156.0 (#4280): the Share dialog of a folder (folder menu, folder settings)
+  folderprops: ['folderprops'],  // 2.1156.0 (#4280): Folder settings… (folder menu, the folder's Share dialog)
+  clientdlg: ['clientdlg'],  // 2.1156.0 (#4280): the client dialog (clients, palette, office documents) and a list's forms
+  evcals: ['evcals'],  // 2.1156.0 (#4280): the dialog Calendars… (calendar menus, a news item about a shared calendar)
+  fieldmodal: ['fieldmodal'],  // 2.1156.0 (#4280): the custom field dialog (the project dialog, table columns, organisation fields)
+  orgadmin: ['orgadmin'],  // 2.1156.0 (#4280): Projects of the organisation (Settings > Workspaces, a news item)
+  sched: ['sched'],  // 2.1156.0 (#4280): the plans of an agent (Plans in the agent chat, the agents' view)
+  timeentry: ['timeentry'],  // 2.1156.0 (#4280): Add time… / edit a time entry (time page, task menu, palette, timer menu)
+  habitdlg: ['habitdlg'],  // 2.1156.0 (#4280): New habit / open a habit (habits view, palette)
+  propcards: ['importprop', 'contractprop', 'propcards'],  // 2.1156.0 (#4280): the card of an agent's proposal (bell, news, agents' view, links #prop/…); importprop.js and contractprop.js with it
+  orgexport: ['orgexport'],  // 2.1156.0 (#4280): the export / retention export boxes of an organisation and the own office (settings, office; LD_NEED)
+  photometa: ['photometa'],  // 2.1156.0 (#4280): photo metadata (the organisation's switch in the settings, the taken date of a document; LD_NEED)
+  cryptscope: ['cryptscope'],  // 2.1156.0 (#4280): the fold "What is encrypted?" of the settings (orgcrypt.js ocScopeFill; LD_NEED settings)
+  meetprop: ['meetprop'],  // 2.1156.0 (#4280): Tasks from notes (the agent chat's cards, LD_NEED; the request dialog through LD_CALL)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {pdf: ['swipenav'], settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop', 'swipenav'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage'],
+const LD_NEED = {pdf: ['swipenav'], settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'family', 'orgexport', 'photometa', 'cryptscope'], agentchat: ['integrations', 'meetprop'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop', 'swipenav', 'photometa'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage', 'signoff', 'orgexport'], integrations: ['signoff'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage'],
   quotes_es: ['quotes'], quotes_fr: ['quotes'], quotes_it: ['quotes'], quotes_nl: ['quotes']};  // 2.1030.0 (#5785): a language's quote texts fill QD_TR of quotes_dada.js  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop; 2.652.0 (#5071): pdf -> swipenav (the swipe of the full screen); 2.882.0 (#5557): docs -> swipenav (the swipe of the document view)
 // 2.599.0 (#4907): settings no longer name ablage: their sharing defaults load it themselves (settings.js); docs still needs it
 // 2.501.0 (#4198): module ablage: docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
@@ -124,6 +143,7 @@ const LD_NEED = {pdf: ['swipenav'], settings: ['agentchat', 'calendar', 'integra
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open', 'otkOpen', 'epv_link'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation); 2.574.0 (#3376): otkOpen (acctset.js); 2.1033.0 (#5790): epv_link (the link of the address proof mail)
   ablage: ['ab_linkFile'],  // 2.501.0 (#4198): the button of a file row in a task / project
+  cinvite: ['cnv_open', 'cnv_boot', 'cnv_after'],  // 2.1156.0 (#4550): the dialog "Invite by link", the opened link before / after the start
   fltdlg: ['filterModal'],  // 2.521.0 (#4479): the filter dialog (sidebar, palette, a filter's menu)
   fints: ['fnt_open'],  // 2.616.0 (#2473): the button "Fetch from bank" (office_bank.js)
   family: ['occModal', 'dlModal', 'famPack', 'shopModeOpen', 'paskOpen', 'kd_pinAsk'],  // 2.501.0 (#4198): the palette, the first start, a child's PIN
@@ -150,7 +170,20 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu'],  // 2.149.0 F (#2518)
   undolist: ['ul_open'],  // 2.773.0 (#5250): the window of the ← button
   ofwalk: ['wlk_open'],  // 2.778.0 (#5383)
-  callsheet: ['cs_open']};  // 2.855.0 (#1956): the button "Call sheet" (dispo.js)
+  callsheet: ['cs_open'],  // 2.855.0 (#1956): the button "Call sheet" (dispo.js)
+  listmodal: ['listModal'],  // 2.1156.0 (#4280): New project / Edit project… (menus, palette, sidebar, agents' view)
+  meetprop: ['mtg_request'],  // 2.1156.0 (#4280): Tasks from notes… (project menu, palette)
+  sharemodal: ['shareModal'],  // 2.1156.0 (#4280): the Share dialog of a project (menus, palette, the project dialog, budget)
+  foldershare: ['folderShareModal'],  // 2.1156.0 (#4280): the Share dialog of a folder (folder menu, folder settings)
+  folderprops: ['folderPropsModal'],  // 2.1156.0 (#4280): Folder settings… (folder menu, the folder's Share dialog)
+  clientdlg: ['clientModal', 'formsModal'],  // 2.1156.0 (#4280): the client dialog (clients, palette, office documents) and a list's forms
+  evcals: ['evCalsModal'],  // 2.1156.0 (#4280): the dialog Calendars… (calendar menus, a news item about a shared calendar)
+  fieldmodal: ['fieldModal'],  // 2.1156.0 (#4280): the custom field dialog (the project dialog, table columns, organisation fields)
+  orgadmin: ['oadmOpen'],  // 2.1156.0 (#4280): Projects of the organisation (Settings > Workspaces, a news item)
+  sched: ['schedOpen'],  // 2.1156.0 (#4280): the plans of an agent (Plans in the agent chat, the agents' view)
+  timeentry: ['entryModal'],  // 2.1156.0 (#4280): Add time… / edit a time entry (time page, task menu, palette, timer menu)
+  habitdlg: ['habitModal'],  // 2.1156.0 (#4280): New habit / open a habit (habits view, palette)
+  propcards: ['propOpen']};  // 2.1156.0 (#4280): the card of an agent's proposal (bell, news, agents' view, links #prop/…); importprop.js and contractprop.js with it
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
   timesheet: ['tsl_printNote'],  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
@@ -185,7 +218,8 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   mr_open: ['minerules'],  // 2.823.0 (#4773): My tasks > Rules…
   viewProjCs: ['callsheet', 1],  // 2.988.0 (#5651): the tab "Call sheets" of a project (projects.js)
   viewSteps: ['undolist', 1],  // 2.773.0 (#5250): the page "Recent steps"
-  viewHelp: ['helpview', 1]};  // 2.1086.0 (#5820): the page "Help"
+  viewHelp: ['helpview', 1],  // 2.1086.0 (#5820): the page "Help"
+  viewTags: ['tagsview', 1]};  // 2.1156.0 (#4280): the tags overview
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at
 // all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.
