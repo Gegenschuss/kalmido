@@ -1,8 +1,9 @@
 // 2.1130.0 (#6057): a chat push while a window shows the pop-up stays away on this device (static/sw.js pushShow)
 // kalmido-suite: nodata
 // No browser, no server: static/sw.js runs in a vm with fake clients and a fake registration.
-// - a chat push (#team/<id>, #msg/t/<room>/<id>, #agents/<id>) and a visible window that answers {visible: true}: no notification
-// - the window answers {visible: false} (pop-up off), is hidden, does not answer in time, or there is none: shown as before
+// - a chat push (the server marks it chat: 1) and a visible, focused window that answers {visible: true}: no notification
+// - the window answers {visible: false} (pop-up off), is hidden or not focused, does not answer in time, or there is none: shown
+// - a push without chat: 1 on the same address (an agent's budget / approval notice on #agents/<id>) always shows
 // - another push (a task, a reminder) always shows, the window is not even asked
 // - WebKit (Safari, the iPhone's Home Screen app): shown silently and closed at once (never a push without a notification)
 const fs = require('fs');
@@ -15,7 +16,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 (async () => {
   const SW = fs.readFileSync(path.join(SRC, 'static', 'sw.js'), 'utf8');
   let shown = [], closed = 0, asked = 0, wins = [], ua = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
-  const win = (vis, answer) => ({visibilityState: vis, url: 'https://kalmido.example/#today', postMessage(m, ports) {
+  const win = (vis, answer, focused = true) => ({visibilityState: vis, focused, url: 'https://kalmido.example/#today', postMessage(m, ports) {
     asked++;
     if (m?.type === 'msgpop?' && answer !== undefined) setTimeout(() => ports[0].postMessage(answer), 5);
   }});
@@ -30,21 +31,26 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
   });
   vm.runInContext(SW, ctx);
   const push = async d => { shown = []; closed = 0; asked = 0; await vm.runInContext(`pushShow(${JSON.stringify(d)})`, ctx); };
-  const team = {title: 'Shoot Berlin', body: 'Bob: The van is booked', url: '/#team/12', tag: 'team-12'};
+  const team = {title: 'Shoot Berlin', body: 'Bob: The van is booked', url: '/#team/12', tag: 'team-12', chat: 1};
 
   wins = [win('visible', {visible: true})];
   await push(team);
   check(shown.length === 0 && asked === 1, 'chat push + a visible window with the pop-up: no notification ' + JSON.stringify(shown));
   await push({...team, url: '/#msg/t/12/99'});
   check(shown.length === 0, 'a thread answer: no notification either');
-  await push({title: 'Claude', body: 'Shall I send it?', url: '/#agents/5'});
+  await push({title: 'Claude', body: 'Shall I send it?', url: '/#agents/5', chat: 1});
   check(shown.length === 0, "an agent's answer: no notification either");
+  await push({title: 'Claude', body: 'Budget reached', url: '/#agents/5'});
+  check(shown.length === 1 && asked === 0, 'the same address without chat: 1 (a budget notice): shown, nobody asked');
   await push({title: 'Due today', body: 'Call the client', url: '/#t/44', task: 44});
   check(shown.length === 1 && asked === 0, 'a task push always shows, nobody is asked');
 
   wins = [win('visible', {visible: false})];
   await push(team);
   check(shown.length === 1 && shown[0].o.body === team.body, 'the pop-up off on that window: shown as before');
+  wins = [win('visible', {visible: true}, false)];
+  await push(team);
+  check(shown.length === 1 && asked === 0, 'a visible window without the focus (another app in front): shown, not asked');
   wins = [win('hidden', {visible: true})];
   await push(team);
   check(shown.length === 1 && asked === 0, 'a hidden window: shown, not asked');
