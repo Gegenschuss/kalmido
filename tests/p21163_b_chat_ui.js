@@ -28,7 +28,7 @@ const M = `JSON.stringify((() => {
   const comp = ta && ta.closest('.chcomp'), send = comp && comp.querySelector(':scope > .btn.pri');
   const sr = send && send.getBoundingClientRect();
   const on = (x, y) => { const e = document.elementFromPoint(x, y); return !!e && !!send && send.contains(e); };
-  const hitSend = sr ? [on(sr.left + sr.width / 2, sr.top + sr.height / 2), on(sr.left + 3, sr.top + 3), on(sr.right - 3, sr.top + 3), on(sr.left + 3, sr.bottom - 3), on(sr.right - 3, sr.bottom - 3)] : [];
+  const hitSend = sr ? [on(sr.left + sr.width / 2, sr.top + sr.height / 2), on(sr.left + sr.width * .3, sr.top + sr.height * .3), on(sr.right - sr.width * .3, sr.top + sr.height * .3), on(sr.left + sr.width * .3, sr.bottom - sr.height * .3), on(sr.right - sr.width * .3, sr.bottom - sr.height * .3)] : [];
   const f = document.querySelector('#chatfab'); let fab = null;
   if (vis(f)) { const bs = [f, ...f.querySelectorAll('*')].map(e => e.getBoundingClientRect()).filter(r => r.width && r.height);
     fab = {l: Math.min(...bs.map(r => r.left)), t: Math.min(...bs.map(r => r.top)), r: Math.max(...bs.map(r => r.right)), b: Math.max(...bs.map(r => r.bottom))}; }
@@ -90,7 +90,7 @@ const meet = (a, b, gap = 0) => !!a && !!b && a.r + gap > b.l && a.l < b.r + gap
         // the conversation: messages readable, the box wide, Send free
         check(g.bRoom && g.bRoom.w >= 120 && g.bRoom.lines <= 2, `${tag} a message reads on one or two lines ${JSON.stringify(g.bRoom)}`);
         check(g.ta && g.comp && g.ta.w >= g.comp.w * (wd >= 900 ? 0.4 : 0.55), `${tag} the box takes most of the composer (${g.ta && g.ta.w} of ${g.comp && g.comp.w}, "${g.ph}")`);
-        check(g.send && g.hitSend.length === 5 && g.hitSend.every(Boolean), `${tag} Send is reachable at its centre and corners ${JSON.stringify(g.hitSend)} ${JSON.stringify(g.send)} fab ${JSON.stringify(g.fab)}`);
+        check(g.send && g.hitSend.length === 5 && g.hitSend.every(Boolean), `${tag} Send is reachable at its centre and towards its corners (30 % in: a round Send has no corners) ${JSON.stringify(g.hitSend)} ${JSON.stringify(g.send)} fab ${JSON.stringify(g.fab)}`);
         if (wd < 900) {
           check(g.plus && !g.tools && !g.sendWord && g.send && g.send.w <= 48, `${tag} the phone's composer: tools behind the plus, round Send without its word ${JSON.stringify({plus: g.plus, tools: g.tools, word: g.sendWord, send: g.send})}`);
         } else {

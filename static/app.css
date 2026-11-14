@@ -2222,6 +2222,9 @@ button.tvr-task:hover{color:var(--accent)}
   .tccomp > .btn.pri > span{display:none}
   .tccomp > .btn.pri svg{width:var(--ic-l);height:var(--ic-l)}
 }
+/* 2.1163.0 (#6094): the thread pane beside the conversation (from 900 px) is narrow: its Send is the icon alone, the box keeps the room */
+.tthpane .tthcomp > .btn.pri{width:2.75rem;min-width:0;padding:0;justify-content:center}
+.tthpane .tthcomp > .btn.pri > span{display:none}
 /* 2.350.0 A (#2790): the team chat on the phone: one header (the app header steps aside while a conversation is open, like
    the agent chat), a long name stays on one line */
 .tcrt b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
