@@ -34,9 +34,12 @@ kt.fresh()
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
+r = A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
+assert r.ok, r.text
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
+WS = A.get(B + "/api/state").json()["me"].get("workspaces") or []
+assert WS, "the organisation of the setup " + str(WS)
+ORG = WS[0]["id"]
 SP = f"org:{ORG}"
 for name, role in (("bert", "member"), ("rita", "readonly")):
     r = A.post(B + "/api/users", json={"username": name, "display_name": name.title(), "password": "password123",
