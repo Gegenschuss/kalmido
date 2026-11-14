@@ -280,8 +280,8 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
    when the row is narrow (like the share dialog's rows) - before, the name took what the buttons left and broke letter by letter */
 .wktrow .n{flex:1 1 12rem}
 .wktrow .oadmb{display:flex;flex-wrap:wrap;gap:.375rem;margin-left:auto}
-/* Select on a phone: the date leaves the row, so the name keeps its room (the box and the "…" stay) */
-@media (max-width:767px){.wkselrow .wkwhen{display:none}}
+/* Select on a phone: the date and the row's "…" leave the row (the floating bar has Move and Delete), so the name keeps its room */
+@media (max-width:767px){.wkselrow .wkwhen,.wkselrow .wkmore{display:none}}
 /* a table in the editor: cells never narrower than their words (CodeMirror's lines break anywhere); the box scrolls sideways like
    the read view's .mdtbl */
 .wkcm .cm-wktbl{overscroll-behavior-x:contain}

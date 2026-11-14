@@ -83,7 +83,8 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     const th = await until(`(() => { const ts = [...document.querySelectorAll('#wk-cm .cm-wktbl th')]; if (ts.length < 6) return null;
       return ts.map(t => { const r = document.createRange(); r.selectNodeContents(t); return [t.textContent.trim(), new Set([...r.getClientRects()].map(x => Math.round(x.top))).size]; }); })()`, {timeout: 20000});
     check(th && th.every(([t, n]) => n <= t.split(/\s+/).length), `#6086 360 the editor's table: each header on one line (was "Equipm ent") ${JSON.stringify(th)}`);
-    const tw = await ev(`(() => { const t = document.querySelector('#wk-cm .cm-wktbl'); return {sw: t.scrollWidth, cw: t.clientWidth, page: document.documentElement.scrollWidth <= innerWidth}; })()`);
+    if (!th) console.log('table state:', await ev(`JSON.stringify({cm: !!document.querySelector('#wk-cm'), edit: WK.edit, pg: WK.pg?.id, mob: isMobile(), tch: isTouch(), lines: [...document.querySelectorAll('#wk-cm .cm-line')].map(l => l.textContent).slice(0, 14), view: (document.querySelector('#view')?.textContent || '').slice(0, 300)})`));
+    const tw = await ev(`(() => { const t = document.querySelector('#wk-cm .cm-wktbl'); return t ? {sw: t.scrollWidth, cw: t.clientWidth, page: document.documentElement.scrollWidth <= innerWidth} : null; })()`);
     check(tw && tw.sw > tw.cw && tw.page, `#6086 360 the editor's table scrolls sideways in its box, the page does not ${JSON.stringify(tw)}`);
     await shot('p21161-table-360.png');
 
@@ -106,7 +107,7 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     check(rd && rd.t === 'Weather plan B' && rd.ti === 'Processes/Shoot day/Weather plan B', `#6090 read: the link shows the page's name ${JSON.stringify(rd)}`);
     check(rd && rd.dt === 'Tags|As of' && rd.dd === rd.want, `#6090 read: the front matter's keys as words, the date written out (was "as_of 2026-11-10") ${JSON.stringify(rd)}`);
     await nav(B + '?w=1280#wiki/' + P.plan);
-    const bl = await until(`(() => { const a = document.querySelector('#view .wkback a'); return a ? {name: a.querySelector('span')?.firstChild?.textContent, dir: a.querySelector('.wkpdir')?.textContent} : null; })()`, {timeout: 20000});
+    const bl = await until(`(() => { const a = document.querySelector('#view .wkback a'); return a ? {name: a.querySelector('span')?.firstChild?.textContent.trim(), dir: a.querySelector('.wkpdir')?.textContent} : null; })()`, {timeout: 20000});
     check(bl && bl.name === 'Checklist' && bl.dir === 'Processes / Shoot day', `#6090 "Linked from": the name, its folders quietly beside it ${JSON.stringify(bl)}`);
     // the daily note: its date as the title, its folder in words
     await nav(B + '?w=1280#wiki/' + P.day);
