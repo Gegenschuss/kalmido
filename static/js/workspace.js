@@ -284,10 +284,15 @@ function importTargetConfirm({what, ws = 'private', place = '', privOk = false, 
     after: md => {
       md.classList.add('itc-dlg');
       // 2.1151.0 D (#4562): check may be a list of boxes (in this order); off = unticked at first
-      [].concat(check || []).reverse().forEach(ck => {
+      [].concat(check || []).reverse().forEach(ck => {  // built as elements (texts as text)
         ck.out.on = !ck.off;
-        $('.cdlg-b', md).insertAdjacentHTML('afterend', `<label class="row" style="gap:8px;align-items:flex-start;margin:10px 0"><input type="checkbox" data-itc="check"${ck.off ? '' : ' checked'}><span>${esc(ck.label)}<br><small class="muted">${esc(ck.hint)}</small></span></label>`);
-        $('[data-itc="check"]', md).addEventListener('change', e => { ck.out.on = e.target.checked; });
+        const lb = document.createElement('label'), inp = document.createElement('input'), sp = document.createElement('span'), sm = document.createElement('small');
+        lb.className = 'row'; lb.style.cssText = 'gap:8px;align-items:flex-start;margin:10px 0';
+        inp.type = 'checkbox'; inp.dataset.itc = 'check'; inp.checked = !ck.off;
+        sm.className = 'muted'; sm.textContent = ck.hint;
+        sp.append(ck.label, document.createElement('br'), sm); lb.append(inp, sp);
+        $('.cdlg-b', md).after(lb);
+        inp.addEventListener('change', () => { ck.out.on = inp.checked; });
       });
       if (!org && orgAlt) {  // 2.144.5 B (#2002)
         $('.foot', md).insertAdjacentHTML('afterbegin', `<button type="button" class="btn" data-itc="org">${wsIcon(orgAlt)} ${esc(tr('Rather into {0}', wsName(orgAlt)))}</button>`);
