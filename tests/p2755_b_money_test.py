@@ -150,19 +150,21 @@ for i, v in enumerate(['12.5', '0', '', '1234.567']):
 d = c.execute("SELECT id FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", ({DID},)).fetchall()
 draft = {DRAFT}
 c.execute("UPDATE office_doc_items SET net='', tax_amount='7.5' WHERE doc_id=?", (draft,))
-out['first'] = mc_migrate(c, 'x')
+# #5951: kalmido_migrations.applied_at is TIMESTAMPTZ now - the start's time is a point in time, not 'x'
+AT = '{Y}-01-02T09:00:00Z'
+out['first'] = mc_migrate(c, AT)
 out['kept_type'] = mc_type(c, 'office_cash_entries', 'amount')
 c.execute("UPDATE office_cash_entries SET amount='1234.50' WHERE id=?", (ids[3],))
-out['second'] = mc_migrate(c, 'x')
+out['second'] = mc_migrate(c, AT)
 out['values'] = [str(c.execute("SELECT amount::text FROM office_cash_entries WHERE id=?", (i,)).fetchone()[0]) for i in ids]
 out['orig'] = c.execute("SELECT amount::text FROM office_cash_entries WHERE id=?", ({EID},)).fetchone()[0]
 out['draft'] = [list(x) for x in c.execute("SELECT net::text, tax_amount::text FROM office_doc_items WHERE doc_id=?", (draft,)).fetchall()]
 out['dflt'] = c.execute("SELECT column_default FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='office_cash_entries' AND column_name='amount'").fetchone()[0]
 out['chain_num'] = hch_check(c, {ORG})['ok']
-out['third'] = mc_migrate(c, 'x')
+out['third'] = mc_migrate(c, AT)
 c.execute("ALTER TABLE office_doc_items ALTER COLUMN tax_amount TYPE TEXT USING tax_amount::text")
 c.execute("UPDATE office_doc_items SET tax_amount='-0.00' WHERE id=?", (d[1]['id'],))
-out['chained_negzero'] = mc_migrate(c, 'x')['office_doc_items.tax_amount']
+out['chained_negzero'] = mc_migrate(c, AT)['office_doc_items.tax_amount']
 c.rollback()
 print(json.dumps(out))
 """)

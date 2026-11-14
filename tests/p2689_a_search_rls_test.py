@@ -74,7 +74,10 @@ mine["inbox"] = A.post(B + "/api/tasks", json={"list_id": INBOX, "title": "priva
 GONE = A.post(B + "/api/tasks", json={"list_id": LA, "title": "deleted needle"}).json()["id"]
 check(A.delete(B + f"/api/tasks/{GONE}").ok, "setup: one needle task deleted")
 FOREIGN = [Ca.post(B + "/api/tasks", json={"list_id": LB, "title": f"Beta needle {i}"}).json()["id"] for i in range(3)]
-dbx("ANALYZE tasks")
+# 2.1123 (#5951): lists / list_members analysed too - with no statistics the planner guesses their rows from the row width,
+# and the narrower time columns (TIMESTAMPTZ instead of TEXT) made it guess more visible lists than there are and pick a
+# sequential scan of tasks; a real database has its statistics (autovacuum), the test now as well
+dbx("ANALYZE tasks, lists, list_members")
 orgs = {x[0]: x[1] for x in dbx("SELECT list_id, MIN(org_id) FROM tasks WHERE list_id IN (?,?) GROUP BY list_id", (LA, LB))}
 check(orgs.get(LA) == ALPHA and orgs.get(LB) == BETA, f"setup: the seeded rows carry their list's organisation ({orgs})")
 
