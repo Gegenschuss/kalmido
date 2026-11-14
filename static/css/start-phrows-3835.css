@@ -1,0 +1,7 @@
+/* 2.1151.0 C (#3835): phones: the symbols of a list row are hidden (like .sr, they stay for screen readers), the row gets the full
+   width and a long press opens its menu with the same actions (multisel.js ms_rowMenu + ms_btnMenu). The computer is unchanged.
+   .ms-phsr = a row button that is hidden like that on a phone */
+@media (max-width:767px){
+  .ms-phsr{position:absolute!important;width:1px!important;min-width:0!important;height:1px!important;min-height:0!important;padding:0!important;margin:-1px!important;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0!important}
+  .terow.temine{-webkit-touch-callout:none}
+}
