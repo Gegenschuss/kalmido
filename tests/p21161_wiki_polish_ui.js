@@ -79,7 +79,8 @@ if (!process.env.P21161_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     await shot('p21161-select-360.png');
     await ev(`(() => { wk_selEnd(); renderView(); return 1; })()`);
     // a table in the editor: no header broken inside a word
-    await nav(B + '?w=360#wiki/' + P.check);
+    await nav(B + '?w=360&t=1#wiki/' + P.check);  // a new address = a full load (a change of the hash alone raced with the list's redraw)
+    await until(`WK.pg?.id === ${P.check}`, {timeout: 20000});
     if (await until(`!!document.querySelector('#view [data-wk="pen"]')`, {timeout: 20000})) await ev(`(() => { const b = document.querySelector('#view [data-wk="pen"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); return 1; })()`);  // a phone reads first
     const th = await until(`(() => { const ts = [...document.querySelectorAll('#wk-cm .cm-wktbl th')]; if (ts.length < 6) return null;
       return ts.map(t => { const r = document.createRange(); r.selectNodeContents(t); return [t.textContent.trim(), new Set([...r.getClientRects()].map(x => Math.round(x.top))).size]; }); })()`, {timeout: 20000});
