@@ -18548,6 +18548,10 @@
   "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Un nuovo messaggio di una persona o una risposta completata di un agente compare brevemente in alto, ovunque tu sia in Kalmido. Solo su questo dispositivo; finché l’app è aperta, questo dispositivo non riceve un push aggiuntivo.",
   "Download as PDF": "Scarica come PDF",
   "Download as Word (.docx)": "Scarica come Word (.docx)",
+  "{0} deletes their account on {1}. The project {2} is deleted with it: copy what you need before that day.": "{0} elimina il proprio account il {1}. Il progetto {2} viene eliminato insieme: copia ciò che ti serve prima di quel giorno.",
+  "Take over cards without a change date too": "Applica anche le schede senza data di modifica",
+  "A card without a change date (REV) then also overwrites a contact that was changed here.": "Una scheda senza data di modifica (REV) sovrascrive allora anche un contatto modificato qui.",
+  "{0} card without a change date overwrote a contact changed here": ["{0} scheda senza data di modifica ha sovrascritto un contatto modificato qui", "{0} schede senza data di modifica hanno sovrascritto contatti modificati qui"],
   "No receipts here yet": "Qui non ci sono ancora ricevute",
   "Receipts stay in their area. Open one to view, change or book it there.": "Le ricevute restano nella loro area. Aprine una per vederla, modificarla o registrarla lì."
 }

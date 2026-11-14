@@ -273,7 +273,7 @@ const newsInWs = it => wsCur() === 'all' || !it.list_id || inWs(listById(it.list
 // ("Rather into private", only with an organisation as the target). Resolves 'same' | 'private' | null (cancelled).
 // 2.144.5 B (#2002): orgAlt = 'org:<id>' offered the other way round when the target is the private space ("Rather into
 // <organisation>", resolves 'org').
-function importTargetConfirm({what, ws = 'private', place = '', privOk = false, orgAlt = '', check = null}) {  // 2.306.0 C (#2889): check = {label, hint, out}: a tick box, its state lands in out.on (default on)
+function importTargetConfirm({what, ws = 'private', place = '', privOk = false, orgAlt = '', check = null}) {  // 2.306.0 C (#2889): check = {label, hint, out}: a tick box, its state lands in out.on (default on); 2.1151.0 D (#4562): or a list of them, {off: true} = unticked
   const org = String(ws || '').startsWith('org:'), name = org ? wsName(ws) : '';
   let priv = false;
   const body = org
@@ -283,11 +283,12 @@ function importTargetConfirm({what, ws = 'private', place = '', privOk = false, 
   return askDialog({title: org ? tr('Import into the organisation {0}?', name) : tr('Import into your private workspace?'), body, ok: tr('Import'),
     after: md => {
       md.classList.add('itc-dlg');
-      if (check) {
-        check.out.on = true;
-        $('.cdlg-b', md).insertAdjacentHTML('afterend', `<label class="row" style="gap:8px;align-items:flex-start;margin:10px 0"><input type="checkbox" data-itc="check" checked><span>${esc(check.label)}<br><small class="muted">${esc(check.hint)}</small></span></label>`);
-        $('[data-itc="check"]', md).addEventListener('change', e => { check.out.on = e.target.checked; });
-      }
+      // 2.1151.0 D (#4562): check may be a list of boxes (in this order); off = unticked at first
+      [].concat(check || []).reverse().forEach(ck => {
+        ck.out.on = !ck.off;
+        $('.cdlg-b', md).insertAdjacentHTML('afterend', `<label class="row" style="gap:8px;align-items:flex-start;margin:10px 0"><input type="checkbox" data-itc="check"${ck.off ? '' : ' checked'}><span>${esc(ck.label)}<br><small class="muted">${esc(ck.hint)}</small></span></label>`);
+        $('[data-itc="check"]', md).addEventListener('change', e => { ck.out.on = e.target.checked; });
+      });
       if (!org && orgAlt) {  // 2.144.5 B (#2002)
         $('.foot', md).insertAdjacentHTML('afterbegin', `<button type="button" class="btn" data-itc="org">${wsIcon(orgAlt)} ${esc(tr('Rather into {0}', wsName(orgAlt)))}</button>`);
         $('button[data-itc]', md).addEventListener('click', () => { priv = 'org'; $('form', md).requestSubmit(); });

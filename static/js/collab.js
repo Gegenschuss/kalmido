@@ -286,6 +286,7 @@ function newsText(it, U) {
       outok: tr('{0} released {1}: you can move it into your private workspace now (within {2} days)', who, q(d.name || ''), d.days || 14),
       outno: tr('{0} rejected giving {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
+      acctdel: tr('{0} deletes their account on {1}. The project {2} is deleted with it: copy what you need before that day.', who, esc(fmtDayAbs(d.day || '')), q(d.name || '')),  // 2.1151.0 D (#4562)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
       rename: tr('{0} renamed the project {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
       restyle: tr('{0} changed the icon or colour of the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),

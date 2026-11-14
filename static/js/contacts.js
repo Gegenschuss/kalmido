@@ -765,17 +765,18 @@ function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf sha
       const fs = file ? [].concat(file) : [...inp.files], f = fs[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
       const b = (S.books || []).find(x => x.id === bid);
-      const ph = {};  // 2.306.0 C (#2889): vCard files only (a CSV has no pictures)
+      const ph = {}, nr = {};  // 2.306.0 C (#2889): vCard files only (a CSV has no pictures); 2.1151.0 D (#4562): nr = cards without REV win
       const to = await importTargetConfirm({what: tr('the contacts'), ws: wsOf(b), place: b?.name || '', privOk: true,
-        check: kind === 'csv' ? null : {label: tr('Import contact photos too'), hint: tr('For photos that are only linked in the file, this server fetches the pictures from the internet.'), out: ph}});
+        check: kind === 'csv' ? null : [{label: tr('Import contact photos too'), hint: tr('For photos that are only linked in the file, this server fetches the pictures from the internet.'), out: ph},
+          {label: tr('Take over cards without a change date too'), hint: tr('A card without a change date (REV) then also overwrites a contact that was changed here.'), out: nr, off: true}]});
       if (!to) return;
       if (to === 'private') {
         let pb = (S.books || []).find(x => !x.org_id && x.role === 'owner');
         if (!pb) { try { pb = await api('POST', '/api/books', {name: tr('Contacts'), org_id: null}); await load(); } catch { return; } }
         bid = pb.id;
       }
-      if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs, null, ph.on === false);  // 2.146.0 E (#2457): the server reads the vCards of all files
-      else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f, ph.on === false); else ctImpRun(bid, f, null, ph.on === false);  // 2.119.1 A (#2080): CSV: the columns first
+      if (fs.length > 1 || /\.zip$/i.test(f.name)) ctImpRun(bid, fs, null, ph.on === false, nr.on === true);  // 2.146.0 E (#2457): the server reads the vCards of all files
+      else if (kind === 'csv' || !/\.vcf$/i.test(f.name)) ctx_csvMap(bid, f, ph.on === false); else ctImpRun(bid, f, null, ph.on === false, nr.on === true);  // 2.119.1 A (#2080): CSV: the columns first
     };
     if (file) inp.onchange(); else inp.click();
   };
@@ -810,12 +811,12 @@ function dvaCtKept(j) {
   return (names.length ? ': ' + names.slice(0, 5).join(', ') + (j.kept_newer > Math.min(5, names.length) ? ', …' : '') : '')
     + (j.kept_norev ? ' · ' + trn('{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand', '{0} cards have no change date (REV): the contacts were changed here and keep their values, please compare by hand', j.kept_norev) : '');
 }
-function ctImpRun(bid, f, mapping, noPhotos) {
+function ctImpRun(bid, f, mapping, noPhotos, norev = false) {  // 2.1151.0 D (#4562): norev = cards without REV overwrite contacts changed here
   const p = ctImpPanel();
   let fi = null;  // 2.146.0 E (#2457): several files / a ZIP: how many were read, which not
   const done = async j => {
     const bad = fi?.errors?.length ? ' · ' + trn('{0} file not read', '{0} files not read', fi.errors.length) + ': ' + fi.errors.slice(0, 3).map(e => e.file).join(', ') : '';
-    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) + (j.bad?.length ? ': ' + j.bad.slice(0, 3).map(b => b.name ? `${b.name} (${b.reason})` : b.reason).join(', ') : '') : '') + (j.over_limit ? ' · ' + trn('{0} card over the limit not imported', '{0} cards over the limit not imported', j.over_limit) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + (j.kept_newer ? ' · ' + trn('{0} contact not overwritten, it is newer here', '{0} contacts not overwritten, they are newer here', j.kept_newer) + dvaCtKept(j) : '') + bad, null, true);
+    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) + (j.bad?.length ? ': ' + j.bad.slice(0, 3).map(b => b.name ? `${b.name} (${b.reason})` : b.reason).join(', ') : '') : '') + (j.over_limit ? ' · ' + trn('{0} card over the limit not imported', '{0} cards over the limit not imported', j.over_limit) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + (j.kept_newer ? ' · ' + trn('{0} contact not overwritten, it is newer here', '{0} contacts not overwritten, they are newer here', j.kept_newer) + dvaCtKept(j) : '') + (j.taken_norev ? ' · ' + trn('{0} card without a change date overwrote a contact changed here', '{0} cards without a change date overwrote contacts changed here', j.taken_norev) : '') /* 2.1151.0 D (#4562) */ + bad, null, true);
     if (j.dupes && (j.dupe_groups || []).length) ctx_dupBtn(p.el, j.dupe_groups);  // 2.119.1 A (#2084)
     await load().catch(() => {}); ctLoad();
   };
@@ -842,7 +843,7 @@ function ctImpRun(bid, f, mapping, noPhotos) {
       p.set(tr('Import running…') + ' ' + tr('{0} of {1} contacts', st.done, st.total), .3 + .7 * (st.total ? st.done / st.total : 0));
     }
   };
-  x.send((() => { const fd = new FormData(); if (Array.isArray(f)) f.forEach(y => fd.append('files', y)); else fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); if (noPhotos) fd.append('photos', '0'); return fd; })());
+  x.send((() => { const fd = new FormData(); if (Array.isArray(f)) f.forEach(y => fd.append('files', y)); else fd.append('file', f); if (mapping) fd.append('mapping', JSON.stringify(mapping)); if (noPhotos) fd.append('photos', '0'); if (norev) fd.append('norev', '1'); return fd; })());
 }
 // 2.119.1 A (#2080): a CSV file (Outlook, Google Contacts, a spreadsheet): the server reads it (delimiter, encoding) and suggests
 // a field per column; here the person checks / changes them, then the rows take the vCard import's way (ctImpRun: progress, background)
