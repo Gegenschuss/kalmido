@@ -259,8 +259,9 @@ def _callsheet(c, run, src, d, ctx):
         return False
     try:
         raw = cs_clean(json.loads(src.get("data") or "{}"))
-        if raw.get("pack"):  # 2.1158.0 (#4566 A): a ticked device (e:<equipment id>) on its new id, a device that did not come along drops
-            keys = [k if not k.startswith("e:") else (f"e:{n}" if (n := run.m("office_equipment", int(k[2:]))) else "") for k in raw["pack"]]
+        if raw.get("pack"):  # 2.1158.0 (#4566 A): a ticked device (e:<equipment id>) / set on its new id, a device that did not come along drops
+            tb = {"e": "office_equipment", "s": "office_sets"}  # a set (s:<id>, its line for a person without the equipment area)
+            keys = [k if k[:2] not in ("e:", "s:") else (f"{k[0]}:{n}" if (n := run.m(tb[k[0]], int(k[2:]))) else "") for k in raw["pack"]]
             raw["pack"] = sorted({k for k in keys if k})
         d["data"] = json.dumps(raw, ensure_ascii=False)
     except (ValueError, TypeError, BadInput):

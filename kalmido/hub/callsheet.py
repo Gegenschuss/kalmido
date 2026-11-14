@@ -107,7 +107,7 @@ CS_ROWS = {"calls": (("dept", "time"), 30),
 CS_CELL = 200
 CS_REFS = ("client_contact", "agency_contact")  # 2.986.0 (#5649): contact ids of the day details
 CS_CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
-CS_PACK_RE = re.compile(r"^(e:[1-9][0-9]{0,17}|t:[0-9a-f]{10})$")  # 2.1158.0 (#4566 A): a line of the packing list (cs_pack)
+CS_PACK_RE = re.compile(r"^([es]:[1-9][0-9]{0,17}|t:[0-9a-f]{10})$")  # 2.1158.0 (#4566 A): a line of the packing list (cs_pack)
 CS_PACK_MAX = 300
 
 
@@ -329,8 +329,10 @@ def cs_pack(c, uid, oid, rows):
     bookings (key "e:<device>"; a set: each of its devices, set = the set's name; the same device twice = the quantities added
     up), then the rows of the quotation's equipment set without a device of the master data (key "t:<hash of the name>",
     text True). Category and the text lines only for a person who may see the equipment area (office/rights.py ofr_allows,
-    like the disposition's resources); the booked devices' names everybody of the disposition sees anyway."""
-    from ..office.offerdispo import odp_set_rows
+    like the disposition's resources), the text lines also the quotations area; without the equipment area a booked set is
+    one line with its name (key "s:<set>"), as the disposition shows it (review F4). The booked devices' names everybody
+    of the disposition sees anyway."""
+    from ..office.offerdispo import ODP_QTY_MAX, odp_set_rows
     eq_ok = ofr_allows(c, uid, oid, "equipment")
     out = {}
 
@@ -343,9 +345,15 @@ def cs_pack(c, uid, oid, rows):
 
     names = {}
     for b in rows:
-        q = max(1, int(b.get("qty") or 1))
+        q = min(ODP_QTY_MAX, max(1, int(b.get("qty") or 1)))  # review F6: bounded like odp_gear
         if b["resource_kind"] == "equipment":
             add(b["resource_id"], b["res_label"], q)
+        elif b["resource_kind"] == "set" and not eq_ok:  # review F4: without the equipment area the set as one line (as the disposition)
+            k = f"s:{int(b['resource_id'])}"
+            if k in out:
+                out[k]["qty"] += q
+            else:
+                out[k] = {"key": k, "eid": 0, "name": b["res_label"] or "?", "category": "", "qty": q, "set": "", "text": False}
         elif b["resource_kind"] == "set":
             r = c.execute("SELECT name, items FROM office_sets WHERE id=? AND org_id=?", (b["resource_id"], oid)).fetchone()
             try:
@@ -355,10 +363,10 @@ def cs_pack(c, uid, oid, rows):
             for it in items if isinstance(items, list) else []:
                 if isinstance(it, dict) and str(it.get("equipment_id", "")).isdigit():
                     try:
-                        n = max(1, int(float(it.get("qty") or 1)))
-                    except (TypeError, ValueError):
+                        n = min(ODP_QTY_MAX, max(1, int(float(it.get("qty") or 1))))
+                    except (TypeError, ValueError, OverflowError):  # review F6: an infinite quantity
                         n = 1
-                    add(int(it["equipment_id"]), "", n * q, (r["name"] if r else "") or b["res_label"] or "")
+                    add(int(it["equipment_id"]), "", min(ODP_QTY_MAX, n * q), (r["name"] if r else "") or b["res_label"] or "")
     ids = sorted({x["eid"] for x in out.values()})
     if ids:
         for e in c.execute(f"SELECT id, name, category FROM office_equipment WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", (oid, *ids)):
@@ -369,7 +377,7 @@ def cs_pack(c, uid, oid, rows):
             x["name"] = nm or "?"
         x["category"] = cat if eq_ok else ""
     lines = sorted(out.values(), key=lambda x: (x["category"].casefold(), x["name"].casefold(), x["eid"]))
-    if eq_ok:
+    if eq_ok and ofr_allows(c, uid, oid, "offers"):  # review F4: the text lines come from the quotation
         seen, text = set(), {}
         for b in rows:
             m = re.match(r"^d:([1-9][0-9]{0,17}):", b.get("offer_pos") or "")
@@ -457,7 +465,7 @@ def cs_clean(d):
         out[k] = v
     v = d.get("pack")  # 2.1158.0 (#4566 A): the ticked lines of the packing list (cs_pack keys), sorted, each once
     if v is not None:
-        if not isinstance(v, list) or len(v) > CS_PACK_MAX or not all(isinstance(x, str) and CS_PACK_RE.match(x) for x in v):
+        if not isinstance(v, list) or len(v) > CS_PACK_MAX or not all(isinstance(x, str) and CS_PACK_RE.fullmatch(x) for x in v):
             raise BadInput(tr("Invalid value: {0}", "pack"))
         out["pack"] = sorted(set(v))
     for k, (cols, most) in CS_ROWS.items():

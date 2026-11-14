@@ -80,10 +80,12 @@ def scenario(S, who, oid, cam):
     r = S.post(B + f"{D}/{Q}/parts", json={"kind": "shoot", "title": "Dreh Studio"})
     check(r.status_code in (200, 201), f"{who}: the shoot part {r.text[:200]}")
     pid = r.json()["part"]["id"]
-    r = S.patch(B + f"{D}/{Q}/parts/{pid}", json={"sheet": {"head": {"shoot_days": 2}, "staff": [{"role_id": cam, "qty": 1}],
+    r = S.patch(B + f"{D}/{Q}/parts/{pid}", json={"sheet": {"head": {"shoot_days": 2}, "staff": [{"role_id": cam, "qty": 1, "uid": "g"}],
                                                              "set": {"name": "Studio", "items": [{"equipment_id": KA, "qty": 1}, {"equipment_id": ST, "qty": 2.5},
                                                                                                  {"equipment_id": AL, "qty": 1}]}}})
     check(r.ok, f"{who}: the sheet with its equipment set {r.text[:200]}")
+    stf = (((r.json().get("part") or {}).get("sheet") or {}).get("staff") or [{}])[0]
+    check(stf.get("uid") and stf["uid"] != "g", f"{who}: review F3: a crew row never keeps the uid g (the device key) {stf}")
     check(S.patch(B + f"{O}/equipment/{AL}", json={"archived": 1}).ok, f"{who}: the old light archived (no device of the master data any more)")
     # ------------------------------------------------------------ the preview
     dp = S.get(B + f"{D}/{Q}/tasks").json().get("dispo") or {}
@@ -129,6 +131,8 @@ def scenario(S, who, oid, cam):
     check(sorted(cs["data"].get("pack") or []) == sorted(tick) and cs["data"].get("loc_name") == "Studio 3", f"{who}: read again, the ticks stay {cs['data']}")
     r = S.put(B + CS + JOB, params={"org": oid}, json={"data": {"pack": ["x:1"]}, "expect_updated_at": cs["updated_at"]})
     check(r.status_code == 400, f"{who}: an unknown key 400 {r.status_code}")
+    r = S.put(B + CS + JOB, params={"org": oid}, json={"data": {"pack": [f"e:{ST}\n"]}, "expect_updated_at": cs["updated_at"]})
+    check(r.status_code == 400, f"{who}: review F5: a key with a line break 400 {r.status_code}")
     hist = S.get(B + CS + JOB + "/history", params={"org": oid}).json().get("history") or []
     check(any("pack" in h["fields"] for h in hist), f"{who}: the history of the call sheet (obj_write) names the packing list {hist}")
     r = S.get(B + CS + JOB + "/pdf", params={"org": oid})
