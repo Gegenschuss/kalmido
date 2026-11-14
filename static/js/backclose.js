@@ -20,6 +20,7 @@ const F8D_LV = [
   ['palette', () => f8d_one($('.palette:not(.an-out)')), () => closePalette()],
   ['dpop', () => typeof DP === 'object' && DP.el ? [DP.el] : [], () => dpClose(true)],
   ['lightbox', () => $$('.lightbox'), el => el.remove()],
+  ['wkpres', () => f8d_one($('#wkp')), () => { if (typeof wkp_close === 'function') wkp_close(); }],  // 2.1153.0 (#5525): a page as a presentation (wklive.js)
   ['pop', () => { const pop = $('#pop'); return pop && !pop.classList.contains('hidden') ? [pop] : []; }, () => closePop()],
   // 2.497.0 (#4040): shopping mode has its own history entry (family.js): a second one here stayed behind after closing it (a dead Back)
   // 2.956.0 (#5230): not the search palette (a .modal too): it is its own level, it counted twice (two entries for one level)

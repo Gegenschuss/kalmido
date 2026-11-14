@@ -18548,5 +18548,12 @@
   "Check the connection in the settings, or remove it.": "Revisa la conexión en los ajustes o elimínala.",
   "{0} new message from {1}": ["{0} mensaje nuevo de {1}", "{0} mensajes nuevos de {1}"],
   "Pop-up for new messages": "Ventana emergente para mensajes nuevos",
-  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Un mensaje nuevo de una persona o una respuesta terminada de un agente aparece brevemente en el borde superior, estés donde estés en Kalmido. Solo en este dispositivo; mientras la app está abierta, este dispositivo no recibe un push adicional."
+  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Un mensaje nuevo de una persona o una respuesta terminada de un agente aparece brevemente en el borde superior, estés donde estés en Kalmido. Solo en este dispositivo; mientras la app está abierta, este dispositivo no recibe un push adicional.",
+  "Present": "Presentar",
+  "Slide": "Diapositiva",
+  "Slide {0} of {1}": "Diapositiva {0} de {1}",
+  "Previous slide": "Diapositiva anterior",
+  "Next slide": "Diapositiva siguiente",
+  "End presentation": "Terminar presentación",
+  "Presentation: {0}": "Presentación: {0}"
 }
