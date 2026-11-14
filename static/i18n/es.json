@@ -18563,5 +18563,7 @@
   "To ({0})": "Para ({0})",
   "Without an e-mail address: {0}": "Sin dirección de correo: {0}",
   "No receipts here yet": "Aquí todavía no hay recibos",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Los recibos se quedan en su área. Abre uno para verlo, cambiarlo o contabilizarlo allí."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Los recibos se quedan en su área. Abre uno para verlo, cambiarlo o contabilizarlo allí.",
+  "You can only read here": "Aquí solo puedes leer",
+  "No documents yet": "Aún no hay documentos"
 }

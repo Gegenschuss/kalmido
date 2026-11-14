@@ -27,6 +27,12 @@ const ab_url = (n, dl, v) => `/api/files/nodes/${n.id}/content?${[dl ? 'dl=1' : 
 const ab_isImg = n => /^image\/(png|jpe?g|gif|webp|avif)$/.test(n.mime || '');
 const ab_isPdf = n => n.mime === 'application/pdf';
 const ab_canWrite = r => r === 'owner' || r === 'edit';
+// 2.1162.0 (#6108): may the person add at the top of space sp? Private: always; an organisation: not as read-only / guest /
+// accounting (the server's need_org_write, files/store.py; only the view follows it, the server still decides)
+const AB_RO_ROLES = ['readonly', 'guest', 'accounting'];
+const ab_spWrite = sp => sp === 'private' || (!!sp && sp.startsWith('org:') && !AB_RO_ROLES.includes(wsOrg(sp.slice(4))?.role));
+// 2.1162.0 (#6108): a drop onto a place the person only reads: a short note instead of nothing (once per drag, not on every dragover)
+const ab_roHint = () => { const t = Date.now(); if (t - (AB.roAt || 0) > 4000) toast(tr('You can only read here')); AB.roAt = t; };
 const ab_role = r => r === 'owner' ? tr('Owner') : r === 'edit' ? tr('Can edit') : r === 'view' ? tr('Can view') : '';
 const ab_when = iso => iso ? fmtDay('short', new Date(iso)) : '';
 // 2.199.0 A (#2742): FS_REF_ICON[ref_kind] = the icon of a filed office document / sheet (set by its module)
@@ -106,7 +112,7 @@ function viewAblage() {
   const treeHtml = tree.map(t => `<button type="button" class="abspace abtree ${t.on ? 'on' : ''}" style="--ablvl:${Math.min(t.lvl, 6)}" data-go="ablage/${t.id}" data-abdrop="${t.id}" ${t.on ? 'aria-current="page"' : ''}>${ic('folder', 's')}<span>${esc(t.name)}</span></button>`).join('');
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${ab_docBtns(true)}</nav>`;  // 2.353.0 D (#2759): + the saved filters; 2.752.0 (#4887): All documents, To review
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
-  const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
+  const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : ab_spWrite(sp);  // 2.1162.0 (#6108): + the role in the organisation
   // 2.752.0 (#4887): a folder with recognition shows the documents' view (abdocs.js abd_foldHtml: their bar, the documents' cards,
   // its subfolders before them); every other folder its list as before
   const fold = !!(r.nid && d?.node && typeof abd_recogHere === 'function' && abd_recogHere(key) && typeof abd_foldHtml === 'function');
@@ -194,7 +200,8 @@ function ab_panelHtml() {
     const tree = one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1);
     const rest = sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode));  // 2.932.0 (#5603): "Shared with me" and the trash on the left edge of Files / All documents (level 0), not stepped in like a sub folder; below the filter groups it starts with a group's gap, so it does not read as a value of the last group
     // 2.768.0 (#4888): "+" at the head of the tree = a new folder at the top of the space it shows (one space: that one; several: the one open)
-    const add = `<button type="button" class="iconbtn abtadd" data-abtadd="${esc(one ? real[0] : (real.includes(ab_curSpace()) ? ab_curSpace() : real[0] || ''))}" title="${esc(tr('New folder'))}" aria-label="${esc(tr('New folder'))}">${ic('plus', 's')}</button>`;
+    const addSp = one ? real[0] : (real.includes(ab_curSpace()) ? ab_curSpace() : real[0] || '');
+    const add = !ab_spWrite(addSp) ? '' /* 2.1162.0 (#6108): only where the person may add */ : `<button type="button" class="iconbtn abtadd" data-abtadd="${esc(addSp)}" title="${esc(tr('New folder'))}" aria-label="${esc(tr('New folder'))}">${ic('plus', 's')}</button>`;
     return `<div class="abthead">${sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`)}${real.length ? add : ''}</div>` + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`
       + (dOn ? docRows() : '') + `<div class="sbbtree abrest${dOn ? ' sgroup' : ''}" role="group" aria-label="${esc(tr('Shared with me'))}">${rest}</div>`;
   };
@@ -676,15 +683,19 @@ document.addEventListener('dragover', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideOver(e); return; }
   const files = [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e), t = e.target.closest('[data-abdrop]');  // 2.750.0 (#4879)
   if (AB.drag && t && ab_dropOk(t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop)) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }  // 2.750.0 (#4879): its own folder takes nothing
-  if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
+  if (files && ab_filesOk(v, t)) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
+  else if (files && !AB.drag) ab_roHint();  // 2.1162.0 (#6108): a read-only place says so
 });
+// 2.1162.0 (#6108): files from the computer: the open place takes them (abdropok), or the folder row under the pointer when the person may add there
+const ab_filesOk = (v, t) => v.classList.contains('abdropok') || (!!t && t.dataset.abdrop !== 'top' && ab_canWrite(ab_item(+t.dataset.abdrop)?.role));
 document.addEventListener('dragleave', e => { if (e.target.classList?.contains('abview') && !e.target.contains(e.relatedTarget)) e.target.classList.remove('abdrop'); });
 document.addEventListener('drop', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideDrop(e); return; }
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
   const t = e.target.closest('[data-abdrop]');
   if (AB.drag || kn_has(e)) { if (!AB.dragIds && !AB.drag) AB.dragIds = kn_ids(e).slice(0, 1); const to = t ? (t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop) : undefined; if (t && to !== undefined) ab_dragDrop(to); else { AB.drag = null; AB.dragIds = null; } return; }  // 2.750.0 (#4879): a drag from Kalmido never uploads; 2.768.0 (#4888): the whole choice
-  const fs = e.dataTransfer?.files; if (!fs?.length || !v.classList.contains('abdropok')) return;
+  const fs = e.dataTransfer?.files; if (!fs?.length) return;
+  if (!ab_filesOk(v, t)) { ab_roHint(); return; }  // 2.1162.0 (#6108)
   ab_upload(fs, t && t.dataset.abdrop !== 'top' ? +t.dataset.abdrop : S.route.nid || null);
 });
 
@@ -781,8 +792,9 @@ function ab_selBar(trash) {
   if (!AB.selOn) return '';
   if (trash) return ab_trashBar();  // 2.589.0 (#4875)
   const xs = ab_selVals(), n = xs.length, docs = xs.some(x => x.isdoc), more = docs || smv_can(xs[0]?.org_id || null);
+  const w = !n || xs.some(x => ab_canWrite(x.role));  // 2.1162.0 (#6108): nothing chosen the person may change = no Move / Trash
   return ms_barHtml('ab-sbar', 'absel', n, tr('Tap files'), [['all', 'all', n && n >= ab_selTotal() ? tr('Select none') : tr('All')],
-    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ['trash', 'trash', isMobile() ? tr('Trash') : tr('Move to the trash'), 'danger']  /* a phone: the short word (its question says it all) */, ...more ? [['more', 'dots', tr('More')]] : []]);
+    ...w ? [['move', 'arrow', tr('Move')]] : [], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ...w ? [['trash', 'trash', isMobile() ? tr('Trash') : tr('Move to the trash'), 'danger']] : []  /* a phone: the short word (its question says it all) */, ...more ? [['more', 'dots', tr('More')]] : []]);
 }
 // a tap while choosing / Ctrl- or Cmd-click / the box: one row or card; Shift: the range from the last one (the anchor stays)
 function ab_selPick(id, shift) {
