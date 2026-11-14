@@ -238,7 +238,7 @@ function povFile(f, url, del, src = 'pf') {
     name: f.name, size: f.size, dlUrl: url(f, true), aid: url === povFileUrl ? undefined : f.id}) : '';
   return `<div class="povf"><a href="${url(f, !(pdf || img))}" ${pdf || img ? 'target="_blank" rel="noopener"' : 'download'}${pdf ? pv_attr({url: url(f, false), name: f.name, size: f.size, dlUrl: url(f, true)}) : ''}${dv} title="${esc(f.name)}">${ic(img ? 'file' : pdf ? 'pdf' : 'file')}<span class="pfn">${esc(f.name)}</span><span class="muted pfs">${fmtSize(f.size)}</span>${upMarkHtml(f.up)}</a>${del || ''}</div>`;
 }
-const povDel = (k, id, lab) => `<button class="iconbtn povx" data-pov="${k}" data-id="${id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('x', 's')}</button>`;
+const povDel = (k, id, lab) => `<button class="iconbtn povx ms-phsr" data-pov="${k}" data-id="${id}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('x', 's')}</button>`;
 function povSec(id, title, body, extra = '', empty = '') {
   // 2.32.0 (#1061): an empty block is one line (title, a short hint, its button); it grows once it has content
   if (empty || !body) return `<section class="povs povs-empty" id="pov-${id}"><div class="povh"><h3>${title}</h3>${empty ? `<span class="muted povemh" title="${esc(empty)}">${esc(empty)}</span>` : ''}<span class="spacer"></span>${extra}</div>${body}</section>`;
@@ -270,6 +270,10 @@ async function povLinkMove(l, j, i, to) {
   const ids = j.links.map(x => x.id); ids.splice(to, 0, ids.splice(i, 1)[0]);
   try { await povApi('PUT', `/api/lists/${l.id}/links/order`, {ids}); } catch { /* shown */ }
 }
+// 2.1151.0 B (#3835): phones: milestones, project files and key links have no symbols in the row (.ms-phsr, kept for screen
+// readers); a long press opens the menu of those buttons (multisel.js ms_rowMenu / ms_btnMenu). A key link's grip still drags
+const POV_PHB = [['#view .povm', '[data-pov="ms-edit"]', '.pmn'], ['#view .povfl .povf', '.povlk, .povx', '.pfn'], ['#view .povl .povla', '[data-pov="link-edit"]', '.pln', '.povl']];
+domReady(() => { for (const [sel, btns, name, up] of POV_PHB) ms_rowMenu(sel, el => { const r = up ? el.closest(up) : el; if (r?.querySelector(btns)) ms_btnMenu(r, btns, r.querySelector(name)?.textContent.trim() || ''); }); });  // multisel.js loads later
 let povRowdOn = false;
 function povRowd() {
   if (povRowdOn) return;
@@ -301,10 +305,10 @@ function viewProjOv() {
   const ms = j.milestones.map(m => `<div class="povm ${m.done ? 'done' : m.day < t0 ? 'over' : ''}">
       <button class="chk ms ${m.done ? 'on' : ''}" data-pov="ms-done" data-id="${m.id}" role="checkbox" aria-checked="${m.done}" aria-label="${esc(tr('Reached: {0}', m.name))}" ${can ? '' : 'disabled'}>${m.done ? ic('check') : ''}</button>
       <span class="pmn">${S.tasks.has(m.id) ? `<button type="button" class="linkbtn" data-pov="ms-open" data-id="${m.id}" title="${esc(tr('Open the milestone'))}"><span>${esc(m.name)}</span></button>` : `<span>${esc(m.name)}</span>`}</span><span class="pmd">${esc(m.day ? fmtDateLoc(m.day) : tr('No date'))}</span>
-      ${can ? `<button class="iconbtn" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
+      ${can ? `<button class="iconbtn ms-phsr" data-pov="ms-edit" data-id="${m.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div>`).join('');
   if (j.role !== 'participant') P.ms = x => povSec('ms', tr('Milestones'), ms + (typeof env_ovHtml === 'function' ? env_ovHtml(l, can, !!ms) : ''), (can ? `<button class="btn sm" data-pov="ms-add">${ic('plus', 's')}<span>${tr('Add milestone')}</span></button>` : '') + x, emp(!ms, tr('No milestones yet.')));
   // files
-  const filesA = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf'));
+  const filesA = j.files.map(f => povFile(f, povFileUrl, (typeof ab_linkBtn === 'function' ? ab_linkBtn('list_file', f.id, l.org_id, 'iconbtn povlk ms-phsr') : '') + (can ? povDel('file-del', f.id, tr('Remove')) : ''), 'pf'));
   const files = filesA.length;  // count; the rows are built by povFlHtml  // 2.48.0 (#1207): + "Show in the file store"
   const fAdd = can ? `<label class="btn sm povup" title="${esc(tr('Images, PDFs, documents') + (isTouch() ? '' : '. ' + tr('Or drop files here')))}">${ic('upload', 's')}<span>${tr('Add file')}</span><input type="file" id="pov-file" multiple hidden></label>` : '';
   // 2.64.2 B (#1817): a list file (encrypted with the list key): the lock tile, decrypted on a click
@@ -315,7 +319,7 @@ function viewProjOv() {
   // side: key links, members, time
   if (can) povRowd();
   const links = j.links.map((x, i) => `<div class="povl">${can ? rowd_grip('lnk') : ''}${flkLink(x.url, 'povla', `${ic(povLinkIcon(x.url), 's')}<span class="pln">${esc(x.title)}</span><span class="muted plh">${esc(povHost(x.url))}</span>`)}
-      ${can ? `<span class="povlb">${i ? rowd_arrows(`<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>`) : ''}<button class="iconbtn" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
+      ${can ? `<span class="povlb">${i ? rowd_arrows(`<button class="iconbtn" data-pov="link-up" data-id="${x.id}" title="${esc(tr('Move up'))}" aria-label="${esc(tr('Move up'))}">${ic('chev', 's up')}</button>`) : ''}<button class="iconbtn ms-phsr" data-pov="link-edit" data-id="${x.id}" title="${esc(tr('Edit'))}" aria-label="${esc(tr('Edit'))}">${ic('edit', 's')}</button></span>` : ''}</div>`).join('');
   P.links = x => povSec('links', tr('Key links'), links, (can ? `<button class="btn sm" data-pov="link-add">${ic('plus', 's')}<span>${tr('Add link')}</span></button>` : '') + x, emp(!links, tr('No links yet: repository, designs, documents.')));
   if (collab() && j.members.length) {
     P.people = x => povSec('people', tr('Members'), `<div class="povp">${j.members.map(p => `<div class="povpm">${avBtn(p.user_id, p.name)}<span class="ppn">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}</span><span class="muted">${esc(roleLabel(p.role))}</span></div>`).join('')}</div>`,
