@@ -18548,5 +18548,7 @@
   "Check the connection in the settings, or remove it.": "Vérifie la connexion dans les réglages ou supprime-la.",
   "{0} new message from {1}": ["{0} nouveau message de {1}", "{0} nouveaux messages de {1}"],
   "Pop-up for new messages": "Fenêtre contextuelle pour les nouveaux messages",
-  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Un nouveau message d’une personne ou une réponse terminée d’un agent s’affiche brièvement en haut de l’écran, où que tu sois dans Kalmido. Uniquement sur cet appareil ; tant que l’app est ouverte, cet appareil ne reçoit pas de push supplémentaire pour cela."
+  "A new message from a person or a finished answer of an agent shows briefly at the top edge, wherever you are in Kalmido. Only on this device; while the app is open, this device gets no extra push for it.": "Un nouveau message d’une personne ou une réponse terminée d’un agent s’affiche brièvement en haut de l’écran, où que tu sois dans Kalmido. Uniquement sur cet appareil ; tant que l’app est ouverte, cet appareil ne reçoit pas de push supplémentaire pour cela.",
+  "No receipts here yet": "Aucun justificatif ici pour l’instant",
+  "Receipts stay in their area. Open one to view, change or book it there.": "Les justificatifs restent dans leur espace. Ouvre-en un pour le consulter, le modifier ou le comptabiliser là-bas."
 }

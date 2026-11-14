@@ -16,6 +16,9 @@ object (only listed when it has something the person may read):
   every key (also the ones above) the files (kind 'file') that lie in the area's folders (put there by an older version):
             per folder -- nothing that lay there drops out of sight
 Knowledge pages themselves are found through the global search (palette), not in the file store.
+2.1148.0 (#4895): last, "Receipts" (key receipts, parts rcoffice / rcmeals / rcbudget, files/fsreceipts.py): references to the
+receipts of the office, the entertainment receipts and the household budget -- items without a file address, `open` = the
+app address of the receipt's area (they stay there); the collection entry carries subs [{key, name}] = its parts with something.
 
 Only a person in the web app gets the collections (fslock.fsl_person_ok: no agent, no API token); the files open through their
 own routes (/api/wiki/files/<id>, /api/list-files/<id>, /api/sheets/<id>/files/<id>, /api/files/nodes/<id>/content), which check the rights again.
@@ -248,6 +251,9 @@ def _unlocked(c, groups):
 
 def fsv_groups(c, uid, oid, key, limit=FSV_MAX):
     """The groups of collection key in space oid (None: private) for uid, at most limit files."""
+    from .fsreceipts import RCX_KEYS, rcx_groups  # 2.1148.0 (#4895): loaded after the office / budget / documents (ORDER)
+    if key in RCX_KEYS:  # "Receipts": references to the receipts of the office, the meals and the budget (files/fsreceipts.py)
+        return rcx_groups(c, uid, oid, key, limit)
     groups = []
     if not _key_on(c, uid, oid, key):
         return groups
@@ -270,13 +276,16 @@ def fsv_collections(c, uid, oid):
     one file only)."""
     if not _person():
         return []
-    return [{"key": k, "name": tr(FSV_KEYS[k])} for k in FSV_ORDER if fsv_groups(c, uid, oid, k, limit=1)]
+    from .fsreceipts import rcx_collection  # 2.1148.0 (#4895)
+    rc = rcx_collection(c, uid, oid)  # "Receipts" last, below the tree: {key, name, subs} (only the parts with something)
+    return [{"key": k, "name": tr(FSV_KEYS[k])} for k in FSV_ORDER if fsv_groups(c, uid, oid, k, limit=1)] + ([rc] if rc else [])
 
 
 @app.get("/api/files/collections/<key>")
 def files_collection(key):
     """One collection "From <area>" of a space (module docstring): read-only, grouped by object."""
-    if key not in FSV_KEYS:
+    from .fsreceipts import RCX_KEYS  # 2.1148.0 (#4895): + "Receipts" and its parts
+    if key not in FSV_KEYS and key not in RCX_KEYS:
         raise Denied(404)
     c = db()
     uid = me()
@@ -292,5 +301,5 @@ def files_collection(key):
             del g[2][FSV_MAX - total:]
             cut = True
         total += len(g[2])
-    return jsonify(key=key, name=tr(FSV_KEYS[key]), space=f"org:{oid}" if oid else "private", more=cut,
+    return jsonify(key=key, name=tr(FSV_KEYS.get(key) or RCX_KEYS[key]), space=f"org:{oid}" if oid else "private", more=cut,
                    groups=[{"title": g[0], "open": g[1], "items": g[2]} for g in groups if g[2]])
