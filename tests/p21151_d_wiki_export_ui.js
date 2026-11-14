@@ -50,10 +50,12 @@ const MODS = 'wiki,comments';
     const {cmd, ev, ctx, nav, shot} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('wkSt', 'book'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: ${JSON.stringify(H)}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'login in the browser');
     await nav(B + `#wiki/${PG}`);
     check(await ready(ev, `!!S.booted && !!document.querySelector('#view [data-wk="pmenu"]') && !!document.querySelector('#view .wkpage')`, 80), 'computer: the page is open');
+    await ev(`(() => { LS.set('wkSt', 'book'); renderView(); return 1; })()`);  // the own reading style (the account's look, set after the start)
+    check(await ready(ev, `!!document.querySelector('#view .wkpage.wkst-book') && !!document.querySelector('#view [data-wk="pmenu"]')`, 40), 'the page is shown in Book');
     const it = await openMenu(ev);
     await shot('p21151d-menu.png');
     check(it.includes('Download as PDF') && it.includes('Download as Word (.docx)') && it.includes('Rename…'), 'the page\'s "…" offers PDF and Word ' + JSON.stringify(it));
