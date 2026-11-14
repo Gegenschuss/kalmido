@@ -2714,7 +2714,9 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
   agent, a booked person / contact / item it does not know has no `rid` and `label`. 2.589.0 (#4571): a shoot day taken
   from a quotation (`offer: true`) has open places: `kind` `slot`, `rid` 0, the crew function as `label` and `slot`; a person
   fills them in the disposition (agents do not); `offer_mark` `changed` / `gone` = a newer version of the quotation would
-  change a firm booking or a filled place. A personal agent (also of a freelancer)
+  change a firm booking or a filled place. 2.1158.0 (#4566): the devices of the quotation's equipment set come along as
+  bookings `kind` `equipment` of the same shoot day with their quantity `qty` (every booking carries `qty`, 1 unless a
+  quotation set more). A personal agent (also of a freelancer)
   gets 404 on `GET /dispo` and `/dispo/free` (its owner's private disposition is not shared, as `/absences`); its shoot
   proposals keep working, their warnings name only the titles of projects it reads.
 - The disposition and the shoot proposals need the module *Disposition* switched on at the owner (personal agent) or at an

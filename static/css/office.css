@@ -1083,6 +1083,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.589.0 (#4571): the shoot days of the preview (office_docproject.js otk_dispoHtml) */
 .otkdh{margin:1rem 0 .25rem}
 .otkdhint{display:flex;align-items:flex-start;gap:.375rem;margin:.75rem 0 0}
+.otktbl .otkdwarn{color:var(--warn)}  /* 2.1158.0 (#4566 A): a device double booked in the period */
 .otktbl .otkd-need .dpbtn{box-shadow:0 0 0 2px var(--warn,var(--accent));border-radius:var(--r-s)}
 /* 2.187.0 A (#2476): the page "Rights" of the office's settings (office_rights.js): people, groups, log, my rights */
 .orr{max-width:var(--w-form);margin-inline:auto}  /* 2.580.0 (#4815): a form page of the office = --w-form, in the middle */

@@ -80,6 +80,13 @@ function cs_formHtml(cs) {
   const area = (k, label, ph = '', max = 1500) => `<div class="row"><label for="cs-${esc(k)}">${tr(label)}</label><textarea id="cs-${esc(k)}" data-f="${esc(k)}" rows="2" maxlength="${esc(String(max))}" placeholder="${esc(ph)}">${esc(d[k] || '')}</textarea></div>`;
   const cl = a.client || {}, prod = a.production || {};
   const calls = d.calls?.length ? d.calls : CS_CALL_DEPTS.map(x => ({dept: tr(x), time: ''}));
+  // 2.1158.0 (#4566 A): the packing list -- the devices booked for the day (from the quotation with their quantity), the rows
+  // without a device as text lines; ticking off is part of the day details (data.pack), saved with "Save"
+  const pack = a.pack || [], ticked = new Set(d.pack || []);
+  const packLi = x => `<li><label><input type="checkbox" data-pk="${esc(x.key)}" ${ticked.has(x.key) ? 'checked' : ''}><span class="cspq">${esc(String(x.qty))} ×</span> <span class="cspn">${esc(x.name)}</span>${x.set ? ` <small class="muted">(${esc(x.set)})</small>` : ''}${x.category ? ` <small class="muted cspc">${esc(x.category)}</small>` : ''}${x.text ? ` <small class="muted">${tr('text only')}</small>` : ''}</label></li>`;
+  const packHtml = `<details class="cssec cspacksec"${pack.length ? ' open' : ''}><summary>${tr('Packing list')}${pack.length ? ` <span class="muted cspcount">${esc(tr('{0} of {1} packed', pack.filter(x => ticked.has(x.key)).length, pack.length))}</span>` : ''}</summary>
+    ${pack.length ? `<ul class="cspack">${/*html-ok*/ pack.map(packLi).join('')}</ul>` : `<p class="muted">${tr('No equipment booked for this shoot day yet.')}</p>`}
+    <p class="muted cshint">${tr('The packing list comes from the equipment booked for this shoot day; what is ticked is kept with "Save".')}</p></details>`;
   const crew = (a.crew || []).map(p => `<li class="${p.open ? 'csopen' : ''}"><b>${esc(p.function || '')}</b> <span>${esc(p.name)}</span> <span class="muted">${esc([p.phone, p.mail].filter(Boolean).join(' · '))}</span></li>`).join('');
   return `${/*html-ok*/ cs_logosHtml(cs)}<h3>${tr('Call sheet')}: ${esc(a.project || a.title || '')}</h3>
     <p class="muted">${esc(fmtDayAbs(a.date))}${a.project && a.title ? ' · ' + esc(a.title) : ''}</p>
@@ -107,6 +114,7 @@ function cs_formHtml(cs) {
     <details class="cssec"${d.cast?.length ? ' open' : ''}><summary>${tr('Cast')}</summary>${/*html-ok*/ cs_rowsHtml('cast', d.cast || [])}</details>
     <details class="cssec"${d.transport?.length ? ' open' : ''}><summary>${tr('Transport')}</summary><p class="muted cshint">${tr('Empty call time: "Own arrangement".')}</p>${/*html-ok*/ cs_rowsHtml('transport', d.transport || [])}</details>
     <details class="cssec"><summary>${tr('Crew list')}</summary>${crew ? `<ul class="cscrew">${/*html-ok*/ crew}</ul>` : `<p class="muted">${tr('Nobody booked yet.')}</p>`}<p class="muted cshint">${tr('The crew comes from the bookings of this shoot day; phone numbers and e-mails from the address book.')}</p></details>
+    ${/*html-ok*/ packHtml}
     ${(a.shot_days || []).length ? `<div class="row"><label for="cs-shot_day">${tr('Shots of the day')}</label><select id="cs-shot_day" data-f="shot_day"><option value="">${tr('None')}</option>${a.shot_days.map(n => `<option value="${esc(n)}" ${d.shot_day === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
     <details class="cssec"${cs.sketch ? ' open' : ''}><summary>${tr('Directions sketch')}</summary>
       <div class="cssketch">${cs.sketch ? `<img src="${esc(cs.sketch_url)}&v=${esc(encodeURIComponent(cs.updated_at))}" alt="${esc(tr('Directions sketch'))}">` : `<p class="muted">${tr('A screenshot or drawing (PNG or JPEG); it gets a page of its own, with "Parking / directions" below it.')}</p>`}</div>
@@ -132,6 +140,8 @@ function cs_collect(md) {
     if (k === 'calls' && rows.every(r => !r.time)) continue;  // only the suggested departments without a time: nothing to keep
     if (rows.length) out[k] = rows;
   }
+  const pk = cs_all('[data-pk]', md).filter(x => x.checked).map(x => x.dataset.pk).sort();  // 2.1158.0 (#4566 A): ticked lines
+  if (pk.length) out.pack = pk;
   return out;
 }
 
@@ -220,6 +230,10 @@ async function cs_open(job, org) {
       if (card) { card.textContent = cs_ctCard(x); card.hidden = !x; }
       if (free) free.hidden = !!x;
       cs_logoDraw(k);  // 2.993.0 (#5650): the logo of the contact chosen
+    }
+    if (t.dataset?.pk) {  // 2.1158.0 (#4566 A): the count of the packing list follows the ticks (saved with "Save")
+      const all = cs_all('[data-pk]', md), cnt = cs_one('.cspcount', md);
+      if (cnt) cnt.textContent = tr('{0} of {1} packed', all.filter(x => x.checked).length, all.length);
     }
     if (t.id === 'cs-logofile' && t.files?.[0]) { await cs_logoUp(t.files[0], t.dataset.k); t.value = ''; return; }
     if (t.id === 'cs-loc_address') { const p = cs_one('.csmap', md); if (p) setHtml(p, t.value.trim() ? `<a href="${esc(cs_mapHref(t.value.trim()))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''); }

@@ -45,7 +45,11 @@ GET  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  the photo of a contac
 PUT  /api/team/dispo/callsheet/<job>/photo/<contact>?org=  {photo: data URI PNG / JPEG}: the contact's new photo (the logo)
 2.1155.0 (#5652): the call sheet by e-mail, the PDF attached, to the distribution (crew, agency, client; see cs_mail_post).
 GET  /api/team/dispo/callsheet/<job>/mail?org=   the form: the recipients, those without an address, subject, text, sender
-POST /api/team/dispo/callsheet/<job>/mail?org=   {to: [...], subject?, text?, preview?}: the preview, else one mail each"""
+POST /api/team/dispo/callsheet/<job>/mail?org=   {to: [...], subject?, text?, preview?}: the preview, else one mail each
+2.1158.0 (#4566 A): the packing list of the shoot day (cs_pack, in auto and the PDF): the devices booked for the day (a
+booking of a device, a set with its devices; from a quotation with its quantity, hub_bookings.qty) with category and
+quantity, plus the rows of the quotation's equipment set without a device of the master data as text lines. What is ticked
+off is part of the day details (data.pack: the keys of the ticked lines), saved like them through obj_write."""
 import base64
 import binascii
 import hashlib
@@ -79,6 +83,7 @@ from ..lists.templates import ptype_ok
 from ..office.model import pb_personal  # 2.988.0 (#5651): a private project's area
 from ..office.model import office_settings  # 2.993.0 (#5650): the office logo of the area
 from ..office.pdfweb import opdf_logo_path, opdf_logo_process  # 2.993.0 (#5650)
+from ..office.rights import ofr_allows  # 2.1158.0 (#4566 A): the packing list's categories / text lines
 from ..contacts.model import PHOTO_MAX, book_role, need_contact  # 2.993.0 (#5650): a logo = the contact's photo
 from ..contacts.web import op_contact_edit  # 2.993.0 (#5650): the contacts' own way of saving it
 from ..office.pdf import (A4_H, C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, _Page, pdf_date, pdf_image_object,
@@ -102,6 +107,8 @@ CS_ROWS = {"calls": (("dept", "time"), 30),
 CS_CELL = 200
 CS_REFS = ("client_contact", "agency_contact")  # 2.986.0 (#5649): contact ids of the day details
 CS_CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+CS_PACK_RE = re.compile(r"^(e:[1-9][0-9]{0,17}|t:[0-9a-f]{10})$")  # 2.1158.0 (#4566 A): a line of the packing list (cs_pack)
+CS_PACK_MAX = 300
 
 
 # ---------------------------------------------------------------- reading
@@ -317,6 +324,71 @@ def cs_shot_days(c, uid, proj):
     return sht_days(c, uid, proj["list_id"])
 
 
+def cs_pack(c, uid, oid, rows):
+    """2.1158.0 (#4566 A): the packing list of the shoot day: [{key, name, category, qty, set, text}] -- the devices of its
+    bookings (key "e:<device>"; a set: each of its devices, set = the set's name; the same device twice = the quantities added
+    up), then the rows of the quotation's equipment set without a device of the master data (key "t:<hash of the name>",
+    text True). Category and the text lines only for a person who may see the equipment area (office/rights.py ofr_allows,
+    like the disposition's resources); the booked devices' names everybody of the disposition sees anyway."""
+    from ..office.offerdispo import odp_set_rows
+    eq_ok = ofr_allows(c, uid, oid, "equipment")
+    out = {}
+
+    def add(eid, name, qty, set_name=""):
+        k = f"e:{int(eid)}"
+        if k in out:
+            out[k]["qty"] += qty
+        else:
+            out[k] = {"key": k, "eid": int(eid), "name": name or "?", "category": "", "qty": qty, "set": set_name, "text": False}
+
+    names = {}
+    for b in rows:
+        q = max(1, int(b.get("qty") or 1))
+        if b["resource_kind"] == "equipment":
+            add(b["resource_id"], b["res_label"], q)
+        elif b["resource_kind"] == "set":
+            r = c.execute("SELECT name, items FROM office_sets WHERE id=? AND org_id=?", (b["resource_id"], oid)).fetchone()
+            try:
+                items = json.loads((r["items"] if r else "") or "[]")
+            except ValueError:
+                items = []
+            for it in items if isinstance(items, list) else []:
+                if isinstance(it, dict) and str(it.get("equipment_id", "")).isdigit():
+                    try:
+                        n = max(1, int(float(it.get("qty") or 1)))
+                    except (TypeError, ValueError):
+                        n = 1
+                    add(int(it["equipment_id"]), "", n * q, (r["name"] if r else "") or b["res_label"] or "")
+    ids = sorted({x["eid"] for x in out.values()})
+    if ids:
+        for e in c.execute(f"SELECT id, name, category FROM office_equipment WHERE org_id=? AND id IN ({','.join('?' * len(ids))})", (oid, *ids)):
+            names[e["id"]] = (e["name"] or "", e["category"] or "")
+    for x in out.values():
+        nm, cat = names.get(x["eid"], ("", ""))
+        if x["name"] == "?" or not x["name"]:
+            x["name"] = nm or "?"
+        x["category"] = cat if eq_ok else ""
+    lines = sorted(out.values(), key=lambda x: (x["category"].casefold(), x["name"].casefold(), x["eid"]))
+    if eq_ok:
+        seen, text = set(), {}
+        for b in rows:
+            m = re.match(r"^d:([1-9][0-9]{0,17}):", b.get("offer_pos") or "")
+            if not m or not b.get("offer_doc") or (b["offer_doc"], m.group(1)) in seen:
+                continue
+            seen.add((b["offer_doc"], m.group(1)))
+            dr = c.execute("SELECT lang FROM office_docs WHERE id=? AND org_id=?", (b["offer_doc"], oid)).fetchone()
+            if dr is None:
+                continue
+            for t in odp_set_rows(c, oid, b["offer_doc"], m.group(1), dr["lang"])[1]:
+                k = "t:" + hashlib.sha256(t["name"].casefold().encode()).hexdigest()[:10]
+                if k in text:
+                    text[k]["qty"] += t["qty"]
+                else:
+                    text[k] = {"key": k, "eid": None, "name": t["name"], "category": "", "qty": t["qty"], "set": "", "text": True}
+        lines += list(text.values())
+    return [{k: v for k, v in x.items() if k != "eid"} for x in lines[:CS_PACK_MAX]]
+
+
 def cs_when(rows):
     """(first day ISO, first time "HH:MM" or "", last time or "") of the job."""
     d0 = min(b["start"][:10] for b in rows)
@@ -342,6 +414,7 @@ def cs_auto(c, uid, oid, rows, d=None, choice=True):
             "client_contact": cs_contact(c, uid, oid, d.get("client_contact"), books, wb),
             "agency_contact": cs_contact(c, uid, oid, d.get("agency_contact"), books, wb),
             "agency_default": cs_contact(c, uid, oid, proj.get("agency_id"), books, wb),
+            "pack": cs_pack(c, uid, oid, rows),  # 2.1158.0 (#4566 A)
             **({"contacts": cs_contacts(c, uid, oid, books, wb)} if choice else {})}
 
 
@@ -382,6 +455,11 @@ def cs_clean(d):
         if not isinstance(v, int) or isinstance(v, bool) or not 0 < v < 2 ** 62:
             raise BadInput(tr("Invalid value: {0}", k))
         out[k] = v
+    v = d.get("pack")  # 2.1158.0 (#4566 A): the ticked lines of the packing list (cs_pack keys), sorted, each once
+    if v is not None:
+        if not isinstance(v, list) or len(v) > CS_PACK_MAX or not all(isinstance(x, str) and CS_PACK_RE.match(x) for x in v):
+            raise BadInput(tr("Invalid value: {0}", "pack"))
+        out["pack"] = sorted(set(v))
     for k, (cols, most) in CS_ROWS.items():
         v = d.get(k)
         if v is None:
@@ -936,7 +1014,8 @@ def cs_pdf(c, uid, oid, job, rows):
     if d.get("shot_day"):
         shots = next((s for n, s in cs_shot_days(c, uid, {"shoot": bool(a["shot_days"]), "list_id": a["list_id"]}) if n == d["shot_day"]), [])
     att = [T(N_("Crew list"))] + ([T(N_("Cast"))] if cast else []) + ([T(N_("Transport"))] if d.get("transport") else []) + \
-          ([T(N_("Shots of the day"))] if shots else []) + ([T(N_("Directions sketch"))] if r and r.get("sketch") else []) + \
+          ([T(N_("Shots of the day"))] if shots else []) + ([T(N_("Packing list"))] if a["pack"] else []) + \
+          ([T(N_("Directions sketch"))] if r and r.get("sketch") else []) + \
           [x.strip() for x in (d.get("attachments") or "").splitlines() if x.strip()]
     doc.kv(T(N_("Attachments")), ", ".join(att))
     # page 2+: cast, crew, transport, shots
@@ -962,6 +1041,11 @@ def cs_pdf(c, uid, oid, job, rows):
                                    (T(N_("Call time")), .16)],
                   [[x.get("vehicle", ""), x.get("from", ""), x.get("to", ""), x.get("riders", ""), x.get("cargo", ""),
                     x.get("call", "") or T(N_("Own arrangement"))] for x in d["transport"]])
+    if a["pack"]:  # 2.1158.0 (#4566 A): the packing list, ticked lines with [x]
+        ticked = set(d.get("pack") or [])
+        doc.table(T(N_("Packing list")), [("", .06), (T(N_("Device")), .46), (T(N_("Category")), .3), (T(N_("Quantity")), .18)],
+                  [["[x]" if x["key"] in ticked else "[  ]", x["name"] + (f" ({x['set']})" if x["set"] else ""), x["category"],
+                    str(x["qty"])] for x in a["pack"]])
     if shots:
         doc.table(T(N_("Shots of the day")) + ": " + d["shot_day"], [(T(N_("No.")), .07), (T(N_("Shot|shoot")), .33), (T(N_("Scene|shot")), .12),
                                                                  (T(N_("Shot size")), .16), (T(N_("Lens|shot")), .12), (T(N_("Location|shot")), .2)],

@@ -18560,5 +18560,16 @@
   "To ({0})": "Aan ({0})",
   "Without an e-mail address: {0}": "Zonder e-mailadres: {0}",
   "No receipts here yet": "Hier zijn nog geen bonnen",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Bonnen blijven in hun eigen onderdeel. Open er een om hem daar te bekijken, te wijzigen of te boeken."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Bonnen blijven in hun eigen onderdeel. Open er een om hem daar te bekijken, te wijzigen of te boeken.",
+  "Equipment: {0}": "Apparatuur: {0}",
+  "Already booked in this period: {0}": "In deze periode al geboekt: {0}",
+  "Only on the packing list (no device in the master data): {0}": "Alleen op de paklijst (geen apparaat in de stamgegevens): {0}",
+  "Equipment is not booked: you have no access to the equipment area.": "Apparatuur wordt niet geboekt: je hebt geen toegang tot het onderdeel Apparatuur.",
+  "The devices of its equipment set are pencilled in too and make the packing list of the call sheet.": "De apparaten van het techniekpakket worden ook voorlopig geboekt en vormen de paklijst van de callsheet.",
+  "Equipment pencilled in: {0}": "Apparaten voorlopig geboekt: {0}",
+  "Double booked equipment: {0}": "Dubbel geboekte apparaten: {0}",
+  "text only": "alleen tekst",
+  "{0} of {1} packed": "{0} van {1} ingepakt",
+  "No equipment booked for this shoot day yet.": "Voor deze draaidag is nog geen apparatuur geboekt.",
+  "The packing list comes from the equipment booked for this shoot day; what is ticked is kept with \"Save\".": "De paklijst komt uit de voor deze draaidag geboekte apparatuur; wat is afgevinkt blijft bewaard met ‘Opslaan’."
 }

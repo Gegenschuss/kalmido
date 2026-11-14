@@ -10,7 +10,7 @@ const DP_GROUPS = [['slots', N_('Open places')], ['people', N_('People')], ['con
 // 2.589.0 (#4571): a shoot day from a quotation: open places of a crew function (kind slot) and the marks a newer version left
 const DP_MARK = {changed: N_('The quotation changed: please check this booking'), gone: N_('No longer in the quotation')};
 const dp_mark = b => b.offer_mark ? tr(DP_MARK[b.offer_mark] || b.offer_mark) : '';
-const dp_label = b => b.kind === 'slot' ? tr('Open: {0}', b.label) : b.slot ? `${b.slot}: ${b.label}` : b.label;
+const dp_label = b => b.kind === 'slot' ? tr('Open: {0}', b.label) : b.slot ? `${b.slot}: ${b.label}` : b.qty > 1 ? `${b.qty} × ${b.label}` : b.label;  // 2.1158.0 (#4566 A): + quantity
 
 async function dp_load() {
   const seq = ++DPV.seq;

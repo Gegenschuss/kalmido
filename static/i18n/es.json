@@ -18560,5 +18560,16 @@
   "To ({0})": "Para ({0})",
   "Without an e-mail address: {0}": "Sin dirección de correo: {0}",
   "No receipts here yet": "Aquí todavía no hay recibos",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Los recibos se quedan en su área. Abre uno para verlo, cambiarlo o contabilizarlo allí."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Los recibos se quedan en su área. Abre uno para verlo, cambiarlo o contabilizarlo allí.",
+  "Equipment: {0}": "Equipo: {0}",
+  "Already booked in this period: {0}": "Ya reservado en este periodo: {0}",
+  "Only on the packing list (no device in the master data): {0}": "Solo en la lista de carga (sin equipo en los datos maestros): {0}",
+  "Equipment is not booked: you have no access to the equipment area.": "El equipo no se reserva: no tienes acceso al área de equipo.",
+  "The devices of its equipment set are pencilled in too and make the packing list of the call sheet.": "Los equipos de su paquete técnico también se reservan provisionalmente y forman la lista de carga de la hoja de rodaje.",
+  "Equipment pencilled in: {0}": "Equipos reservados provisionalmente: {0}",
+  "Double booked equipment: {0}": "Equipos con doble reserva: {0}",
+  "text only": "solo texto",
+  "{0} of {1} packed": "{0} de {1} cargados",
+  "No equipment booked for this shoot day yet.": "Todavía no hay equipo reservado para este día de rodaje.",
+  "The packing list comes from the equipment booked for this shoot day; what is ticked is kept with \"Save\".": "La lista de carga sale del equipo reservado para este día de rodaje; lo marcado se guarda con «Guardar»."
 }

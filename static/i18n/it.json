@@ -18561,5 +18561,16 @@
   "To ({0})": "A ({0})",
   "Without an e-mail address: {0}": "Senza indirizzo e-mail: {0}",
   "No receipts here yet": "Qui non ci sono ancora ricevute",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Le ricevute restano nella loro area. Aprine una per vederla, modificarla o registrarla lì."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Le ricevute restano nella loro area. Aprine una per vederla, modificarla o registrarla lì.",
+  "Equipment: {0}": "Attrezzatura: {0}",
+  "Already booked in this period: {0}": "Già prenotato in questo periodo: {0}",
+  "Only on the packing list (no device in the master data): {0}": "Solo nella lista di carico (nessun dispositivo nei dati anagrafici): {0}",
+  "Equipment is not booked: you have no access to the equipment area.": "L'attrezzatura non viene prenotata: non hai accesso all'area Attrezzatura.",
+  "The devices of its equipment set are pencilled in too and make the packing list of the call sheet.": "Anche i dispositivi del suo pacchetto tecnico vengono prenotati in opzione e formano la lista di carico dell'ordine del giorno.",
+  "Equipment pencilled in: {0}": "Dispositivi prenotati in opzione: {0}",
+  "Double booked equipment: {0}": "Dispositivi prenotati due volte: {0}",
+  "text only": "solo testo",
+  "{0} of {1} packed": "{0} di {1} caricati",
+  "No equipment booked for this shoot day yet.": "Per questo giorno di riprese non è ancora prenotata alcuna attrezzatura.",
+  "The packing list comes from the equipment booked for this shoot day; what is ticked is kept with \"Save\".": "La lista di carico deriva dall'attrezzatura prenotata per questo giorno di riprese; ciò che è spuntato resta con «Salva»."
 }

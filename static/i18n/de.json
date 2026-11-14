@@ -18560,5 +18560,16 @@
   "To ({0})": "An ({0})",
   "Without an e-mail address: {0}": "Ohne E-Mail-Adresse: {0}",
   "No receipts here yet": "Hier gibt es noch keine Belege",
-  "Receipts stay in their area. Open one to view, change or book it there.": "Belege bleiben in ihrem Bereich. Öffne einen, um ihn dort anzusehen, zu ändern oder zu buchen."
+  "Receipts stay in their area. Open one to view, change or book it there.": "Belege bleiben in ihrem Bereich. Öffne einen, um ihn dort anzusehen, zu ändern oder zu buchen.",
+  "Equipment: {0}": "Technik: {0}",
+  "Already booked in this period: {0}": "In diesem Zeitraum schon gebucht: {0}",
+  "Only on the packing list (no device in the master data): {0}": "Nur auf der Packliste (kein Gerät in den Stammdaten): {0}",
+  "Equipment is not booked: you have no access to the equipment area.": "Technik wird nicht gebucht: Du hast keinen Zugriff auf den Bereich Technik.",
+  "The devices of its equipment set are pencilled in too and make the packing list of the call sheet.": "Die Geräte seines Technik-Pakets werden ebenfalls vorläufig gebucht und bilden die Packliste des Call Sheets.",
+  "Equipment pencilled in: {0}": "Geräte vorläufig gebucht: {0}",
+  "Double booked equipment: {0}": "Doppelt gebuchte Geräte: {0}",
+  "text only": "nur Text",
+  "{0} of {1} packed": "{0} von {1} gepackt",
+  "No equipment booked for this shoot day yet.": "Für diesen Drehtag ist noch keine Technik gebucht.",
+  "The packing list comes from the equipment booked for this shoot day; what is ticked is kept with \"Save\".": "Die Packliste kommt aus der für diesen Drehtag gebuchten Technik; Abgehaktes bleibt mit „Speichern“."
 }

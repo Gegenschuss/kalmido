@@ -198,6 +198,8 @@ def _msg(c, run, src, d, ctx):
 # 2.671.0 (#5097): the place key of a booking the disposition made from a quotation (office/offerdispo.py odp_days):
 # d:<part origin id>:<crew row uid>:<n>; the crew row uid is carried over as it is (only the part id is mapped)
 _OI_BOOK_POS = re.compile(r"d:([1-9][0-9]{0,17}):([^\n]{0,200}):([1-9][0-9]{0,3})")
+# 2.1158.0 (#4566 A): a device of the quotation's equipment set: d:<part origin id>:g:<equipment id> (the device is mapped too)
+_OI_GEAR_POS = re.compile(r"d:([1-9][0-9]{0,17}):g:([1-9][0-9]{0,17})")
 
 
 def _booking_offer(run, src, d, ctx):
@@ -209,6 +211,16 @@ def _booking_offer(run, src, d, ctx):
         return
     doc = run.m("office_docs", src.get("offer_doc"))
     root = run.m("office_docs", src.get("offer_root")) or doc
+    gm = _OI_GEAR_POS.fullmatch(str(src.get("offer_pos") or ""))  # 2.1158.0 (#4566 A)
+    if gm:
+        part = _oi_origins(run, ctx.data).get(("office_doc_parts", int(gm.group(1)))) if root else None
+        eq = run.m("office_equipment", int(gm.group(2))) if part else None
+        if not eq:
+            d.update(offer_root=None, offer_doc=None, offer_pos="", offer_mark="")
+            return
+        mark = src.get("offer_mark") if src.get("offer_mark") in ("changed", "gone") else ""
+        d.update(offer_root=root, offer_doc=doc or root, offer_pos=f"d:{part}:g:{eq}", offer_mark=mark)
+        return
     m = _OI_BOOK_POS.fullmatch(str(src.get("offer_pos") or ""))
     part = _oi_origins(run, ctx.data).get(("office_doc_parts", int(m.group(1)))) if m and root else None
     if not part:
