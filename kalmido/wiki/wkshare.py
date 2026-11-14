@@ -376,12 +376,14 @@ def wsh_end(c, uid, fid, reason="unshare"):
     if n is None:
         return None
     pair = None
+    log = not (k is not None and k["email"])  # 2.1138.0 (#6025): by address, no history line
     if k is not None and k["pair_id"]:
         pn = _wsh_node(c, k["pair_id"])
         if pn is not None:
             pair = obj_node_unshare(c, uid, pn, k["pair_id"], kind="wiki", ref_id=pn["ref_id"] if pn["kind"] == "ref" else None,
-                                    org=pn["org_id"] or None, reason=reason)  # 2.969.0 (#5644): the pair's row names its space too
-    rv = obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None, reason=reason)
+                                    org=pn["org_id"] or None, reason=reason, log=log)  # 2.969.0 (#5644): the pair's row names its space too
+    rv = obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None, reason=reason,
+                          log=log)
     if rv:  # Fable F2: a share without a card (listed as a page share) gets an empty one, so its Undo works the same way
         x = c.execute("SELECT row_json FROM obj_revoked WHERE id=?", (rv,)).fetchone()
         d = json.loads(x["row_json"] or "{}")
@@ -676,7 +678,8 @@ def wsh_create():
             raise Denied(404)
         had = c.execute("SELECT 1 FROM fs_shares f JOIN wiki_share_cards k ON k.fs_share_id=f.id WHERE f.node_id=? AND f.user_id=? "
                         "AND (f.expires_at IS NULL OR f.expires_at>?)", (nodes[0]["id"], who, ts)).fetchone()
-        ids = [obj_node_share(c, uid, n, "user_id", who, "view", exp, None) for n in nodes]
+        # 2.1138.0 (#6025): by address no line of the node's history names the account (an open share writes none either)
+        ids = [obj_node_share(c, uid, n, "user_id", who, "view", exp, None, log=not by_mail) for n in nodes]
         sid = ("person", ids[0])
         # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
         mail = seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else ""
@@ -832,7 +835,8 @@ def wsh_update(sid):
                 for fid in (r["fid"], r["pair_id"]):
                     n = _wsh_node(c, fid) if fid else None
                     if n is not None:
-                        obj_node_share(c, me(), n, "user_id", r["user_id"], r["role"] if r["role"] in ("view", "edit") else "view", exp, None)
+                        obj_node_share(c, me(), n, "user_id", r["user_id"], r["role"] if r["role"] in ("view", "edit") else "view", exp, None,
+                                       log=not r["token"])  # 2.1138.0 (#6025): by address, no history line
             if "images" in b:  # Fable F2: a share listed without a card gets one here
                 c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,images,email) VALUES(?,?,?,'') ON CONFLICT (fs_share_id) "
                           "DO UPDATE SET images=excluded.images", (r["fid"], bool(r["is_folder"]), bool(imgs)))
@@ -908,11 +912,11 @@ def wsh_restore(sid):
         rv = wsh_revoked(c, n)
         k = json.loads(rv["row_json"]).get("wiki_card") or {}
         from ..core.objects import obj_node_reshare
-        back = obj_node_reshare(c, rv["id"], owner=uid, org=None)  # 2.969.0 (#5644): the node must still be uid's private one
+        back = obj_node_reshare(c, rv["id"], owner=uid, org=None, log=not k.get("email"))  # 2.969.0 (#5644): the node must still be uid's private one
         if back is None:  # the person has a share of that node again (or the node went): nothing to bring back
             c.commit()
             raise Denied(409, tr("Already shared"))
-        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
+        pair = obj_node_reshare(c, k["pair"], owner=uid, org=None, log=not k.get("email")) if k.get("pair") else None  # #5644: the pair too (else 409, all rolled back)
         c.execute("INSERT INTO wiki_share_cards(fs_share_id,folder,pair_id,images,email) VALUES(?,?,?,?,?) ON CONFLICT (fs_share_id) DO NOTHING",
                   (n, bool(k.get("folder")), pair[0] if pair else None, bool(k.get("images")), k.get("email") or ""))
         bump(c)

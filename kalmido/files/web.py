@@ -20,6 +20,7 @@ from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
 from .store import download_name  # 2.750.0 (#4876)
+from .store import FS_NOT_ADDR  # 2.1138.0 (#6025)
 from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
@@ -88,7 +89,8 @@ def _shared_flags(c, ids):
     if not ids:
         return set()
     q = ",".join("?" * len(ids))
-    return {r[0] for r in c.execute(f"SELECT DISTINCT node_id FROM fs_shares WHERE node_id IN ({q}) AND COALESCE(list_own, 0)=0",
+    return {r[0] for r in c.execute(f"SELECT DISTINCT node_id FROM fs_shares WHERE node_id IN ({q}) AND COALESCE(list_own, 0)=0 "
+                                    f"AND {FS_NOT_ADDR.format(a='fs_shares')}",  # 2.1138.0 (#6025)
                                     list(ids))}  # 2.568.0 (#4739, review F6): a project's member rows are no file store share
 
 
@@ -357,8 +359,9 @@ def _versions(c, nid):
 def _shares(c, nid, own=False):
     # 2.568.0 (#4739): a project's own member shares (list_own, written by its members dialog through the core) are no shares
     # of this dialog; own=True lists them too (core/objects.py obj_shares)
-    rows = c.execute("SELECT * FROM fs_shares WHERE node_id=?" + ("" if own else " AND COALESCE(list_own, 0)=0") + " ORDER BY id",
-                     (nid,)).fetchall()
+    # 2.1138.0 (#6025): never a share by e-mail address of the knowledge dialog (files/store.py FS_NOT_ADDR)
+    rows = c.execute("SELECT * FROM fs_shares WHERE node_id=?" + ("" if own else " AND COALESCE(list_own, 0)=0")
+                     + f" AND {FS_NOT_ADDR.format(a='fs_shares')} ORDER BY id", (nid,)).fetchall()
     names = _names(c, [r["user_id"] or r["agent_id"] for r in rows])
     gq = [r["group_id"] for r in rows if r["group_id"]]
     gn = {}
@@ -961,7 +964,8 @@ def _agent_event(c, aid, n, role):
 @app.patch("/api/files/shares/<int:sid>")
 def files_share_patch(sid):
     c = db()
-    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0", (sid,)).fetchone()  # #4739: the members dialog's
+    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0 "  # #4739: the members dialog's
+                  f"AND {FS_NOT_ADDR.format(a='fs_shares')}", (sid,)).fetchone()  # 2.1138.0 (#6025): the knowledge dialog's by address
     if not s:
         raise Denied(404)
     _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
@@ -994,7 +998,8 @@ def files_share_patch(sid):
 @app.delete("/api/files/shares/<int:sid>")
 def files_share_delete(sid):
     c = db()
-    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0", (sid,)).fetchone()  # #4739: the members dialog's
+    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0 "  # #4739: the members dialog's
+                  f"AND {FS_NOT_ADDR.format(a='fs_shares')}", (sid,)).fetchone()  # 2.1138.0 (#6025): the knowledge dialog's by address
     if not s:
         raise Denied(404)
     n = _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)

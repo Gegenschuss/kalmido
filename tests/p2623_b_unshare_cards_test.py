@@ -5,7 +5,8 @@ page's or folder's node marks the card in sheet_shares / wiki_shares ended (revo
 an older version after a rollback reads only the card and must not open the share again. Invented names only.
  - tables: the card of an organisation's table is marked, the guest reads nothing; Undo (share again) opens the card again
  - freelancer-matrix: sheets, wiki (a private table shared by address: the card goes, as in the table's dialog; a page and a
-   folder of a person without an organisation: the card is marked, the folder card ends as a whole -- both core shares)
+   folder of a person without an organisation: the card is marked, the folder card ends as a whole -- both core shares;
+   2.1138.0 #6025: shared by address, they end in the knowledge dialog -- the file store's dialog answers 404 for them)
  - a share made in the file store on a table's node (no card) goes into obj_revoked too; a plain folder's share is deleted
    and (2.747.0, #5246) kept in obj_revoked as well (reason unshare, no kind)
  - tenant-matrix: sheet_share (a person of another workspace cannot take the share back: 404, the card stays)
@@ -151,9 +152,13 @@ FS1 = card[0][0] if card else 0
 check(not dbx("SELECT 1 FROM wiki_shares WHERE kind<>'link'"), "#5244: wiki_shares holds no person row")
 # 2.1115.0 (#5967): a share by address has the dialog's id "e<..>" (p<n> of it is refused), taken from the dialog first
 E1 = next((x["id"] for x in Fr.get(B + f"/api/wiki/shares?page={W1}").json().get("shares", []) if x["kind"] == "person"), "")
-r = Fr.delete(B + f"/api/files/shares/{FS1}")
+# 2.1138.0 (#6025): the file store's dialog does not list or reach a share by address any more (its account would show):
+# it ends in the knowledge dialog, the same core step (wsh_end)
+check(Fr.delete(B + f"/api/files/shares/{FS1}").status_code == 404 and W1 in shared(Fi),
+      "#6025: the file store's dialog does not reach the share by address (404), fiona still reads")
+r = Fr.delete(B + f"/api/wiki/shares/{E1}")
 check(r.ok and W1 not in shared(Fi) and Fi.get(B + f"/api/wiki/shared/pages/{W1}").status_code == 404,
-      f"taken back in the file store's dialog: fiona reads nothing {r.status_code}")
+      f"taken back in the knowledge dialog: fiona reads nothing {r.status_code}")
 check(not dbx("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (FS1,)), "#4778: the card went with its share")
 check(revoked("wiki", W1) == 1, "... the row in obj_revoked")
 check(Fr.post(B + f"/api/wiki/shares/p{FS1}/restore").status_code == 404, "#5967: the p<n> form of a share by address is refused")
@@ -172,7 +177,11 @@ fc = dbx("SELECT k.fs_share_id, k.pair_id FROM wiki_share_cards k JOIN fs_shares
 check(bool(fc and fc[0][0] and fc[0][1]), f"the folder card has two core shares {fc}")
 C1, C2 = fc[0] if fc else (0, 0)
 check(W3 in shared(Fi), "fiona reads the folder's page")
-check(Fr.delete(B + f"/api/files/shares/{C1}").ok, "the folder's core share taken back in the file store's dialog")
+# 2.1138.0 (#6025): shared by address -- 404 in the file store's dialog, ended as a whole in the knowledge dialog
+check(Fr.delete(B + f"/api/files/shares/{C1}").status_code == 404, "#6025: the file store's dialog does not reach the folder card (404)")
+EF = next((x["id"] for x in Fr.get(B + "/api/wiki/shares", params={"space": "private", "folder": "Docs"}).json().get("shares", [])
+           if x["kind"] == "person" and x.get("direct")), "e0")
+check(Fr.delete(B + f"/api/wiki/shares/{EF}").ok, "the folder card taken back in the knowledge dialog")
 check(not dbx("SELECT 1 FROM wiki_share_cards WHERE fs_share_id=?", (C1,)), "#4778: the folder card ended")
 check(not dbx("SELECT 1 FROM fs_shares WHERE id IN (?, ?)", (C1, C2)), "... its other core share went with it")
 check(W2 not in shared(Fi) and W3 not in shared(Fi), "... fiona reads none of its pages")
